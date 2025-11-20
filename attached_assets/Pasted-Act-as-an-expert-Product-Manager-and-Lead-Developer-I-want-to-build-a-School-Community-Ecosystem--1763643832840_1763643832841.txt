@@ -1,0 +1,52 @@
+Act as an expert Product Manager and Lead Developer. I want to build a "School Community Ecosystem" web app. I don't know how to code, so I need you to handle all logic, database structures, and UI designs smartly.
+
+Here is the full logic and behavioral blueprint for the app:
+
+### 1. The Core Philosophy
+This is a social platform for students, teachers, and admins. It relies on "Reputation" and "Secret Access Codes" to manage chaos. It needs to be secure, fun (gamified), and self-sustaining even as students graduate.
+
+### 2. The "Inheritance" & Admin System (Crucial)
+* **Admins:** Have special UI (Gold frames, unique fonts).
+* **The Problem:** Admins graduate.
+* **The Solution (Succession):** Build a "Handover Protocol." An Admin can appoint a "Successor." With one button click, the Admin transfers all privileges/ownership to the Successor and downgrades themselves to "Alumni/Retired" status.
+
+### 3. Access & The "Key" System
+* **Login:** Simple Email/Phone login. Keeps users logged in.
+* **Scopes:**
+    1.  **Global/Public:** Accessible to everyone.
+    2.  **Stage (Grade) Level:** 6 Stages.
+    3.  **Section (Class) Level:** e.g., Class 10-A.
+* **The Code Logic:**
+    * Users can READ anything.
+    * To WRITE (Post news, edit schedule) in a specific Stage/Section, they need a "Access Code."
+    * **Smart Feature:** Once a user enters the code correctly *once*, save it to their profile as a "Digital Key." Don't ask for it again every time they post.
+
+### 4. News Feed & Content (The Social Engine)
+* **Public Square:** A feed where ANY logged-in student can post without a code.
+* **Restricted Feeds:** News for specific Stages/Sections (requires the Digital Key).
+* **Media Support:** Posts must support Text, Voice Notes (Audio), Images, GIFs, Stickers, Polls, and Quizzes.
+* **Credibility Engine:**
+    * Every post AND every User Profile Bio has a "Credibility Rating" (Truthful vs. Fake).
+    * *Safety Logic:* If a user's credibility drops too low due to spam/bullying, their account turns "Red" (Threatened) automatically.
+
+### 5. Events & Schedules
+* **Events:** Can be marked as "Curricular" or "Extracurricular." Students can RSVP.
+* **Schedules:** A flexible grid (5-7 periods + breaks).
+    * Only editable by users holding the "Section Key."
+    * Include fields for Teacher Name and Subject.
+
+### 6. Teacher Profiles & Reviews
+* **Static Data:** Name, Photo, Certificates.
+* **Dynamic Data:** "Classroom Rules" (e.g., Allows Water, No Food).
+* **Reviews:** Students can rate teachers. Admins moderate these pages.
+
+### 7. Gamification & Stats
+* **Reputation Score:** Calculated from: News activity + Credibility rating + Event participation.
+* **Ranks:** Titles like "Pioneer," "Contributor" appear next to names.
+* **Privacy:** Clicking a student's name shows their *Stats Card* (Score, Rank, Badges) but HIDES personal info (Phone, Transport details).
+
+### 8. Visuals & UI
+* **Theme:** Dark/Light mode toggle.
+* **Admin Distinction:** Admins must look visually different (special avatar borders, colored chat bubbles).
+
+**Please start by creating the database schema and the backend logic to handle this "Key System" and "Credibility Algorithm," then build the frontend.**
