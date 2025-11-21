@@ -275,7 +275,7 @@ export default function EventsPage() {
       });
       setSelectedScope(null);
       setShowCreateForm(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events", globalScope?.id] });
     },
     onError: (error: Error) => {
       toast({

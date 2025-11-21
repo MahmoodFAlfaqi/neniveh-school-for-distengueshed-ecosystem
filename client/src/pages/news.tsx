@@ -37,11 +37,12 @@ export default function NewsPage() {
   // Check if user has access to selected scope
   const hasAccess = useHasAccessToScope(selectedScope);
 
-  // Fetch global news posts (scopeId = null for Public Square)
+  // Fetch news posts for the selected scope (or all global posts if no scope selected)
   const { data: posts = [], isLoading } = useQuery<Post[]>({
-    queryKey: ["/api/posts", null],
+    queryKey: ["/api/posts", selectedScope],
     queryFn: async () => {
-      const response = await fetch("/api/posts?scopeId=null");
+      const scopeParam = selectedScope === null ? "null" : selectedScope;
+      const response = await fetch(`/api/posts?scopeId=${scopeParam}`);
       if (!response.ok) throw new Error("Failed to fetch posts");
       return response.json();
     },
@@ -71,8 +72,7 @@ export default function NewsPage() {
         description: "Your news has been shared successfully",
       });
       setNewPost("");
-      setSelectedScope(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/posts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/posts", selectedScope] });
     },
     onError: (error: Error) => {
       toast({
