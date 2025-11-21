@@ -558,6 +558,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const eventData = insertEventSchema.parse(eventPayload);
+      
+      // If creating event in a restricted scope, verify user has access
+      if (eventData.scopeId) {
+        const hasAccess = await storage.hasAccessToScope(req.session.userId!, eventData.scopeId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: "You don't have access to create events in this scope. Please enter the access code first." });
+        }
+      }
+      
       const event = await storage.createEvent(eventData);
       res.status(201).json(event);
     } catch (error) {
