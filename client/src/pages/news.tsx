@@ -105,7 +105,7 @@ export default function NewsPage() {
           <CardHeader>
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10">
-                <AvatarImage src={user?.avatarUrl} />
+                <AvatarImage src={user?.avatarUrl || undefined} />
                 <AvatarFallback>{user?.name?.charAt(0) || "U"}</AvatarFallback>
               </Avatar>
               <div>

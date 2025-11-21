@@ -589,6 +589,8 @@ export class DatabaseStorage implements IStorage {
           credibilityRating: posts.credibilityRating,
           mediaUrl: posts.mediaUrl,
           mediaType: posts.mediaType,
+          likesCount: posts.likesCount,
+          commentsCount: posts.commentsCount,
           createdAt: posts.createdAt,
           authorName: users.name,
           authorRole: users.role,
