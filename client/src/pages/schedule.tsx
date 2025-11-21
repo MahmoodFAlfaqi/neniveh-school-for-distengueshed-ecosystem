@@ -278,10 +278,19 @@ export default function SchedulePage() {
         {/* Calendar with Events */}
         <Card>
           <CardHeader>
-            <CardTitle>Upcoming Events</CardTitle>
-            <CardDescription>
-              Showing events you're attending and events for your class/grade
-            </CardDescription>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle>Upcoming Events</CardTitle>
+                <CardDescription>
+                  Showing events you're attending and events for your class/grade
+                </CardDescription>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-semibold">
+                  {today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </div>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-7 gap-2">
@@ -309,15 +318,20 @@ export default function SchedulePage() {
                       {dayEvents.slice(0, 2).map(event => {
                         const isRsvped = rsvpedEventIds.has(event.id);
                         return (
-                          <div
+                          <Link
                             key={event.id}
-                            className={`text-xs p-1 rounded truncate ${
-                              isRsvped ? 'bg-primary text-primary-foreground' : 'bg-accent text-accent-foreground'
-                            }`}
-                            title={event.title}
+                            href={`/events/${event.id}`}
+                            data-testid={`link-event-badge-${event.id}`}
                           >
-                            {event.title}
-                          </div>
+                            <div
+                              className={`text-xs p-1 rounded truncate cursor-pointer hover-elevate ${
+                                isRsvped ? 'bg-primary text-primary-foreground' : 'bg-accent text-accent-foreground'
+                              }`}
+                              title={event.title}
+                            >
+                              {event.title}
+                            </div>
+                          </Link>
                         );
                       })}
                       {dayEvents.length > 2 && (
@@ -330,75 +344,6 @@ export default function SchedulePage() {
                 );
               })}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Event List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Events</CardTitle>
-            <CardDescription>
-              Click on any event to view full details
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {relevantEvents.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No upcoming events
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {relevantEvents.map(event => {
-                  const isRsvped = rsvpedEventIds.has(event.id);
-                  const eventDate = new Date(event.startTime);
-                  
-                  return (
-                    <Link
-                      key={event.id}
-                      href={`/events/${event.id}`}
-                      data-testid={`link-event-${event.id}`}
-                    >
-                      <div className="p-4 rounded-lg border hover-elevate cursor-pointer">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-semibold text-lg">{event.title}</h3>
-                              {isRsvped && (
-                                <span className="text-xs px-2 py-1 bg-primary text-primary-foreground rounded">
-                                  Attending
-                                </span>
-                              )}
-                            </div>
-                            {event.description && (
-                              <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                                {event.description}
-                              </p>
-                            )}
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {eventDate.toLocaleDateString('en-US', { 
-                                  weekday: 'short', 
-                                  month: 'short', 
-                                  day: 'numeric',
-                                  hour: 'numeric',
-                                  minute: '2-digit'
-                                })}
-                              </div>
-                              {event.location && (
-                                <div className="flex items-center gap-1">
-                                  📍 {event.location}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
           </CardContent>
         </Card>
 
