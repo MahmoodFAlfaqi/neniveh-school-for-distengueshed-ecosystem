@@ -11,7 +11,10 @@ import { Badge } from "@/components/ui/badge";
 
 type StudentId = {
   id: string;
+  username: string;
   studentId: string;
+  grade: number;
+  className: string;
   createdByAdminId: string;
   isAssigned: boolean;
   assignedToUserId: string | null;
@@ -21,7 +24,9 @@ type StudentId = {
 
 export default function AdminPage() {
   const { toast } = useToast();
-  const [newStudentId, setNewStudentId] = useState("");
+  const [username, setUsername] = useState("");
+  const [grade, setGrade] = useState("");
+  const [className, setClassName] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const { data: studentIds, isLoading } = useQuery<StudentId[]>({
@@ -29,15 +34,18 @@ export default function AdminPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (studentId: string) => {
-      return await apiRequest("POST", "/api/admin/student-ids", { studentId });
+    mutationFn: async (data: { username: string; grade: number; className: string }) => {
+      return await apiRequest("POST", "/api/admin/student-ids", data);
     },
-    onSuccess: () => {
+    onSuccess: (response: any) => {
+      const generatedId = response?.studentId?.studentId || response?.studentId || "Unknown";
       toast({
         title: "Student ID created",
-        description: "New student ID has been generated successfully",
+        description: `Generated ID: ${generatedId} for ${response?.studentId?.username || username}`,
       });
-      setNewStudentId("");
+      setUsername("");
+      setGrade("");
+      setClassName("");
       queryClient.invalidateQueries({ queryKey: ["/api/admin/student-ids"] });
     },
     onError: (error: Error) => {
@@ -71,8 +79,12 @@ export default function AdminPage() {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newStudentId.trim()) {
-      createMutation.mutate(newStudentId.trim());
+    if (username.trim() && grade && className.trim()) {
+      createMutation.mutate({
+        username: username.trim(),
+        grade: parseInt(grade),
+        className: className.trim().toUpperCase(),
+      });
     }
   };
 
@@ -99,24 +111,50 @@ export default function AdminPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleCreate} className="flex gap-4">
-              <div className="flex-1">
-                <Label htmlFor="studentId" className="sr-only">Student ID</Label>
-                <Input
-                  id="studentId"
-                  placeholder="e.g., ST2024001"
-                  value={newStudentId}
-                  onChange={(e) => setNewStudentId(e.target.value)}
-                  data-testid="input-new-student-id"
-                />
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="username">Username</Label>
+                  <Input
+                    id="username"
+                    placeholder="e.g., John.Smith"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    data-testid="input-username"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="grade">Grade (1-6)</Label>
+                  <Input
+                    id="grade"
+                    type="number"
+                    min="1"
+                    max="6"
+                    placeholder="1-6"
+                    value={grade}
+                    onChange={(e) => setGrade(e.target.value)}
+                    data-testid="input-grade"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="className">Class</Label>
+                  <Input
+                    id="className"
+                    placeholder="e.g., A"
+                    value={className}
+                    onChange={(e) => setClassName(e.target.value)}
+                    data-testid="input-class"
+                  />
+                </div>
               </div>
               <Button 
                 type="submit" 
-                disabled={createMutation.isPending || !newStudentId.trim()}
+                disabled={createMutation.isPending || !username.trim() || !grade || !className.trim()}
                 data-testid="button-create-student-id"
+                className="w-full"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                {createMutation.isPending ? "Creating..." : "Create ID"}
+                {createMutation.isPending ? "Generating..." : "Generate Student ID"}
               </Button>
             </form>
           </CardContent>
@@ -147,15 +185,21 @@ export default function AdminPage() {
                     data-testid={`student-id-${record.studentId}`}
                   >
                     <div className="flex items-center gap-4 flex-1">
-                      <code className="text-lg font-mono font-semibold">
-                        {record.studentId}
-                      </code>
+                      <div className="flex flex-col">
+                        <span className="font-semibold">{record.username}</span>
+                        <code className="text-sm font-mono text-muted-foreground">
+                          ID: {record.studentId}
+                        </code>
+                      </div>
+                      <Badge variant="outline">
+                        Grade {record.grade}-{record.className}
+                      </Badge>
                       <Badge variant={record.isAssigned ? "default" : "outline"}>
                         {record.isAssigned ? "Assigned" : "Available"}
                       </Badge>
                       {record.isAssigned && (
                         <span className="text-sm text-muted-foreground">
-                          Assigned on {new Date(record.assignedAt!).toLocaleDateString()}
+                          {new Date(record.assignedAt!).toLocaleDateString()}
                         </span>
                       )}
                     </div>

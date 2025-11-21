@@ -5,7 +5,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userRoleEnum = pgEnum("user_role", ["student", "teacher", "admin", "alumni"]);
+export const userRoleEnum = pgEnum("user_role", ["student", "admin"]);
 export const accountStatusEnum = pgEnum("account_status", ["active", "threatened", "suspended"]);
 export const scopeTypeEnum = pgEnum("scope_type", ["global", "stage", "section"]);
 export const eventTypeEnum = pgEnum("event_type", ["curricular", "extracurricular"]);
@@ -23,6 +23,10 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   role: userRoleEnum("role").notNull().default("student"),
   isSpecialAdmin: boolean("is_special_admin").notNull().default(false), // For initial admin accounts
+  
+  // Grade and Class assignment (for students)
+  grade: integer("grade"), // 1-6 for grades 1-6, null for admins
+  className: text("class_name"), // e.g., "A", "B", "C", "D", null for admins
   
   // Gamification fields
   credibilityScore: real("credibility_score").notNull().default(50.0), // 0-100 scale
@@ -69,10 +73,13 @@ export const adminSuccessions = pgTable("admin_successions", {
   notes: text("notes"),
 });
 
-// Admin Student IDs - IDs that can be assigned to new students
+// Admin Student IDs - Username + ID pairs that can be assigned to new students
 export const adminStudentIds = pgTable("admin_student_ids", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  studentId: text("student_id").notNull().unique(), // The actual ID string (e.g., "STU2024001")
+  username: text("username").notNull().unique(), // The pre-assigned username (e.g., "John.Smith"), must be unique
+  studentId: text("student_id").notNull().unique(), // The auto-generated random ID
+  grade: integer("grade").notNull(), // 1-6 for grades
+  className: text("class_name").notNull(), // e.g., "A", "B", "C", "D"
   isAssigned: boolean("is_assigned").notNull().default(false), // Whether this ID has been used
   assignedToUserId: varchar("assigned_to_user_id").references(() => users.id), // Which user claimed this ID
   createdByAdminId: varchar("created_by_admin_id").notNull().references(() => users.id),
@@ -302,17 +309,14 @@ export const insertUserSchema = createInsertSchema(users)
     reputationScore: true,
     accountStatus: true,
     isSpecialAdmin: true, // Only set programmatically for special admins
+    name: true, // Derived from username, not provided by user
+    role: true, // Auto-set to student
+    grade: true, // Set from adminStudentId lookup
+    className: true, // Set from adminStudentId lookup
   })
   .extend({
-    username: z.string()
-      .trim()
-      .min(1, "Username is required")
-      .regex(
-        /^[A-Za-z.,-]+(\s+[A-Za-z.,-]+){1,4}$/,
-        "Username must contain 2-5 names with only letters, periods, hyphens, commas, and spaces"
-      ),
+    username: z.string().trim().min(1, "Username is required"),
     studentId: z.string().trim().min(1, "Student ID is required"),
-    name: z.string().trim().min(1, "Full name is required"),
     email: z.string().trim().email("Valid email is required"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     phone: z.string().trim().optional(),
@@ -340,9 +344,18 @@ export const insertAdminStudentIdSchema = createInsertSchema(adminStudentIds)
     isAssigned: true,
     assignedToUserId: true,
     assignedAt: true,
+    studentId: true, // Auto-generated, not provided by admin
   })
   .extend({
-    studentId: z.string().trim().min(1, "Student ID cannot be empty"),
+    username: z.string()
+      .trim()
+      .min(1, "Username is required")
+      .regex(
+        /^[A-Za-z.,-]+(\s+[A-Za-z.,-]+){1,4}$/,
+        "Username must contain 2-5 names with only letters, periods, hyphens, commas, and spaces"
+      ),
+    grade: z.number().int().min(1).max(6),
+    className: z.string().trim().min(1, "Class name is required"),
   });
 
 export const insertPostSchema = createInsertSchema(posts).omit({

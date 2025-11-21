@@ -63,20 +63,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email already registered" });
       }
       
-      // Verify student ID exists and is not assigned
-      const studentIdRecord = await storage.getStudentIdRecord(userData.studentId);
-      if (!studentIdRecord) {
-        return res.status(400).json({ message: "Invalid student ID. Please contact an administrator." });
-      }
-      if (studentIdRecord.isAssigned) {
-        return res.status(400).json({ message: "Student ID already in use" });
-      }
-      
-      // Create user
+      // Create user (will validate student ID and assign it automatically)
       const user = await storage.createUser(userData);
-      
-      // Mark student ID as assigned
-      await storage.assignStudentId(userData.studentId, user.id);
       
       // Set session
       req.session.userId = user.id;
@@ -167,20 +155,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== ADMIN STUDENT ID MANAGEMENT ====================
   
   // Generate new student ID (admin only)
+  // Admin provides username, grade, className → system generates random studentId
   app.post("/api/admin/student-ids", requireAdmin, async (req, res) => {
     try {
       const validatedData = insertAdminStudentIdSchema.parse({
-        studentId: req.body.studentId,
+        username: req.body.username,
+        grade: req.body.grade,
+        className: req.body.className,
         createdByAdminId: req.session.userId!,
       });
       
-      // Check if ID already exists
-      const existing = await storage.getStudentIdRecord(validatedData.studentId);
-      if (existing) {
-        return res.status(400).json({ message: "Student ID already exists" });
-      }
-      
-      const record = await storage.createStudentId(validatedData.studentId, req.session.userId!);
+      const record = await storage.createStudentId(
+        validatedData.username,
+        validatedData.grade,
+        validatedData.className,
+        req.session.userId!
+      );
       
       res.json({ 
         message: "Student ID created successfully",
@@ -191,7 +181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
       console.error("Failed to create student ID:", error);
-      res.status(500).json({ message: "Failed to create student ID" });
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to create student ID" });
     }
   });
 

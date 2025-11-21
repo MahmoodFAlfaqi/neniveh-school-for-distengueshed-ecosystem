@@ -52,8 +52,9 @@ export interface IStorage {
   updateUserReputation(userId: string, newScore: number): Promise<User | undefined>;
   
   // Student ID Management (Admin only)
-  createStudentId(studentId: string, adminId: string): Promise<AdminStudentId>;
+  createStudentId(username: string, grade: number, className: string, adminId: string): Promise<AdminStudentId>;
   getStudentIdRecord(studentId: string): Promise<AdminStudentId | undefined>;
+  getStudentIdByUsername(username: string): Promise<AdminStudentId | undefined>;
   getAllStudentIds(): Promise<AdminStudentId[]>;
   deleteStudentId(id: string): Promise<boolean>;
   assignStudentId(studentId: string, userId: string): Promise<void>;
@@ -124,13 +125,68 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const hashedPassword = await bcrypt.hash(insertUser.password, 10);
+    
+    // Check if this is a student (has studentId) or admin
+    const studentIdRecord = await this.getStudentIdRecord(insertUser.studentId);
+    
+    // If no student ID record found, this must be an admin being created directly
+    if (!studentIdRecord) {
+      // For admins: derive name from username and create with admin role
+      const name = insertUser.username
+        .replace(/[.,-]/g, ' ')
+        .split(' ')
+        .filter(word => word.length > 0) // Remove empty strings from double punctuation
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+      
+      const [user] = await db
+        .insert(users)
+        .values({
+          ...insertUser,
+          password: hashedPassword,
+          name,
+          role: "admin",
+          grade: null,
+          className: null,
+        })
+        .returning();
+      
+      return user;
+    }
+    
+    // For students: validate the student ID record
+    if (studentIdRecord.isAssigned) {
+      throw new Error("This student ID has already been used");
+    }
+    
+    // Verify the username matches
+    if (studentIdRecord.username !== insertUser.username) {
+      throw new Error("Username does not match the assigned student ID");
+    }
+    
+    // Derive the full name from username (replace periods/hyphens/commas with spaces, capitalize each word)
+    const name = insertUser.username
+      .replace(/[.,-]/g, ' ')
+      .split(' ')
+      .filter(word => word.length > 0) // Remove empty strings from double punctuation
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+    
     const [user] = await db
       .insert(users)
       .values({
         ...insertUser,
         password: hashedPassword,
+        name,
+        role: "student",
+        grade: studentIdRecord.grade,
+        className: studentIdRecord.className,
       })
       .returning();
+    
+    // Mark the student ID as assigned
+    await this.assignStudentId(insertUser.studentId, user.id);
+    
     return user;
   }
 
@@ -168,12 +224,36 @@ export class DatabaseStorage implements IStorage {
   
   /**
    * Create a new student ID that can be assigned during registration
+   * Auto-generates a random 8-character alphanumeric ID
    */
-  async createStudentId(studentId: string, adminId: string): Promise<AdminStudentId> {
+  async createStudentId(username: string, grade: number, className: string, adminId: string): Promise<AdminStudentId> {
+    // Check if username already exists
+    const existingUsername = await this.getStudentIdByUsername(username);
+    if (existingUsername) {
+      throw new Error("A student ID has already been created for this username");
+    }
+    
+    // Generate a random 8-character alphanumeric ID
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let studentId = '';
+    for (let i = 0; i < 8; i++) {
+      studentId += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    // Check if ID already exists (very unlikely but possible)
+    const existing = await this.getStudentIdRecord(studentId);
+    if (existing) {
+      // Recursively try again with a new random ID
+      return this.createStudentId(username, grade, className, adminId);
+    }
+    
     const [record] = await db
       .insert(adminStudentIds)
       .values({
+        username,
         studentId,
+        grade,
+        className,
         createdByAdminId: adminId,
       })
       .returning();
@@ -188,6 +268,17 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(adminStudentIds)
       .where(eq(adminStudentIds.studentId, studentId));
+    return record || undefined;
+  }
+
+  /**
+   * Get student ID record by username
+   */
+  async getStudentIdByUsername(username: string): Promise<AdminStudentId | undefined> {
+    const [record] = await db
+      .select()
+      .from(adminStudentIds)
+      .where(eq(adminStudentIds.username, username));
     return record || undefined;
   }
 
@@ -340,11 +431,11 @@ export class DatabaseStorage implements IStorage {
     try {
       // Perform atomic transaction
       const result = await db.transaction(async (tx) => {
-        // Downgrade current admin to alumni
+        // Downgrade current admin to student
         await tx
           .update(users)
           .set({ 
-            role: "alumni",
+            role: "student",
             updatedAt: new Date(),
           })
           .where(eq(users.id, currentAdminId));
@@ -373,7 +464,7 @@ export class DatabaseStorage implements IStorage {
 
       return { 
         success: true, 
-        message: `Admin privileges successfully transferred to ${successor.name}. You are now Alumni.`,
+        message: `Admin privileges successfully transferred to ${successor.name}. You are now a student.`,
         succession: result
       };
     } catch (error) {

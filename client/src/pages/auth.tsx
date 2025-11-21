@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -18,11 +17,9 @@ export default function AuthPage() {
   const [registerData, setRegisterData] = useState({
     username: "",
     studentId: "",
-    name: "",
     email: "",
     password: "",
     phone: "",
-    role: "student" as "student" | "teacher" | "admin" | "alumni",
   });
   const [loginData, setLoginData] = useState({
     username: "",
@@ -161,19 +158,7 @@ export default function AuthPage() {
                     required
                     data-testid="input-studentid"
                   />
-                  <p className="text-xs text-muted-foreground">Admin-assigned ID required</p>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="register-name">Full Name</Label>
-                  <Input
-                    id="register-name"
-                    placeholder="John Smith"
-                    value={registerData.name}
-                    onChange={(e) => setRegisterData({ ...registerData, name: e.target.value })}
-                    required
-                    data-testid="input-name"
-                  />
+                  <p className="text-xs text-muted-foreground">Use the ID provided by your administrator (matches your username)</p>
                 </div>
                 
                 <div className="space-y-2">
@@ -212,23 +197,6 @@ export default function AuthPage() {
                     onChange={(e) => setRegisterData({ ...registerData, phone: e.target.value })}
                     data-testid="input-phone"
                   />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="register-role">Role</Label>
-                  <Select
-                    value={registerData.role}
-                    onValueChange={(value) => setRegisterData({ ...registerData, role: value as typeof registerData.role })}
-                  >
-                    <SelectTrigger data-testid="select-role">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="student">Student</SelectItem>
-                      <SelectItem value="teacher">Teacher</SelectItem>
-                      <SelectItem value="alumni">Alumni</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
                 
                 <Button type="submit" className="w-full" disabled={registerMutation.isPending} data-testid="button-register">
