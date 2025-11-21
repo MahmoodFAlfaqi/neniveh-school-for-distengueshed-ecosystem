@@ -38,7 +38,7 @@ export default function EventDetail() {
   const eventId = params?.id;
 
   const { data: event, isLoading: eventLoading } = useQuery<Event>({
-    queryKey: ["/api/events", eventId],
+    queryKey: [`/api/events/${eventId}`],
     enabled: !!eventId,
   });
 

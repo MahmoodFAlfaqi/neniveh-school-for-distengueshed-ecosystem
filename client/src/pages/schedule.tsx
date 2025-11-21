@@ -63,12 +63,14 @@ type Event = {
   id: string;
   title: string;
   description: string | null;
-  date: string;
-  type: string;
+  eventType: string;
   scopeId: string | null;
   startTime: string;
   endTime: string | null;
   location: string | null;
+  imageUrl: string | null;
+  createdById: string;
+  createdAt: string;
 };
 
 type RSVP = {
@@ -224,7 +226,7 @@ export default function SchedulePage() {
   // Group events by date
   const eventsByDate = new Map<string, Event[]>();
   relevantEvents.forEach(event => {
-    const eventDate = new Date(event.date).toDateString();
+    const eventDate = new Date(event.startTime).toDateString();
     if (!eventsByDate.has(eventDate)) {
       eventsByDate.set(eventDate, []);
     }

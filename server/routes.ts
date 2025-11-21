@@ -592,6 +592,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch events" });
     }
   });
+
+  // Get single event by ID
+  app.get("/api/events/:id", requireAuth, async (req, res) => {
+    try {
+      const events = await storage.getEvents(undefined, req.session.userId);
+      const event = events.find(e => e.id === req.params.id);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      res.json(event);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch event" });
+    }
+  });
   
   // RSVP to event
   app.post("/api/events/:id/rsvp", requireAuth, async (req, res) => {
