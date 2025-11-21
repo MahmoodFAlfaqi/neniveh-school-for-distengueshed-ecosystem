@@ -18,6 +18,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { ScopeSelector } from "@/components/ScopeSelector";
+import { useHasAccessToScope } from "@/hooks/use-digital-keys";
 
 type Event = {
   id: string;
@@ -202,6 +204,7 @@ function EventCard({ event, globalScopeId }: { event: Event; globalScopeId: stri
 export default function EventsPage() {
   const { toast } = useToast();
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [selectedScope, setSelectedScope] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -210,6 +213,9 @@ export default function EventsPage() {
     endTime: "",
     location: "",
   });
+
+  // Check if user has access to selected scope
+  const hasAccess = useHasAccessToScope(selectedScope);
 
   // Fetch all scopes to find the global scope
   const { data: scopes = [] } = useQuery<Array<{
@@ -246,12 +252,10 @@ export default function EventsPage() {
 
   const createEventMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      if (!globalScope) {
-        throw new Error("Global scope not found");
-      }
+      const scopeId = selectedScope || globalScope?.id || null;
       return await apiRequest("POST", "/api/events", {
         ...data,
-        scopeId: globalScope.id,
+        scopeId,
         startTime: new Date(data.startTime),
         endTime: data.endTime ? new Date(data.endTime) : null,
       });
@@ -259,7 +263,7 @@ export default function EventsPage() {
     onSuccess: () => {
       toast({
         title: "Event created",
-        description: "Your event has been posted to the Public Square",
+        description: "Your event has been posted successfully",
       });
       setFormData({
         title: "",
@@ -269,8 +273,9 @@ export default function EventsPage() {
         endTime: "",
         location: "",
       });
+      setSelectedScope(null);
       setShowCreateForm(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/events", globalScope?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
     },
     onError: (error: Error) => {
       toast({
@@ -394,6 +399,15 @@ export default function EventsPage() {
                     />
                   </div>
                 </div>
+
+                <Separator />
+
+                <ScopeSelector
+                  value={selectedScope}
+                  onChange={setSelectedScope}
+                  label="Event Scope"
+                  placeholder="Select event scope"
+                />
               </CardContent>
               <CardFooter className="justify-end gap-2">
                 <Button
@@ -406,7 +420,7 @@ export default function EventsPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!formData.title.trim() || !formData.startTime || createEventMutation.isPending}
+                  disabled={!formData.title.trim() || !formData.startTime || createEventMutation.isPending || (selectedScope !== null && !hasAccess)}
                   data-testid="button-submit-event"
                 >
                   {createEventMutation.isPending ? "Creating..." : "Create Event"}

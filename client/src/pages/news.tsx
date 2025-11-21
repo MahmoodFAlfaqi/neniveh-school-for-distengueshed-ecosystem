@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Heart, MessageSquare, Send, TrendingUp } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { ScopeSelector } from "@/components/ScopeSelector";
+import { useHasAccessToScope } from "@/hooks/use-digital-keys";
 
 type Post = {
   id: string;
@@ -30,6 +32,10 @@ type Post = {
 export default function NewsPage() {
   const { toast } = useToast();
   const [newPost, setNewPost] = useState("");
+  const [selectedScope, setSelectedScope] = useState<string | null>(null);
+
+  // Check if user has access to selected scope
+  const hasAccess = useHasAccessToScope(selectedScope);
 
   // Fetch global news posts (scopeId = null for Public Square)
   const { data: posts = [], isLoading } = useQuery<Post[]>({
@@ -56,16 +62,17 @@ export default function NewsPage() {
     mutationFn: async (content: string) => {
       return await apiRequest("POST", "/api/posts", {
         content,
-        scopeId: null, // null for Public Square
+        scopeId: selectedScope,
       });
     },
     onSuccess: () => {
       toast({
         title: "Post published",
-        description: "Your news has been shared to the Public Square",
+        description: "Your news has been shared successfully",
       });
       setNewPost("");
-      queryClient.invalidateQueries({ queryKey: ["/api/posts", null] });
+      setSelectedScope(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/posts"] });
     },
     onError: (error: Error) => {
       toast({
@@ -117,7 +124,7 @@ export default function NewsPage() {
             </div>
           </CardHeader>
           <form onSubmit={handleSubmitPost}>
-            <CardContent>
+            <CardContent className="space-y-4">
               <Textarea
                 placeholder="What's happening in our school community?"
                 value={newPost}
@@ -125,11 +132,18 @@ export default function NewsPage() {
                 className="min-h-24 resize-none border-0 text-base focus-visible:ring-0"
                 data-testid="textarea-new-post"
               />
+              <Separator />
+              <ScopeSelector
+                value={selectedScope}
+                onChange={setSelectedScope}
+                label="Post to"
+                placeholder="Select where to post"
+              />
             </CardContent>
             <CardFooter className="justify-end">
               <Button
                 type="submit"
-                disabled={!newPost.trim() || createPostMutation.isPending}
+                disabled={!newPost.trim() || createPostMutation.isPending || (selectedScope !== null && !hasAccess)}
                 data-testid="button-submit-post"
               >
                 <Send className="w-4 h-4 mr-2" />
