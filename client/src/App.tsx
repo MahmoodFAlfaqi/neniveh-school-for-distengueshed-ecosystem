@@ -15,6 +15,7 @@ import SettingsPage from "@/pages/settings";
 import AdminPage from "@/pages/admin";
 import GradesPage from "@/pages/grades";
 import GradeDetailPage from "@/pages/grade-detail";
+import ClassDetailPage from "@/pages/class-detail";
 import NotFound from "@/pages/not-found";
 
 type User = {
@@ -111,6 +112,13 @@ function Router() {
         {() => (
           <AuthenticatedLayout>
             <AdminPage />
+          </AuthenticatedLayout>
+        )}
+      </Route>
+      <Route path="/grades/:gradeNumber/:className">
+        {() => (
+          <AuthenticatedLayout>
+            <ClassDetailPage />
           </AuthenticatedLayout>
         )}
       </Route>
