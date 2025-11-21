@@ -98,6 +98,9 @@ export interface IStorage {
   createTeacher(teacher: InsertTeacher): Promise<Teacher>;
   getTeachers(): Promise<Teacher[]>;
   getTeacher(id: string): Promise<Teacher | undefined>;
+  updateTeacher(id: string, updates: Partial<InsertTeacher>): Promise<Teacher | undefined>;
+  deleteTeacher(id: string): Promise<boolean>;
+  getTeacherWithReviews(id: string): Promise<{ teacher: Teacher; reviews: TeacherReview[]; averageRating: number } | undefined>;
   createTeacherReview(review: InsertTeacherReview): Promise<TeacherReview>;
   getTeacherReviews(teacherId: string): Promise<TeacherReview[]>;
   
@@ -843,6 +846,33 @@ export class DatabaseStorage implements IStorage {
   async getTeacher(id: string): Promise<Teacher | undefined> {
     const [teacher] = await db.select().from(teachers).where(eq(teachers.id, id));
     return teacher || undefined;
+  }
+
+  async updateTeacher(id: string, updates: Partial<InsertTeacher>): Promise<Teacher | undefined> {
+    const [updated] = await db
+      .update(teachers)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(teachers.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteTeacher(id: string): Promise<boolean> {
+    const result = await db.delete(teachers).where(eq(teachers.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async getTeacherWithReviews(id: string): Promise<{ teacher: Teacher; reviews: TeacherReview[]; averageRating: number } | undefined> {
+    const teacher = await this.getTeacher(id);
+    if (!teacher) return undefined;
+
+    const reviews = await this.getTeacherReviews(id);
+    
+    const averageRating = reviews.length > 0
+      ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
+      : 0;
+
+    return { teacher, reviews, averageRating };
   }
 
   async createTeacherReview(insertReview: InsertTeacherReview): Promise<TeacherReview> {
