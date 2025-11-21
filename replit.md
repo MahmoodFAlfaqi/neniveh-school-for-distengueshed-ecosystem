@@ -22,7 +22,14 @@ A social platform for students, teachers, and administrators that creates a gami
 
 5. **End-to-End Tested**: Full flow verified - admin generates IDs, student registers with generated ID, name derives correctly, auto-login works.
 
-**Next Work**: Restructure navigation for Grade hierarchy (6 grades → classes within each grade), implement passcode posting, reviews system, personalized schedule.
+6. **Grade & Class Navigation Complete**: 
+   - /grades - Overview of all 6 grades (Grade 1-6) in grid layout
+   - /grades/:gradeNumber - Individual grade pages showing classes (A-E), News/Events tabs
+   - /grades/:gradeNumber/:className - Class detail pages with student lists, Class News/Events tabs
+   - All pages include passcode requirement messaging (passcode system pending)
+   - Queries staged (enabled: false) until backend scopes are implemented
+
+**Next Work**: Implement global News posting (Public Square), Events posting with auto-RSVP, passcode system for grade/class posting, personalized Schedule calendar, admin teacher management, review system, user profile updates.
 
 ## User Preferences
 
