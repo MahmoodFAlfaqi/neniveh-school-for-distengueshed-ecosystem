@@ -20,7 +20,13 @@ A social platform for students, teachers, and administrators that creates a gami
 
 1. **Global News (Public Square)**: Full news posting system at /news with credibility ratings, author info, engagement metrics (likes/comments). Both admins and students can post.
 
-2. **Events System**: Event creation with RSVP functionality at /events. Events include curricular/extracurricular types, date/time/location, creator info, and attendance tracking.
+2. **Events System with RSVP**: 
+   - Event creation with RSVP toggle functionality at /events
+   - Events include curricular/extracurricular types, date/time/location, creator info
+   - RSVP button shows correct state immediately (userHasRsvpd flag from backend)
+   - Click RSVP to attend, click again to cancel - prevents duplicate RSVPs
+   - Unique database constraint on (eventId, userId) enforces one RSVP per user
+   - Collapsible attendee list shows profiles (avatar, name, role, credibility)
 
 3. **Admin ID Generation & Student Registration**: 
    - Admins input username + grade (1-6) + class (A-E), system auto-generates 8-char alphanumeric student ID
