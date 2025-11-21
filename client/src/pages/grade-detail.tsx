@@ -6,14 +6,23 @@ import { Users, Calendar, Newspaper, Lock } from "lucide-react";
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { Scope } from "@shared/schema";
+import { useHasAccessToScope } from "@/hooks/use-digital-keys";
 
 type Post = {
   id: string;
-  title: string;
   content: string;
   authorId: string;
+  scopeId?: string;
   credibilityRating: number;
+  likesCount: number;
+  commentsCount: number;
   createdAt: string;
+  author: {
+    name: string;
+    role: string;
+    avatarUrl?: string;
+  };
 };
 
 type Event = {
@@ -33,14 +42,23 @@ export default function GradeDetail() {
   // Mock classes for now - in reality, this would come from the database
   const classes = ["A", "B", "C", "D", "E"];
 
+  // Fetch all scopes to find this grade's scope
+  const { data: scopes } = useQuery<Scope[]>({
+    queryKey: ["/api/scopes"],
+  });
+
+  // Find the scope for this grade
+  const gradeScope = scopes?.find(s => s.name === `Grade ${grade}`);
+  const hasAccess = useHasAccessToScope(gradeScope?.id);
+
   const { data: posts, isLoading: postsLoading } = useQuery<Post[]>({
-    queryKey: ["/api/posts", `grade-${grade}`],
-    enabled: false, // Will enable once backend is ready
+    queryKey: ["/api/posts", gradeScope?.id],
+    enabled: !!gradeScope?.id,
   });
 
   const { data: events, isLoading: eventsLoading } = useQuery<Event[]>({
-    queryKey: ["/api/events", `grade-${grade}`],
-    enabled: false, // Will enable once backend is ready
+    queryKey: ["/api/events", gradeScope?.id],
+    enabled: !!gradeScope?.id,
   });
 
   const getGradeName = (num: number) => {
@@ -145,15 +163,18 @@ export default function GradeDetail() {
                 {posts.map((post) => (
                   <Card key={post.id}>
                     <CardHeader>
-                      <CardTitle>{post.title}</CardTitle>
                       <div className="flex items-center gap-2">
+                        <span className="font-semibold">{post.author.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {post.author.role}
+                        </Badge>
                         <Badge variant="secondary">
                           Credibility: {post.credibilityRating}
                         </Badge>
-                        <span className="text-sm text-muted-foreground">
-                          {new Date(post.createdAt).toLocaleDateString()}
-                        </span>
                       </div>
+                      <span className="text-sm text-muted-foreground">
+                        {new Date(post.createdAt).toLocaleDateString()}
+                      </span>
                     </CardHeader>
                     <CardContent>
                       <p className="text-muted-foreground">{post.content}</p>
