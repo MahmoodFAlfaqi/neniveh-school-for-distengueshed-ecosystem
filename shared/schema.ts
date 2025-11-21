@@ -13,11 +13,16 @@ export const eventTypeEnum = pgEnum("event_type", ["curricular", "extracurricula
 // Users table with reputation and credibility
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Authentication fields
+  username: text("username").notNull().unique(), // 2-5 names, letters/periods/hyphens/commas only
+  studentId: text("student_id").notNull().unique(), // Admin-assigned ID required for registration
   email: text("email").notNull().unique(),
   phone: text("phone"),
   password: text("password").notNull(),
   name: text("name").notNull(),
   role: userRoleEnum("role").notNull().default("student"),
+  isSpecialAdmin: boolean("is_special_admin").notNull().default(false), // For initial admin accounts
   
   // Gamification fields
   credibilityScore: real("credibility_score").notNull().default(50.0), // 0-100 scale
@@ -62,6 +67,17 @@ export const adminSuccessions = pgTable("admin_successions", {
   newAdminId: varchar("new_admin_id").notNull().references(() => users.id),
   handoverDate: timestamp("handover_date").notNull().defaultNow(),
   notes: text("notes"),
+});
+
+// Admin Student IDs - IDs that can be assigned to new students
+export const adminStudentIds = pgTable("admin_student_ids", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentId: text("student_id").notNull().unique(), // The actual ID string (e.g., "STU2024001")
+  isAssigned: boolean("is_assigned").notNull().default(false), // Whether this ID has been used
+  assignedToUserId: varchar("assigned_to_user_id").references(() => users.id), // Which user claimed this ID
+  createdByAdminId: varchar("created_by_admin_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  assignedAt: timestamp("assigned_at"),
 });
 
 // Posts with credibility and scope
@@ -284,6 +300,15 @@ export const insertUserSchema = createInsertSchema(users).omit({
   credibilityScore: true,
   reputationScore: true,
   accountStatus: true,
+  isSpecialAdmin: true, // Only set programmatically for special admins
+}).extend({
+  username: z.string()
+    .min(1, "Username is required")
+    .regex(
+      /^[A-Za-z.,-]+(\s+[A-Za-z.,-]+){1,4}$/,
+      "Username must contain 2-5 names with only letters, periods, hyphens, commas, and spaces"
+    ),
+  studentId: z.string().min(1, "Student ID is required"),
 });
 
 export const insertScopeSchema = createInsertSchema(scopes).omit({
@@ -299,6 +324,14 @@ export const insertDigitalKeySchema = createInsertSchema(digitalKeys).omit({
 export const insertAdminSuccessionSchema = createInsertSchema(adminSuccessions).omit({
   id: true,
   handoverDate: true,
+});
+
+export const insertAdminStudentIdSchema = createInsertSchema(adminStudentIds).omit({
+  id: true,
+  createdAt: true,
+  isAssigned: true,
+  assignedToUserId: true,
+  assignedAt: true,
 });
 
 export const insertPostSchema = createInsertSchema(posts).omit({
@@ -356,6 +389,9 @@ export type DigitalKey = typeof digitalKeys.$inferSelect;
 
 export type InsertAdminSuccession = z.infer<typeof insertAdminSuccessionSchema>;
 export type AdminSuccession = typeof adminSuccessions.$inferSelect;
+
+export type InsertAdminStudentId = z.infer<typeof insertAdminStudentIdSchema>;
+export type AdminStudentId = typeof adminStudentIds.$inferSelect;
 
 export type InsertPost = z.infer<typeof insertPostSchema>;
 export type Post = typeof posts.$inferSelect;

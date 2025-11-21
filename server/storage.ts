@@ -3,6 +3,7 @@ import {
   scopes,
   digitalKeys,
   adminSuccessions,
+  adminStudentIds,
   posts,
   events,
   eventRsvps,
@@ -18,6 +19,8 @@ import {
   type InsertDigitalKey,
   type AdminSuccession,
   type InsertAdminSuccession,
+  type AdminStudentId,
+  type InsertAdminStudentId,
   type Post,
   type InsertPost,
   type Event,
@@ -43,9 +46,17 @@ export interface IStorage {
   // User management
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserCredibility(userId: string, newScore: number): Promise<User | undefined>;
   updateUserReputation(userId: string, newScore: number): Promise<User | undefined>;
+  
+  // Student ID Management (Admin only)
+  createStudentId(studentId: string, adminId: string): Promise<AdminStudentId>;
+  getStudentIdRecord(studentId: string): Promise<AdminStudentId | undefined>;
+  getAllStudentIds(): Promise<AdminStudentId[]>;
+  deleteStudentId(id: string): Promise<boolean>;
+  assignStudentId(studentId: string, userId: string): Promise<void>;
   
   // Access Code / Digital Key System
   verifyAndUnlockScope(userId: string, scopeId: string, accessCode: string): Promise<{ success: boolean; message: string; key?: DigitalKey }>;
@@ -106,6 +117,11 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const hashedPassword = await bcrypt.hash(insertUser.password, 10);
     const [user] = await db
@@ -146,6 +162,70 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return user || undefined;
+  }
+
+  // ==================== STUDENT ID MANAGEMENT ====================
+  
+  /**
+   * Create a new student ID that can be assigned during registration
+   */
+  async createStudentId(studentId: string, adminId: string): Promise<AdminStudentId> {
+    const [record] = await db
+      .insert(adminStudentIds)
+      .values({
+        studentId,
+        createdByAdminId: adminId,
+      })
+      .returning();
+    return record;
+  }
+
+  /**
+   * Get student ID record by the ID string
+   */
+  async getStudentIdRecord(studentId: string): Promise<AdminStudentId | undefined> {
+    const [record] = await db
+      .select()
+      .from(adminStudentIds)
+      .where(eq(adminStudentIds.studentId, studentId));
+    return record || undefined;
+  }
+
+  /**
+   * Get all student IDs (for admin management interface)
+   */
+  async getAllStudentIds(): Promise<AdminStudentId[]> {
+    return await db
+      .select()
+      .from(adminStudentIds)
+      .orderBy(desc(adminStudentIds.createdAt));
+  }
+
+  /**
+   * Delete a student ID (only if not assigned)
+   */
+  async deleteStudentId(id: string): Promise<boolean> {
+    const result = await db
+      .delete(adminStudentIds)
+      .where(and(
+        eq(adminStudentIds.id, id),
+        eq(adminStudentIds.isAssigned, false) // Can only delete unassigned IDs
+      ));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  /**
+   * Mark a student ID as assigned to a user
+   */
+  async assignStudentId(studentId: string, userId: string): Promise<void> {
+    await db
+      .update(adminStudentIds)
+      .set({
+        isAssigned: true,
+        assignedToUserId: userId,
+        assignedAt: new Date(),
+      })
+      .where(eq(adminStudentIds.studentId, studentId));
   }
 
   // ==================== ACCESS CODE / DIGITAL KEY SYSTEM ====================
