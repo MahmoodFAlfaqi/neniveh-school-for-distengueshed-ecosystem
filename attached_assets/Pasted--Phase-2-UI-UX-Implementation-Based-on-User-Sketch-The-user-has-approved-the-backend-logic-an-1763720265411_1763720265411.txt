@@ -1,0 +1,21 @@
+**Phase 2: UI/UX Implementation (Based on User Sketch)**
+
+The user has approved the backend logic and provided a specific sketch for the desired UI layout. The goal is to implement a modern, responsive interface using React/Tailwind CSS based strictly on this structural design.
+
+**Do NOT change the existing backend logic or database schema.**
+
+### 1. Structure Implementation (Based on Sketch)
+Implement a three-part fixed layout:
+* **Top Navigation Bar (Fixed):** Must contain Login/Logout, User Name/Profile Picture, and the primary navigation links: `Home`, `News`, `Events`, `Support`, `Stats`, `Settings`.
+* **Left/Right Sidebars (or Main Content):**
+    * In the **News View**: Create the layout with the "Create Post" box at the top, followed by a vertically scrolling list of "News Feed Items."
+    * In the **Events View**: Implement the layout with vertical scrolling event cards (showing Date, Time, and Description).
+    * In the **Profile View**: Implement the layout featuring a large "Profile/Description" box and a separate "Stats" card below it.
+
+### 2. Design & Styling Requirements
+* **Aesthetic:** The design must follow the principles discussed previously: clean, card-based UI with consistent border-radius (rounded corners) and spacing.
+* **Theming:** Implement a **Dark Mode** that strictly mirrors the structure and spacing of the Light Mode, avoiding pure black backgrounds in favor of dark slate/charcoal gray.
+* **Responsive:** The layout must adapt well to mobile screens (e.g., the top bar collapses, and the side elements stack vertically).
+* **Rich Media Placeholders:** For the News Creator, include placeholders for the rich media features: an icon for **Image/GIF upload**, an icon for **Voice Note recording**, and an icon for **Poll/Quiz creation**. (The backend functionality for these can be added later, but the buttons must be visible now).
+
+**Goal:** Implement the entire UI structure and styling first. Focus on the `News` and `Profile` views as priority.
