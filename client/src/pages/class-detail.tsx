@@ -51,8 +51,7 @@ export default function ClassDetail() {
   });
 
   const { data: students, isLoading: studentsLoading } = useQuery<Student[]>({
-    queryKey: ["/api/users", `class-${grade}-${className}`],
-    enabled: false, // Will enable once backend is ready
+    queryKey: [`/api/classes/${grade}/${className}/students`],
   });
 
   const getUserInitials = (name: string) => {

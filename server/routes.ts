@@ -50,21 +50,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/register", async (req, res) => {
     try {
       const userData = insertUserSchema.parse(req.body);
+      console.log("[REGISTER] Registration attempt for:", userData.username, "with studentId:", userData.studentId);
       
       // Check if username already exists
       const existingByUsername = await storage.getUserByUsername(userData.username);
       if (existingByUsername) {
+        console.log("[REGISTER] Username already taken:", userData.username);
         return res.status(400).json({ message: "Username already taken" });
       }
       
       // Check if email already exists
       const existingByEmail = await storage.getUserByEmail(userData.email);
       if (existingByEmail) {
+        console.log("[REGISTER] Email already registered:", userData.email);
         return res.status(400).json({ message: "Email already registered" });
       }
       
+      console.log("[REGISTER] Creating user...");
       // Create user (will validate student ID and assign it automatically)
       const user = await storage.createUser(userData);
+      console.log("[REGISTER] User created successfully:", user.id);
       
       // Set session
       req.session.userId = user.id;
@@ -78,10 +83,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.log("[REGISTER] Validation error:", error.errors);
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
-      console.error("Registration error:", error);
-      res.status(500).json({ message: "Registration failed" });
+      console.error("[REGISTER] Registration error:", error);
+      console.error("[REGISTER] Error stack:", error instanceof Error ? error.stack : "No stack");
+      res.status(500).json({ 
+        message: "Registration failed",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
   
@@ -375,6 +385,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to search user" });
+    }
+  });
+
+  // Get students by class
+  app.get("/api/classes/:grade/:className/students", requireAuth, async (req, res) => {
+    try {
+      const { grade, className } = req.params;
+      const gradeNum = parseInt(grade);
+      
+      if (isNaN(gradeNum) || gradeNum < 1 || gradeNum > 6) {
+        return res.status(400).json({ message: "Invalid grade (must be 1-6)" });
+      }
+      
+      if (!className || className.length !== 1 || !/[A-E]/i.test(className)) {
+        return res.status(400).json({ message: "Invalid class name (must be A-E)" });
+      }
+      
+      const students = await storage.getStudentsByClass(gradeNum, className.toUpperCase());
+      
+      // Return students without sensitive info
+      const studentsPublicInfo = students.map(({ password, phone, transportDetails, email, ...student }) => student);
+      
+      res.json(studentsPublicInfo);
+    } catch (error) {
+      console.error("Failed to fetch students by class:", error);
+      res.status(500).json({ message: "Failed to fetch students" });
     }
   });
 

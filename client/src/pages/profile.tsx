@@ -13,6 +13,8 @@ type User = {
   credibilityScore: number;
   reputationScore: number;
   accountStatus: string;
+  grade?: number | null;
+  className?: string | null;
   phone?: string;
   bio?: string;
 };
@@ -62,6 +64,9 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-2 mt-2">
                   <Badge>{user.role}</Badge>
                   <Badge variant="outline">ID: {user.studentId}</Badge>
+                  {user.grade && user.className && (
+                    <Badge variant="secondary">Grade {user.grade}-{user.className}</Badge>
+                  )}
                 </div>
               </div>
             </div>

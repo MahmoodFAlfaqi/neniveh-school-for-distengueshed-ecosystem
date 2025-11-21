@@ -47,6 +47,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getStudentsByClass(grade: number, className: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUserCredibility(userId: string, newScore: number): Promise<User | undefined>;
   updateUserReputation(userId: string, newScore: number): Promise<User | undefined>;
@@ -121,6 +122,21 @@ export class DatabaseStorage implements IStorage {
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.username, username));
     return user || undefined;
+  }
+
+  async getStudentsByClass(grade: number, className: string): Promise<User[]> {
+    const students = await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.grade, grade),
+          eq(users.className, className),
+          eq(users.role, "student")
+        )
+      )
+      .orderBy(users.name);
+    return students;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
