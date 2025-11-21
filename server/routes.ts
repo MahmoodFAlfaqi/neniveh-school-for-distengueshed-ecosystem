@@ -86,11 +86,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("[REGISTER] Validation error:", error.errors);
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
-      console.error("[REGISTER] Registration error:", error);
+      
+      // Handle student ID validation errors (return 400, not 500)
+      if (error instanceof Error) {
+        const message = error.message;
+        console.log("[REGISTER] Registration error:", message);
+        
+        // These are validation errors, not server errors
+        if (message.includes("Student ID") || message.includes("Username does not match")) {
+          return res.status(400).json({ message });
+        }
+      }
+      
+      // Only use 500 for unexpected errors
+      console.error("[REGISTER] Unexpected error:", error);
       console.error("[REGISTER] Error stack:", error instanceof Error ? error.stack : "No stack");
       res.status(500).json({ 
-        message: "Registration failed",
-        error: error instanceof Error ? error.message : "Unknown error"
+        message: "Registration failed. Please try again.",
       });
     }
   });
