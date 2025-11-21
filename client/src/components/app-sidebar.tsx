@@ -1,4 +1,4 @@
-import { Home, Calendar, Users, Settings, BookOpen, User, LogOut } from "lucide-react";
+import { Home, Calendar, Users, Settings, BookOpen, User, LogOut, Shield } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -49,6 +49,14 @@ const mainNavItems = [
     title: "Schedule",
     url: "/schedule",
     icon: BookOpen,
+  },
+];
+
+const adminNavItems = [
+  {
+    title: "Admin Management",
+    url: "/admin",
+    icon: Shield,
   },
 ];
 
@@ -122,6 +130,30 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {user?.role === "admin" && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administration</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminNavItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      data-testid={`nav-${item.title.toLowerCase().replace(" ", "-")}`}
+                      className={location === item.url ? "bg-sidebar-accent" : ""}
+                    >
+                      <Link href={item.url}>
+                        <item.icon className="w-4 h-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         <SidebarGroup>
           <SidebarGroupLabel>Account</SidebarGroupLabel>

@@ -7,6 +7,12 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import Home from "@/pages/home";
 import AuthPage from "@/pages/auth";
+import EventsPage from "@/pages/events";
+import TeachersPage from "@/pages/teachers";
+import SchedulePage from "@/pages/schedule";
+import ProfilePage from "@/pages/profile";
+import SettingsPage from "@/pages/settings";
+import AdminPage from "@/pages/admin";
 import NotFound from "@/pages/not-found";
 
 type User = {
@@ -61,6 +67,48 @@ function Router() {
         {() => (
           <AuthenticatedLayout>
             <Home />
+          </AuthenticatedLayout>
+        )}
+      </Route>
+      <Route path="/events">
+        {() => (
+          <AuthenticatedLayout>
+            <EventsPage />
+          </AuthenticatedLayout>
+        )}
+      </Route>
+      <Route path="/teachers">
+        {() => (
+          <AuthenticatedLayout>
+            <TeachersPage />
+          </AuthenticatedLayout>
+        )}
+      </Route>
+      <Route path="/schedule">
+        {() => (
+          <AuthenticatedLayout>
+            <SchedulePage />
+          </AuthenticatedLayout>
+        )}
+      </Route>
+      <Route path="/profile">
+        {() => (
+          <AuthenticatedLayout>
+            <ProfilePage />
+          </AuthenticatedLayout>
+        )}
+      </Route>
+      <Route path="/settings">
+        {() => (
+          <AuthenticatedLayout>
+            <SettingsPage />
+          </AuthenticatedLayout>
+        )}
+      </Route>
+      <Route path="/admin">
+        {() => (
+          <AuthenticatedLayout>
+            <AdminPage />
           </AuthenticatedLayout>
         )}
       </Route>
