@@ -6,30 +6,37 @@ A social platform for students, teachers, and administrators that creates a gami
 
 ## Recent Changes (November 21, 2025)
 
-**Completed: Admin ID Generation & Student Registration Restructure**
+**Critical Bug Fixes - Data Consistency & Transaction Safety (COMPLETED)**
 
-1. **Admin Username+ID Pair Generation**: Admins now input username + grade (1-6) + class (A, B, etc.), and the system auto-generates an 8-character alphanumeric student ID. Stored in `adminStudentIds` table with fields: username, studentId, grade, className, isAssigned.
+1. **Transaction-Safe Registration**: Student registration now uses database transactions with row-level locking to prevent race conditions. All operations (student ID validation, user creation, ID assignment) happen atomically - if any step fails, the entire transaction rolls back.
 
-2. **Simplified Student Registration**: Registration form now only requires username + studentId + email + password + phone (optional). Name field removed from UI and auto-derived from username (e.g., "John.Smith" → "John Smith"). Role field removed and auto-set to "student". Grade and className auto-populated from student ID record.
+2. **Race Condition Prevention**: Student ID assignment includes `isAssigned=false` guard in UPDATE statement. Multiple concurrent registrations cannot reuse the same ID.
 
-3. **Database Schema Updates**: 
-   - Users table: Added grade/className fields, unique constraint on username
-   - AdminStudentIds table: New table for managing student ID assignment
-   - Role enum: Removed "alumni" (only student/admin now, succession downgrades to student)
-   - createUser() storage method: Handles both admin creation (no studentId validation) and student creation (validates studentId record and auto-assigns)
+3. **Username Case Preservation**: Original username casing from admin (e.g., "Sarah Jones") is preserved in database. All lookups use SQL `LOWER()` function for case-insensitive matching. Login works with any casing variation.
 
-4. **Special Admin Accounts**: Two pre-seeded admin accounts created: "Mahmood.Fawaz.AL-Faqi" and "Mustafa.Mouied.Al-Ali" with password "NOTHINg27$"
+4. **Removed Non-Transactional Paths**: Eliminated `assignStudentId()` method from storage interface. All student ID assignment now happens exclusively within the createUser transaction.
 
-5. **End-to-End Tested**: Full flow verified - admin generates IDs, student registers with generated ID, name derives correctly, auto-login works.
+**Features Implemented**
 
-6. **Grade & Class Navigation Complete**: 
-   - /grades - Overview of all 6 grades (Grade 1-6) in grid layout
-   - /grades/:gradeNumber - Individual grade pages showing classes (A-E), News/Events tabs
-   - /grades/:gradeNumber/:className - Class detail pages with student lists, Class News/Events tabs
-   - All pages include passcode requirement messaging (passcode system pending)
+1. **Global News (Public Square)**: Full news posting system at /news with credibility ratings, author info, engagement metrics (likes/comments). Both admins and students can post.
+
+2. **Events System**: Event creation with RSVP functionality at /events. Events include curricular/extracurricular types, date/time/location, creator info, and attendance tracking.
+
+3. **Admin ID Generation & Student Registration**: 
+   - Admins input username + grade (1-6) + class (A-E), system auto-generates 8-char alphanumeric student ID
+   - Registration requires username + studentId + email + password + phone (optional)
+   - Name auto-derived from username (e.g., "John.Smith" → "John Smith")
+   - Grade and className auto-populated from student ID record
+
+4. **Grade & Class Navigation**: 
+   - /grades - Overview of all 6 grades in grid layout
+   - /grades/:gradeNumber - Individual grade pages with classes (A-E), News/Events tabs
+   - /grades/:gradeNumber/:className - Class detail pages with student lists, News/Events tabs
    - Queries staged (enabled: false) until backend scopes are implemented
 
-**Next Work**: Implement global News posting (Public Square), Events posting with auto-RSVP, passcode system for grade/class posting, personalized Schedule calendar, admin teacher management, review system, user profile updates.
+**Testing Status**: End-to-end tested admin ID generation → student registration → login flow. All critical paths verified working correctly.
+
+**Remaining Work**: Passcode system for grade/class posting access, personalized Schedule calendar, admin teacher management, teacher review system.
 
 ## User Preferences
 
