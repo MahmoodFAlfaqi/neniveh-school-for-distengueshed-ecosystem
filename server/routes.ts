@@ -1,5 +1,8 @@
 import type { Express, Request, Response, NextFunction } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
+import { promises as fs } from "fs";
+import path from "path";
 import { storage } from "./storage";
 import { 
   insertUserSchema,
@@ -10,9 +13,12 @@ import {
   insertTeacherSchema,
   insertTeacherReviewSchema,
   insertScopeSchema,
+  insertProfileCommentSchema,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { z } from "zod";
+import { requireModeration } from "./moderation";
+import { upload, getMediaType } from "./upload";
 
 // Authentication middleware
 function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -329,12 +335,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== POSTS ====================
   
-  // Create post (uses authenticated user)
-  app.post("/api/posts", requireAuth, async (req, res) => {
+  // Create post (uses authenticated user) with optional file upload
+  app.post("/api/posts", requireAuth, upload.single('media'), async (req, res) => {
     try {
+      // Moderate content before saving (only if content is provided)
+      if (req.body.content?.trim()) {
+        await requireModeration(req.body.content);
+      }
+      
+      // Prepare post data with media if uploaded
       const postData = insertPostSchema.parse({
         ...req.body,
         authorId: req.session.userId!, // Use authenticated user
+        mediaUrl: req.file ? `/uploads/${req.file.filename}` : undefined,
+        mediaType: req.file ? getMediaType(req.file.mimetype) : undefined,
       });
       
       // If posting to a restricted scope, verify user has access
@@ -350,6 +364,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      if (error instanceof Error) {
+        // Handle moderation errors
+        if (error.message.includes("community guidelines")) {
+          return res.status(400).json({ message: error.message });
+        }
       }
       res.status(500).json({ message: "Failed to create post" });
     }
@@ -392,6 +412,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create event
   app.post("/api/events", requireAuth, async (req, res) => {
     try {
+      // Moderate event description before saving (only if description is provided)
+      if (req.body.description?.trim()) {
+        await requireModeration(req.body.description);
+      }
+      
       const eventData = insertEventSchema.parse({
         ...req.body,
         createdById: req.session.userId!,
@@ -401,6 +426,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      if (error instanceof Error && error.message.includes("community guidelines")) {
+        return res.status(400).json({ message: error.message });
       }
       res.status(500).json({ message: "Failed to create event" });
     }
@@ -539,6 +567,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create teacher review
   app.post("/api/teachers/:id/reviews", requireAuth, async (req, res) => {
     try {
+      // Moderate review comment before saving (only if comment is provided)
+      if (req.body.comment?.trim()) {
+        await requireModeration(req.body.comment);
+      }
+      
       const reviewData = insertTeacherReviewSchema.parse({
         ...req.body,
         teacherId: req.params.id,
@@ -549,6 +582,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      if (error instanceof Error && error.message.includes("community guidelines")) {
+        return res.status(400).json({ message: error.message });
       }
       res.status(500).json({ message: "Failed to create review" });
     }
@@ -563,6 +599,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch reviews" });
     }
   });
+
+  // ==================== PROFILE COMMENTS ====================
+  
+  // Create profile comment
+  app.post("/api/users/:userId/comments", requireAuth, async (req, res) => {
+    try {
+      // Moderate content before saving (only if comment is provided)
+      if (req.body.comment?.trim()) {
+        await requireModeration(req.body.comment);
+      }
+      
+      const commentData = insertProfileCommentSchema.parse({
+        ...req.body,
+        profileUserId: req.params.userId,
+        authorId: req.session.userId!,
+      });
+      
+      const comment = await storage.createProfileComment(commentData);
+      res.json(comment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      if (error instanceof Error && error.message.includes("community guidelines")) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to create comment" });
+    }
+  });
+  
+  // Get profile comments
+  app.get("/api/users/:userId/comments", requireAuth, async (req, res) => {
+    try {
+      const comments = await storage.getProfileComments(req.params.userId);
+      res.json(comments);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch comments" });
+    }
+  });
+
+  // ==================== FILE UPLOADS ====================
+  
+  // Ensure uploads directory exists and serve uploaded files
+  const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+  try {
+    await fs.mkdir(UPLOAD_DIR, { recursive: true });
+  } catch (error) {
+    console.error("Failed to create uploads directory:", error);
+    // Continue anyway - static serving will fail gracefully
+  }
+  app.use('/uploads', express.static(UPLOAD_DIR));
 
   const httpServer = createServer(app);
 
