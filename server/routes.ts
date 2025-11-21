@@ -613,6 +613,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get current user's RSVPs
+  app.get("/api/rsvps", requireAuth, async (req, res) => {
+    try {
+      const rsvps = await storage.getUserRsvps(req.session.userId!);
+      res.json(rsvps);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user RSVPs" });
+    }
+  });
+
   app.get("/api/events/:id/attendees", requireAuth, async (req, res) => {
     try {
       const attendees = await storage.getEventAttendees(req.params.id);

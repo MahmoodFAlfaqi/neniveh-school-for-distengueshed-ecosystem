@@ -87,6 +87,7 @@ export interface IStorage {
   getEvents(scopeId?: string, userId?: string): Promise<any[]>;
   rsvpToEvent(eventId: string, userId: string): Promise<EventRsvp | null>;
   getEventRsvps(eventId: string): Promise<EventRsvp[]>;
+  getUserRsvps(userId: string): Promise<EventRsvp[]>;
   getEventAttendees(eventId: string): Promise<User[]>;
   
   // Schedules
@@ -776,6 +777,10 @@ export class DatabaseStorage implements IStorage {
 
   async getEventRsvps(eventId: string): Promise<EventRsvp[]> {
     return await db.select().from(eventRsvps).where(eq(eventRsvps.eventId, eventId));
+  }
+
+  async getUserRsvps(userId: string): Promise<EventRsvp[]> {
+    return await db.select().from(eventRsvps).where(eq(eventRsvps.userId, userId));
   }
 
   async getEventAttendees(eventId: string): Promise<User[]> {
