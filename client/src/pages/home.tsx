@@ -31,13 +31,13 @@ type Post = {
 type Event = {
   id: string;
   title: string;
-  startTime: string;
-  eventType: string;
+  date: string;
+  type: string;
 };
 
 export default function Home() {
   const { data: user } = useQuery<User>({
-    queryKey: ["/api/user"],
+    queryKey: ["/api/auth/me"],
   });
 
   const { data: recentPosts = [] } = useQuery<Post[]>({
@@ -145,16 +145,16 @@ export default function Home() {
                       >
                         <div className="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-primary/10 text-primary">
                           <span className="text-xs font-medium">
-                            {new Date(event.startTime).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
+                            {new Date(event.date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
                           </span>
                           <span className="text-lg font-bold">
-                            {new Date(event.startTime).getDate()}
+                            {new Date(event.date).getDate()}
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm truncate">{event.title}</p>
                           <Badge variant="outline" className="text-xs mt-1">
-                            {event.eventType}
+                            {event.type}
                           </Badge>
                         </div>
                       </div>

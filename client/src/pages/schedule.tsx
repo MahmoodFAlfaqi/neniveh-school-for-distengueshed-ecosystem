@@ -25,7 +25,7 @@ type Scope = {
 
 export default function SchedulePage() {
   const { data: user, isLoading: userLoading } = useQuery<User>({
-    queryKey: ["/api/user"],
+    queryKey: ["/api/auth/me"],
   });
 
   const { data: scopes } = useQuery<Scope[]>({
