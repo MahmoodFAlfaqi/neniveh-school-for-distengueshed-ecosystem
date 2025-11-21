@@ -174,6 +174,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user by ID (public profile)
+  app.get("/api/users/:userId", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Only expose safe public fields
+      const publicProfile = {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role,
+        grade: user.grade,
+        className: user.className,
+        avatarUrl: user.avatarUrl,
+        bio: user.bio,
+        credibilityScore: user.credibilityScore,
+        reputationScore: user.reputationScore,
+        accountStatus: user.accountStatus,
+        createdAt: user.createdAt,
+        // Student stats
+        initiativeScore: user.initiativeScore,
+        communicationScore: user.communicationScore,
+        cooperationScore: user.cooperationScore,
+        kindnessScore: user.kindnessScore,
+        perseveranceScore: user.perseveranceScore,
+        fitnessScore: user.fitnessScore,
+        playingSkillsScore: user.playingSkillsScore,
+        inClassMisconductScore: user.inClassMisconductScore,
+        outClassMisconductScore: user.outClassMisconductScore,
+        literaryScienceScore: user.literaryScienceScore,
+        naturalScienceScore: user.naturalScienceScore,
+        electronicScienceScore: user.electronicScienceScore,
+        confidenceScore: user.confidenceScore,
+        temperScore: user.temperScore,
+        cheerfulnessScore: user.cheerfulnessScore,
+      };
+      
+      res.json(publicProfile);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user profile" });
+    }
+  });
+
   // ==================== ADMIN STUDENT ID MANAGEMENT ====================
   
   // Generate new student ID (admin only)

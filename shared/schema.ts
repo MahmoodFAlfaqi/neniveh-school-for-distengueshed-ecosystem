@@ -40,6 +40,23 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   bio: text("bio"),
   
+  // Student Stats (15 metrics, 1-5 stars) - averages from peer ratings
+  initiativeScore: real("initiative_score"),
+  communicationScore: real("communication_score"),
+  cooperationScore: real("cooperation_score"),
+  kindnessScore: real("kindness_score"),
+  perseveranceScore: real("perseverance_score"),
+  fitnessScore: real("fitness_score"),
+  playingSkillsScore: real("playing_skills_score"),
+  inClassMisconductScore: real("in_class_misconduct_score"), // Inverse score
+  outClassMisconductScore: real("out_class_misconduct_score"), // Inverse score
+  literaryScienceScore: real("literary_science_score"),
+  naturalScienceScore: real("natural_science_score"),
+  electronicScienceScore: real("electronic_science_score"),
+  confidenceScore: real("confidence_score"),
+  temperScore: real("temper_score"), // Inverse score
+  cheerfulnessScore: real("cheerfulness_score"),
+  
   // Metadata
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -197,6 +214,35 @@ export const profileComments = pgTable("profile_comments", {
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// Peer Ratings - students rate each other on 15 metrics
+export const peerRatings = pgTable("peer_ratings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ratedUserId: varchar("rated_user_id").notNull().references(() => users.id, { onDelete: "cascade" }), // Who is being rated
+  raterUserId: varchar("rater_user_id").notNull().references(() => users.id, { onDelete: "cascade" }), // Who is rating
+  
+  // 15 metrics (1-5 stars each)
+  initiativeScore: integer("initiative_score").notNull(),
+  communicationScore: integer("communication_score").notNull(),
+  cooperationScore: integer("cooperation_score").notNull(),
+  kindnessScore: integer("kindness_score").notNull(),
+  perseveranceScore: integer("perseverance_score").notNull(),
+  fitnessScore: integer("fitness_score").notNull(),
+  playingSkillsScore: integer("playing_skills_score").notNull(),
+  inClassMisconductScore: integer("in_class_misconduct_score").notNull(),
+  outClassMisconductScore: integer("out_class_misconduct_score").notNull(),
+  literaryScienceScore: integer("literary_science_score").notNull(),
+  naturalScienceScore: integer("natural_science_score").notNull(),
+  electronicScienceScore: integer("electronic_science_score").notNull(),
+  confidenceScore: integer("confidence_score").notNull(),
+  temperScore: integer("temper_score").notNull(),
+  cheerfulnessScore: integer("cheerfulness_score").notNull(),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueRaterRated: unique().on(table.ratedUserId, table.raterUserId),
+}));
 
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
@@ -411,6 +457,31 @@ export const insertProfileCommentSchema = createInsertSchema(profileComments).om
   createdAt: true,
 });
 
+export const insertPeerRatingSchema = createInsertSchema(peerRatings)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    // Validate all scores are 1-5
+    initiativeScore: z.number().int().min(1).max(5),
+    communicationScore: z.number().int().min(1).max(5),
+    cooperationScore: z.number().int().min(1).max(5),
+    kindnessScore: z.number().int().min(1).max(5),
+    perseveranceScore: z.number().int().min(1).max(5),
+    fitnessScore: z.number().int().min(1).max(5),
+    playingSkillsScore: z.number().int().min(1).max(5),
+    inClassMisconductScore: z.number().int().min(1).max(5),
+    outClassMisconductScore: z.number().int().min(1).max(5),
+    literaryScienceScore: z.number().int().min(1).max(5),
+    naturalScienceScore: z.number().int().min(1).max(5),
+    electronicScienceScore: z.number().int().min(1).max(5),
+    confidenceScore: z.number().int().min(1).max(5),
+    temperScore: z.number().int().min(1).max(5),
+    cheerfulnessScore: z.number().int().min(1).max(5),
+  });
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -447,3 +518,6 @@ export type TeacherReview = typeof teacherReviews.$inferSelect;
 
 export type InsertProfileComment = z.infer<typeof insertProfileCommentSchema>;
 export type ProfileComment = typeof profileComments.$inferSelect;
+
+export type InsertPeerRating = z.infer<typeof insertPeerRatingSchema>;
+export type PeerRating = typeof peerRatings.$inferSelect;

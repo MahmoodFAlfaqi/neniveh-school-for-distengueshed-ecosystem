@@ -126,6 +126,13 @@ function Router() {
           </AuthenticatedLayout>
         )}
       </Route>
+      <Route path="/profile/:userId">
+        {() => (
+          <AuthenticatedLayout>
+            <ProfilePage />
+          </AuthenticatedLayout>
+        )}
+      </Route>
       <Route path="/profile">
         {() => (
           <AuthenticatedLayout>
