@@ -549,12 +549,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await requireModeration(req.body.description);
       }
       
-      const eventData = insertEventSchema.parse({
+      // Parse dates from ISO strings to Date objects
+      const eventPayload = {
         ...req.body,
         createdById: req.session.userId!,
-      });
+        startTime: new Date(req.body.startTime),
+        endTime: req.body.endTime ? new Date(req.body.endTime) : undefined,
+      };
+      
+      const eventData = insertEventSchema.parse(eventPayload);
       const event = await storage.createEvent(eventData);
-      res.json(event);
+      res.status(201).json(event);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
@@ -562,6 +567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof Error && error.message.includes("community guidelines")) {
         return res.status(400).json({ message: error.message });
       }
+      console.error("Failed to create event:", error);
       res.status(500).json({ message: "Failed to create event" });
     }
   });

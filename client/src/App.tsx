@@ -7,6 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import Home from "@/pages/home";
 import AuthPage from "@/pages/auth";
+import NewsPage from "@/pages/news";
 import EventsPage from "@/pages/events";
 import TeachersPage from "@/pages/teachers";
 import SchedulePage from "@/pages/schedule";
@@ -70,6 +71,13 @@ function Router() {
         {() => (
           <AuthenticatedLayout>
             <Home />
+          </AuthenticatedLayout>
+        )}
+      </Route>
+      <Route path="/news">
+        {() => (
+          <AuthenticatedLayout>
+            <NewsPage />
           </AuthenticatedLayout>
         )}
       </Route>

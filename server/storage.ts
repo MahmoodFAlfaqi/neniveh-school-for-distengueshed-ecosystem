@@ -675,15 +675,52 @@ export class DatabaseStorage implements IStorage {
     return event;
   }
 
-  async getEvents(scopeId?: string): Promise<Event[]> {
+  async getEvents(scopeId?: string): Promise<any[]> {
+    const baseQuery = db
+      .select({
+        id: events.id,
+        title: events.title,
+        description: events.description,
+        eventType: events.eventType,
+        scopeId: events.scopeId,
+        startTime: events.startTime,
+        endTime: events.endTime,
+        location: events.location,
+        imageUrl: events.imageUrl,
+        createdById: events.createdById,
+        createdAt: events.createdAt,
+        createdByName: users.name,
+        createdByRole: users.role,
+        createdByAvatarUrl: users.avatarUrl,
+      })
+      .from(events)
+      .leftJoin(users, eq(events.createdById, users.id));
+
     if (scopeId) {
-      return await db
-        .select()
-        .from(events)
+      const results = await baseQuery
         .where(eq(events.scopeId, scopeId))
         .orderBy(desc(events.startTime));
+      
+      // Add RSVP count for each event
+      const eventsWithRsvps = await Promise.all(
+        results.map(async (event) => {
+          const rsvps = await this.getEventRsvps(event.id);
+          return { ...event, rsvpCount: rsvps.length };
+        })
+      );
+      return eventsWithRsvps;
     }
-    return await db.select().from(events).orderBy(desc(events.startTime));
+    
+    const results = await baseQuery.orderBy(desc(events.startTime));
+    
+    // Add RSVP count for each event
+    const eventsWithRsvps = await Promise.all(
+      results.map(async (event) => {
+        const rsvps = await this.getEventRsvps(event.id);
+        return { ...event, rsvpCount: rsvps.length };
+      })
+    );
+    return eventsWithRsvps;
   }
 
   async rsvpToEvent(eventId: string, userId: string): Promise<EventRsvp> {
