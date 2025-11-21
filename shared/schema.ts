@@ -159,7 +159,8 @@ export const teachers = pgTable("teachers", {
   
   name: text("name").notNull(),
   photoUrl: text("photo_url"),
-  certificates: text("certificates").array(),
+  description: text("description"), // Admin-written description of the teacher
+  academicAchievements: text("academic_achievements").array(), // Degrees, certifications, awards
   
   // Dynamic data
   classroomRules: text("classroom_rules").array(),
@@ -391,12 +392,17 @@ export const insertTeacherSchema = createInsertSchema(teachers).omit({
   updatedAt: true,
 });
 
-export const insertTeacherReviewSchema = createInsertSchema(teacherReviews).omit({
-  id: true,
-  createdAt: true,
-  isModerated: true,
-  moderatedById: true,
-});
+export const insertTeacherReviewSchema = createInsertSchema(teacherReviews)
+  .omit({
+    id: true,
+    createdAt: true,
+    isModerated: true,
+    moderatedById: true,
+  })
+  .extend({
+    rating: z.number().int().min(1, "Rating must be at least 1").max(5, "Rating must be at most 5"),
+    comment: z.string().trim().optional(),
+  });
 
 export const insertProfileCommentSchema = createInsertSchema(profileComments).omit({
   id: true,
