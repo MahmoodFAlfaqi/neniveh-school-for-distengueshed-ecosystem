@@ -93,6 +93,7 @@ export interface IStorage {
   createSchedule(schedule: InsertSchedule): Promise<Schedule>;
   getSchedules(scopeId: string): Promise<Schedule[]>;
   updateSchedule(id: string, teacherName: string, subject: string): Promise<Schedule | undefined>;
+  bulkUpdateSchedules(scopeId: string, updates: Array<{ dayOfWeek: number; periodNumber: number; subject: string | null; teacherName: string | null }>): Promise<void>;
   
   // Teachers
   createTeacher(teacher: InsertTeacher): Promise<Teacher>;
@@ -833,6 +834,43 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schedules.id, id))
       .returning();
     return schedule || undefined;
+  }
+
+  async bulkUpdateSchedules(scopeId: string, updates: Array<{ dayOfWeek: number; periodNumber: number; subject: string | null; teacherName: string | null }>): Promise<void> {
+    for (const update of updates) {
+      // Check if schedule exists for this slot
+      const [existing] = await db
+        .select()
+        .from(schedules)
+        .where(
+          and(
+            eq(schedules.scopeId, scopeId),
+            eq(schedules.dayOfWeek, update.dayOfWeek),
+            eq(schedules.periodNumber, update.periodNumber)
+          )
+        );
+
+      if (existing) {
+        // Update existing schedule
+        await db
+          .update(schedules)
+          .set({
+            subject: update.subject,
+            teacherName: update.teacherName,
+            updatedAt: new Date(),
+          })
+          .where(eq(schedules.id, existing.id));
+      } else if (update.subject || update.teacherName) {
+        // Create new schedule entry only if there's actual data
+        await db.insert(schedules).values({
+          scopeId,
+          dayOfWeek: update.dayOfWeek,
+          periodNumber: update.periodNumber,
+          subject: update.subject,
+          teacherName: update.teacherName,
+        });
+      }
+    }
   }
 
   // ==================== TEACHERS ====================

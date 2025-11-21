@@ -1,8 +1,40 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, Clock, User as UserIcon, BookOpen } from "lucide-react";
+import { Calendar, Clock, User as UserIcon, BookOpen, Edit, Save, X } from "lucide-react";
+import { useState } from "react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+// Predefined subjects list
+const SUBJECTS = [
+  "Math",
+  "R.E.",
+  "P.E.",
+  "Social Studies",
+  "Biology",
+  "Chemistry",
+  "Physics",
+  "Arabic",
+  "English",
+  "French",
+  "B.P.C.",
+  "Finance",
+  "Geology",
+  "Computer Science",
+  "Arts",
+  "Moralism",
+  "Library",
+] as const;
 
 type Schedule = {
   id: string;
@@ -14,16 +46,35 @@ type Schedule = {
 };
 
 type User = {
+  id: string;
   grade: number | null;
   className: string | null;
+  role: "student" | "admin";
 };
 
 type Scope = {
   id: string;
   name: string;
+  type: "global" | "stage" | "section";
+};
+
+type Event = {
+  id: string;
+  title: string;
+  date: string;
+  type: string;
+  scopeId: string | null;
+};
+
+type RSVP = {
+  eventId: string;
 };
 
 export default function SchedulePage() {
+  const { toast } = useToast();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedSchedules, setEditedSchedules] = useState<Record<string, { subject: string | null; teacherName: string | null }>>({});
+
   const { data: user, isLoading: userLoading } = useQuery<User>({
     queryKey: ["/api/auth/me"],
   });
@@ -32,8 +83,28 @@ export default function SchedulePage() {
     queryKey: ["/api/scopes"],
   });
 
+  const { data: digitalKeys = [] } = useQuery<{ scopeId: string }[]>({
+    queryKey: ["/api/keys"],
+    enabled: !!user,
+  });
+
+  const { data: events = [] } = useQuery<Event[]>({
+    queryKey: ["/api/events"],
+  });
+
+  const { data: rsvps = [] } = useQuery<RSVP[]>({
+    queryKey: ["/api/rsvps"],
+    enabled: !!user,
+  });
+
+  // Find user's class scope
   const classScope = scopes?.find(
     (s) => s.name === `Class ${user?.grade}-${user?.className}`
+  );
+
+  // Find user's grade scope
+  const gradeScope = scopes?.find(
+    (s) => s.type === "stage" && s.name === `Grade ${user?.grade}`
   );
 
   const { data: schedules = [], isLoading: schedulesLoading } = useQuery<Schedule[]>({
@@ -47,6 +118,46 @@ export default function SchedulePage() {
     enabled: !!classScope?.id,
   });
 
+  // Check if user can edit (admin or has access to class scope)
+  const canEdit = user?.role === "admin" || digitalKeys.some(key => key.scopeId === classScope?.id);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!classScope?.id) throw new Error("No class scope");
+      
+      const updates = Object.entries(editedSchedules).map(([key, value]) => {
+        const [dayStr, periodStr] = key.split('-');
+        return {
+          dayOfWeek: parseInt(dayStr),
+          periodNumber: parseInt(periodStr),
+          subject: value.subject,
+          teacherName: value.teacherName,
+        };
+      });
+
+      return apiRequest(`/api/schedules/${classScope.id}/bulk`, {
+        method: "PATCH",
+        body: JSON.stringify({ updates }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules", classScope?.id] });
+      setIsEditing(false);
+      setEditedSchedules({});
+      toast({
+        title: "Schedule updated",
+        description: "Your timetable has been saved successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update schedule. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const periods = [1, 2, 3, 4, 5, 6, 7];
 
@@ -55,6 +166,58 @@ export default function SchedulePage() {
       (s) => s.dayOfWeek === dayIndex + 1 && s.periodNumber === periodNum
     );
   };
+
+  const getEditedValue = (dayIndex: number, periodNum: number, field: 'subject' | 'teacherName') => {
+    const key = `${dayIndex + 1}-${periodNum}`;
+    if (editedSchedules[key]) {
+      return editedSchedules[key][field];
+    }
+    const schedule = getScheduleForSlot(dayIndex, periodNum);
+    return schedule?.[field] || null;
+  };
+
+  const updateScheduleSlot = (dayIndex: number, periodNum: number, field: 'subject' | 'teacherName', value: string | null) => {
+    const key = `${dayIndex + 1}-${periodNum}`;
+    setEditedSchedules(prev => ({
+      ...prev,
+      [key]: {
+        subject: field === 'subject' ? value : (prev[key]?.subject || getScheduleForSlot(dayIndex, periodNum)?.subject || null),
+        teacherName: field === 'teacherName' ? value : (prev[key]?.teacherName || getScheduleForSlot(dayIndex, periodNum)?.teacherName || null),
+      }
+    }));
+  };
+
+  // Get events for calendar (RSVPed events + class/grade events)
+  const rsvpedEventIds = new Set(rsvps.map(r => r.eventId));
+  const relevantEvents = events.filter(event => {
+    // Show if user RSVPed
+    if (rsvpedEventIds.has(event.id)) return true;
+    // Show if event is for user's class or grade
+    if (event.scopeId === classScope?.id || event.scopeId === gradeScope?.id) return true;
+    return false;
+  });
+
+  // Generate calendar dates (yesterday + next 2 weeks = 15 days)
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const calendarDates: Date[] = [];
+  for (let i = 0; i < 15; i++) {
+    const date = new Date(yesterday);
+    date.setDate(date.getDate() + i);
+    calendarDates.push(date);
+  }
+
+  // Group events by date
+  const eventsByDate = new Map<string, Event[]>();
+  relevantEvents.forEach(event => {
+    const eventDate = new Date(event.date).toDateString();
+    if (!eventsByDate.has(eventDate)) {
+      eventsByDate.set(eventDate, []);
+    }
+    eventsByDate.get(eventDate)!.push(event);
+  });
 
   if (userLoading) {
     return (
@@ -91,13 +254,72 @@ export default function SchedulePage() {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <Calendar className="w-8 h-8" />
-            Class Schedule
+            Schedule & Events
           </h1>
           <p className="text-muted-foreground mt-2">
-            Weekly schedule for Class {user.grade}-{user.className}
+            Class {user.grade}-{user.className} • {relevantEvents.length} upcoming events
           </p>
         </div>
 
+        {/* Calendar with Events */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Upcoming Events</CardTitle>
+            <CardDescription>
+              Showing events you're attending and events for your class/grade
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-7 gap-2">
+              {calendarDates.map((date, idx) => {
+                const dateStr = date.toDateString();
+                const dayEvents = eventsByDate.get(dateStr) || [];
+                const isToday = dateStr === today.toDateString();
+                const isPast = date < today && !isToday;
+
+                return (
+                  <div
+                    key={idx}
+                    className={`p-3 rounded-lg border ${
+                      isToday ? 'bg-primary/10 border-primary' : isPast ? 'bg-muted/50' : 'bg-card'
+                    }`}
+                    data-testid={`calendar-day-${idx}`}
+                  >
+                    <div className="text-xs font-medium text-muted-foreground">
+                      {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                    </div>
+                    <div className={`text-2xl font-bold ${isToday ? 'text-primary' : ''}`}>
+                      {date.getDate()}
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      {dayEvents.slice(0, 2).map(event => {
+                        const isRsvped = rsvpedEventIds.has(event.id);
+                        return (
+                          <div
+                            key={event.id}
+                            className={`text-xs p-1 rounded truncate ${
+                              isRsvped ? 'bg-primary text-primary-foreground' : 'bg-accent text-accent-foreground'
+                            }`}
+                            title={event.title}
+                          >
+                            {event.title}
+                          </div>
+                        );
+                      })}
+                      {dayEvents.length > 2 && (
+                        <div className="text-xs text-muted-foreground">
+                          +{dayEvents.length - 2} more
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Timetable */}
         {schedulesLoading ? (
           <Card>
             <CardContent className="p-6">
@@ -107,12 +329,54 @@ export default function SchedulePage() {
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle>Your Timetable</CardTitle>
-              <CardDescription>
-                {schedules.length > 0
-                  ? `${schedules.length} class periods scheduled this week`
-                  : "No schedule entries yet"}
-              </CardDescription>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle>Weekly Timetable</CardTitle>
+                  <CardDescription>
+                    {schedules.length > 0
+                      ? `${schedules.length} class periods scheduled`
+                      : "No schedule entries yet"}
+                  </CardDescription>
+                </div>
+                {canEdit && (
+                  <div className="flex gap-2">
+                    {isEditing ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setIsEditing(false);
+                            setEditedSchedules({});
+                          }}
+                          data-testid="button-cancel-edit"
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => saveMutation.mutate()}
+                          disabled={saveMutation.isPending}
+                          data-testid="button-save-schedule"
+                        >
+                          <Save className="w-4 h-4 mr-2" />
+                          {saveMutation.isPending ? "Saving..." : "Save Changes"}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => setIsEditing(true)}
+                        data-testid="button-edit-schedule"
+                      >
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit Schedule
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -129,7 +393,7 @@ export default function SchedulePage() {
                   </thead>
                   <tbody>
                     {periods.map((period) => (
-                      <tr key={period} className="border-b hover-elevate">
+                      <tr key={period} className="border-b">
                         <td className="p-3 font-medium bg-muted/50">
                           <div className="flex items-center gap-2">
                             <Clock className="w-4 h-4" />
@@ -137,23 +401,56 @@ export default function SchedulePage() {
                           </div>
                         </td>
                         {days.map((day, dayIndex) => {
-                          const schedule = getScheduleForSlot(dayIndex, period);
+                          const currentSubject = getEditedValue(dayIndex, period, 'subject');
+                          const currentTeacher = getEditedValue(dayIndex, period, 'teacherName');
+
                           return (
                             <td
                               key={day}
                               className="p-2"
                               data-testid={`schedule-cell-${dayIndex + 1}-${period}`}
                             >
-                              {schedule ? (
+                              {isEditing ? (
+                                <div className="space-y-2 p-2">
+                                  <Select
+                                    value={currentSubject || ""}
+                                    onValueChange={(value) =>
+                                      updateScheduleSlot(dayIndex, period, 'subject', value || null)
+                                    }
+                                  >
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue placeholder="Select subject" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="">None</SelectItem>
+                                      {SUBJECTS.map((subject) => (
+                                        <SelectItem key={subject} value={subject}>
+                                          {subject}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <input
+                                    type="text"
+                                    placeholder="Teacher name"
+                                    className="w-full px-2 py-1 text-xs border rounded"
+                                    value={currentTeacher || ""}
+                                    onChange={(e) =>
+                                      updateScheduleSlot(dayIndex, period, 'teacherName', e.target.value || null)
+                                    }
+                                    data-testid={`input-teacher-${dayIndex + 1}-${period}`}
+                                  />
+                                </div>
+                              ) : currentSubject ? (
                                 <div className="space-y-1 p-2 rounded-lg border bg-card hover-elevate">
                                   <div className="flex items-center gap-1 text-sm font-semibold">
                                     <BookOpen className="w-3 h-3" />
-                                    {schedule.subject || "No Subject"}
+                                    {currentSubject}
                                   </div>
-                                  {schedule.teacherName && (
+                                  {currentTeacher && (
                                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                       <UserIcon className="w-3 h-3" />
-                                      {schedule.teacherName}
+                                      {currentTeacher}
                                     </div>
                                   )}
                                 </div>
@@ -171,12 +468,17 @@ export default function SchedulePage() {
                 </table>
               </div>
 
-              {schedules.length === 0 && (
+              {schedules.length === 0 && !isEditing && (
                 <div className="mt-8 text-center">
                   <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-sm text-muted-foreground">
                     No schedule entries have been created yet for your class.
                   </p>
+                  {canEdit && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Click "Edit Schedule" to start building your timetable.
+                    </p>
+                  )}
                 </div>
               )}
             </CardContent>

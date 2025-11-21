@@ -682,6 +682,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk update schedules for a scope (requires section key or admin)
+  app.patch("/api/schedules/:scopeId/bulk", requireAuth, async (req, res) => {
+    try {
+      const { scopeId } = req.params;
+      const { updates } = req.body;
+
+      if (!Array.isArray(updates)) {
+        return res.status(400).json({ message: "Updates must be an array" });
+      }
+
+      // Verify user has access to the section or is admin
+      const user = await storage.getUser(req.session.userId!);
+      const hasAccess = user?.role === "admin" || await storage.hasAccessToScope(req.session.userId!, scopeId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: "You need the section key or admin privileges to edit schedules" });
+      }
+
+      await storage.bulkUpdateSchedules(scopeId, updates);
+      res.json({ message: "Schedules updated successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update schedules" });
+    }
+  });
+
   // ==================== TEACHERS ====================
   
   // Create teacher profile (admin only)
