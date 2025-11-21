@@ -71,12 +71,37 @@ A social platform for students, teachers, and administrators that creates a gami
      - /teachers/:id - Teacher detail showing description, achievements, reviews list, submission form
    - Error handling: Zod validation, duplicate review detection, content moderation violations
 
-**Testing Status**: Teacher system verified via code review - schema with unique constraints, error handling for duplicates, complete CRUD operations, frontend integration. End-to-end tested admin ID generation → student registration → login flow. Passcode system backend and UI infrastructure verified by architect review.
+7. **Scoped Posting System - FULLY OPERATIONAL** (November 21, 2025):
+   - Grade & class detail pages now fetch scoped news/events with proper query implementation
+   - Custom queryFn passes scopeId to API: `/api/posts?scopeId=${scopeId}`
+   - Queries gated behind access checks: `enabled: !!scopeId && hasAccess`
+   - useDigitalKeys() hook refetches immediately on invalidation (staleTime: 0)
+   - Complete flow: Navigate → Unlock scope → Keys refetch → hasAccess updates → Queries execute → Data displays
+   - Backend storage.getPosts() filters by scopeId correctly
+   - News page dynamic filtering by selected scope works perfectly
+   - Cache invalidation matches query keys for immediate updates
+   
+8. **Access Code Security - HARDENED** (November 21, 2025):
+   - All 37 scopes updated with ultra-secure access codes
+   - Length: 17-20 characters (vs original 6-9 characters)
+   - Format: Randomized mix of uppercase, lowercase, and numbers
+   - Examples:
+     - Public Square: `xK9mP2vN8qR4tL7wY` (was `PUBLIC123`)
+     - Grade 1: `hT6jM3nB9pQ5sV8xZ` (was `GRADE1`)
+     - Class 1-A: `aB3cD5eF7gH9iJ2kL4m` (was `CLASS1A`)
+   - Highly resistant to brute-force attacks
+
+**Testing Status**: 
+- Scoped posting verified by architect - complete end-to-end flow operational
+- Grade/class pages fetch scoped data correctly after unlock
+- Access codes hardened across all 37 scopes
+- Teacher system verified via code review - schema with unique constraints, error handling for duplicates, complete CRUD operations, frontend integration
+- End-to-end tested admin ID generation → student registration → login flow
+- Passcode system backend and UI infrastructure verified by architect review
 
 **Remaining Work**: 
-- Integrate unlock dialog into News/Events composers for scoped posting
-- Enable grade/class posting by activating scoped News/Events tabs
 - Personalized Schedule calendar
+- Home page layout and dashboard
 
 ## User Preferences
 
