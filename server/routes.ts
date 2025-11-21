@@ -15,6 +15,7 @@ import {
   insertScopeSchema,
   insertProfileCommentSchema,
   insertAdminStudentIdSchema,
+  insertPeerRatingSchema,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { z } from "zod";
@@ -919,6 +920,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(comments);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch comments" });
+    }
+  });
+
+  // ==================== PEER RATINGS ====================
+  
+  // Submit or update a peer rating
+  app.post("/api/users/:userId/rate", requireAuth, async (req, res) => {
+    try {
+      const ratedUserId = req.params.userId;
+      const raterUserId = req.session.userId!;
+      
+      // Prevent self-rating
+      if (ratedUserId === raterUserId) {
+        return res.status(400).json({ message: "You cannot rate yourself" });
+      }
+      
+      // Validate that the user being rated exists
+      const ratedUser = await storage.getUser(ratedUserId);
+      if (!ratedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Parse and validate the rating data
+      const ratingData = insertPeerRatingSchema.parse({
+        ...req.body,
+        ratedUserId,
+        raterUserId,
+      });
+      
+      const rating = await storage.submitPeerRating(ratingData);
+      res.json(rating);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to submit rating" });
+    }
+  });
+  
+  // Get user's existing rating for another user
+  app.get("/api/users/:userId/rating", requireAuth, async (req, res) => {
+    try {
+      const ratedUserId = req.params.userId;
+      const raterUserId = req.session.userId!;
+      
+      const rating = await storage.getUserRating(ratedUserId, raterUserId);
+      res.json(rating || null);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch rating" });
     }
   });
 
