@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, Clock, User as UserIcon, BookOpen, Edit, Save, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -125,20 +125,24 @@ export default function SchedulePage() {
     mutationFn: async () => {
       if (!classScope?.id) throw new Error("No class scope");
       
+      // Only send slots that were actually edited (exist in editedSchedules)
       const updates = Object.entries(editedSchedules).map(([key, value]) => {
         const [dayStr, periodStr] = key.split('-');
         return {
           dayOfWeek: parseInt(dayStr),
           periodNumber: parseInt(periodStr),
-          subject: value.subject,
-          teacherName: value.teacherName,
+          subject: value.subject || null,
+          teacherName: value.teacherName || null,
         };
       });
 
-      return apiRequest(`/api/schedules/${classScope.id}/bulk`, {
-        method: "PATCH",
-        body: JSON.stringify({ updates }),
-      });
+      // Only send if there are actual changes
+      if (updates.length === 0) {
+        setIsEditing(false);
+        return { message: "No changes to save" };
+      }
+
+      return apiRequest("PATCH", `/api/schedules/${classScope.id}/bulk`, { updates });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/schedules", classScope?.id] });
@@ -188,14 +192,17 @@ export default function SchedulePage() {
   };
 
   // Get events for calendar (RSVPed events + class/grade events)
-  const rsvpedEventIds = new Set(rsvps.map(r => r.eventId));
-  const relevantEvents = events.filter(event => {
-    // Show if user RSVPed
-    if (rsvpedEventIds.has(event.id)) return true;
-    // Show if event is for user's class or grade
-    if (event.scopeId === classScope?.id || event.scopeId === gradeScope?.id) return true;
-    return false;
-  });
+  const rsvpedEventIds = useMemo(() => new Set(rsvps.map(r => r.eventId)), [rsvps]);
+  
+  const relevantEvents = useMemo(() => {
+    return events.filter(event => {
+      // Show if user RSVPed
+      if (rsvpedEventIds.has(event.id)) return true;
+      // Show if event is for user's class or grade
+      if (event.scopeId === classScope?.id || event.scopeId === gradeScope?.id) return true;
+      return false;
+    });
+  }, [events, rsvpedEventIds, classScope?.id, gradeScope?.id]);
 
   // Generate calendar dates (yesterday + next 2 weeks = 15 days)
   const today = new Date();
@@ -413,16 +420,16 @@ export default function SchedulePage() {
                               {isEditing ? (
                                 <div className="space-y-2 p-2">
                                   <Select
-                                    value={currentSubject || ""}
+                                    value={currentSubject || "NONE"}
                                     onValueChange={(value) =>
-                                      updateScheduleSlot(dayIndex, period, 'subject', value || null)
+                                      updateScheduleSlot(dayIndex, period, 'subject', value === "NONE" ? null : value)
                                     }
                                   >
                                     <SelectTrigger className="h-8 text-xs">
                                       <SelectValue placeholder="Select subject" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="">None</SelectItem>
+                                      <SelectItem value="NONE">None</SelectItem>
                                       {SUBJECTS.map((subject) => (
                                         <SelectItem key={subject} value={subject}>
                                           {subject}
