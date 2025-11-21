@@ -51,14 +51,26 @@ export default function GradeDetail() {
   const gradeScope = scopes?.find(s => s.name === `Grade ${grade}`);
   const hasAccess = useHasAccessToScope(gradeScope?.id);
 
-  const { data: posts, isLoading: postsLoading } = useQuery<Post[]>({
+  const { data: posts = [], isLoading: postsLoading } = useQuery<Post[]>({
     queryKey: ["/api/posts", gradeScope?.id],
-    enabled: !!gradeScope?.id,
+    queryFn: async () => {
+      if (!gradeScope?.id) return [];
+      const response = await fetch(`/api/posts?scopeId=${gradeScope.id}`);
+      if (!response.ok) throw new Error("Failed to fetch posts");
+      return response.json();
+    },
+    enabled: !!gradeScope?.id && hasAccess,
   });
 
-  const { data: events, isLoading: eventsLoading } = useQuery<Event[]>({
+  const { data: events = [], isLoading: eventsLoading } = useQuery<Event[]>({
     queryKey: ["/api/events", gradeScope?.id],
-    enabled: !!gradeScope?.id,
+    queryFn: async () => {
+      if (!gradeScope?.id) return [];
+      const response = await fetch(`/api/events?scopeId=${gradeScope.id}`);
+      if (!response.ok) throw new Error("Failed to fetch events");
+      return response.json();
+    },
+    enabled: !!gradeScope?.id && hasAccess,
   });
 
   const getGradeName = (num: number) => {

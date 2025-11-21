@@ -58,14 +58,26 @@ export default function ClassDetail() {
   const classScope = scopes?.find(s => s.name === `Class ${grade}-${className}`);
   const hasAccess = useHasAccessToScope(classScope?.id);
 
-  const { data: posts, isLoading: postsLoading } = useQuery<Post[]>({
+  const { data: posts = [], isLoading: postsLoading } = useQuery<Post[]>({
     queryKey: ["/api/posts", classScope?.id],
-    enabled: !!classScope?.id,
+    queryFn: async () => {
+      if (!classScope?.id) return [];
+      const response = await fetch(`/api/posts?scopeId=${classScope.id}`);
+      if (!response.ok) throw new Error("Failed to fetch posts");
+      return response.json();
+    },
+    enabled: !!classScope?.id && hasAccess,
   });
 
-  const { data: events, isLoading: eventsLoading } = useQuery<Event[]>({
+  const { data: events = [], isLoading: eventsLoading } = useQuery<Event[]>({
     queryKey: ["/api/events", classScope?.id],
-    enabled: !!classScope?.id,
+    queryFn: async () => {
+      if (!classScope?.id) return [];
+      const response = await fetch(`/api/events?scopeId=${classScope.id}`);
+      if (!response.ok) throw new Error("Failed to fetch events");
+      return response.json();
+    },
+    enabled: !!classScope?.id && hasAccess,
   });
 
   const { data: students, isLoading: studentsLoading } = useQuery<Student[]>({

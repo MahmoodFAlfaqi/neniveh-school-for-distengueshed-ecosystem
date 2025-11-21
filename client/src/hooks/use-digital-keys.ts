@@ -5,7 +5,7 @@ import type { DigitalKey } from "@shared/schema";
 export function useDigitalKeys() {
   return useQuery<DigitalKey[]>({
     queryKey: ["/api/keys"],
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    staleTime: 0, // Always refetch on invalidation
   });
 }
 
