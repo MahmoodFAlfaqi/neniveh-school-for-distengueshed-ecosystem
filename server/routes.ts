@@ -14,6 +14,7 @@ import {
   insertTeacherReviewSchema,
   insertScopeSchema,
   insertProfileCommentSchema,
+  insertAdminStudentIdSchema,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { z } from "zod";
@@ -50,13 +51,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userData = insertUserSchema.parse(req.body);
       
-      // Check if user already exists
-      const existing = await storage.getUserByEmail(userData.email);
-      if (existing) {
-        return res.status(400).json({ message: "User already exists" });
+      // Check if username already exists
+      const existingByUsername = await storage.getUserByUsername(userData.username);
+      if (existingByUsername) {
+        return res.status(400).json({ message: "Username already taken" });
       }
       
+      // Check if email already exists
+      const existingByEmail = await storage.getUserByEmail(userData.email);
+      if (existingByEmail) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+      
+      // Verify student ID exists and is not assigned
+      const studentIdRecord = await storage.getStudentIdRecord(userData.studentId);
+      if (!studentIdRecord) {
+        return res.status(400).json({ message: "Invalid student ID. Please contact an administrator." });
+      }
+      if (studentIdRecord.isAssigned) {
+        return res.status(400).json({ message: "Student ID already in use" });
+      }
+      
+      // Create user
       const user = await storage.createUser(userData);
+      
+      // Mark student ID as assigned
+      await storage.assignStudentId(userData.studentId, user.id);
+      
+      // Set session
+      req.session.userId = user.id;
       
       // Don't send password back
       const { password, ...userWithoutPassword } = user;
@@ -69,20 +92,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
+      console.error("Registration error:", error);
       res.status(500).json({ message: "Registration failed" });
     }
   });
   
-  // Login
+  // Login (username + password)
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { email, password } = req.body;
+      const { username, password } = req.body;
       
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email and password required" });
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password required" });
       }
       
-      const user = await storage.getUserByEmail(email);
+      const user = await storage.getUserByUsername(username);
       if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
@@ -103,6 +127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user: userWithoutPassword 
       });
     } catch (error) {
+      console.error("Login error:", error);
       res.status(500).json({ message: "Login failed" });
     }
   });
@@ -129,6 +154,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(userWithoutPassword);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // ==================== ADMIN STUDENT ID MANAGEMENT ====================
+  
+  // Generate new student ID (admin only)
+  app.post("/api/admin/student-ids", requireAdmin, async (req, res) => {
+    try {
+      const validatedData = insertAdminStudentIdSchema.parse({
+        studentId: req.body.studentId,
+        createdByAdminId: req.session.userId!,
+      });
+      
+      // Check if ID already exists
+      const existing = await storage.getStudentIdRecord(validatedData.studentId);
+      if (existing) {
+        return res.status(400).json({ message: "Student ID already exists" });
+      }
+      
+      const record = await storage.createStudentId(validatedData.studentId, req.session.userId!);
+      
+      res.json({ 
+        message: "Student ID created successfully",
+        studentId: record 
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Failed to create student ID:", error);
+      res.status(500).json({ message: "Failed to create student ID" });
+    }
+  });
+
+  // Get all student IDs (admin only)
+  app.get("/api/admin/student-ids", requireAdmin, async (req, res) => {
+    try {
+      const studentIds = await storage.getAllStudentIds();
+      res.json(studentIds);
+    } catch (error) {
+      console.error("Failed to fetch student IDs:", error);
+      res.status(500).json({ message: "Failed to fetch student IDs" });
+    }
+  });
+
+  // Delete student ID (admin only, only unassigned IDs)
+  app.delete("/api/admin/student-ids/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const success = await storage.deleteStudentId(id);
+      
+      if (!success) {
+        return res.status(400).json({ 
+          message: "Cannot delete student ID. It may be already assigned or not found." 
+        });
+      }
+      
+      res.json({ message: "Student ID deleted successfully" });
+    } catch (error) {
+      console.error("Failed to delete student ID:", error);
+      res.status(500).json({ message: "Failed to delete student ID" });
     }
   });
 

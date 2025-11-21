@@ -293,23 +293,30 @@ export const profileCommentsRelations = relations(profileComments, ({ one }) => 
 }));
 
 // Insert schemas
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  credibilityScore: true,
-  reputationScore: true,
-  accountStatus: true,
-  isSpecialAdmin: true, // Only set programmatically for special admins
-}).extend({
-  username: z.string()
-    .min(1, "Username is required")
-    .regex(
-      /^[A-Za-z.,-]+(\s+[A-Za-z.,-]+){1,4}$/,
-      "Username must contain 2-5 names with only letters, periods, hyphens, commas, and spaces"
-    ),
-  studentId: z.string().min(1, "Student ID is required"),
-});
+export const insertUserSchema = createInsertSchema(users)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+    credibilityScore: true,
+    reputationScore: true,
+    accountStatus: true,
+    isSpecialAdmin: true, // Only set programmatically for special admins
+  })
+  .extend({
+    username: z.string()
+      .trim()
+      .min(1, "Username is required")
+      .regex(
+        /^[A-Za-z.,-]+(\s+[A-Za-z.,-]+){1,4}$/,
+        "Username must contain 2-5 names with only letters, periods, hyphens, commas, and spaces"
+      ),
+    studentId: z.string().trim().min(1, "Student ID is required"),
+    name: z.string().trim().min(1, "Full name is required"),
+    email: z.string().trim().email("Valid email is required"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
+    phone: z.string().trim().optional(),
+  });
 
 export const insertScopeSchema = createInsertSchema(scopes).omit({
   id: true,
@@ -326,13 +333,17 @@ export const insertAdminSuccessionSchema = createInsertSchema(adminSuccessions).
   handoverDate: true,
 });
 
-export const insertAdminStudentIdSchema = createInsertSchema(adminStudentIds).omit({
-  id: true,
-  createdAt: true,
-  isAssigned: true,
-  assignedToUserId: true,
-  assignedAt: true,
-});
+export const insertAdminStudentIdSchema = createInsertSchema(adminStudentIds)
+  .omit({
+    id: true,
+    createdAt: true,
+    isAssigned: true,
+    assignedToUserId: true,
+    assignedAt: true,
+  })
+  .extend({
+    studentId: z.string().trim().min(1, "Student ID cannot be empty"),
+  });
 
 export const insertPostSchema = createInsertSchema(posts).omit({
   id: true,
