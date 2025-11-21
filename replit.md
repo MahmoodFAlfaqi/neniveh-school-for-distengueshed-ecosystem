@@ -40,9 +40,25 @@ A social platform for students, teachers, and administrators that creates a gami
    - /grades/:gradeNumber/:className - Class detail pages with student lists, News/Events tabs
    - Queries staged (enabled: false) until backend scopes are implemented
 
-**Testing Status**: End-to-end tested admin ID generation → student registration → login flow. All critical paths verified working correctly.
+5. **Access Code & Digital Keys System** (Foundation Complete):
+   - Backend enforces scope access for both posts and events (403 if user lacks digital key)
+   - GET /api/keys - Fetch user's unlocked scopes
+   - POST /api/keys/unlock - Verify access code and create digital key
+   - GET /api/keys/check/:scopeId - Check if user has access to scope
+   - UnlockScopeDialog component - Reusable modal for entering secret codes
+   - useDigitalKeys() hook - Global React Query hook for managing key state
+   - useHasAccessToScope(scopeId) - Helper hook to check access
+   - /keys page - Visual management of all scopes with lock/unlock status
+   - Sidebar navigation includes Keys menu item
 
-**Remaining Work**: Passcode system for grade/class posting access, personalized Schedule calendar, admin teacher management, teacher review system.
+**Testing Status**: End-to-end tested admin ID generation → student registration → login flow. Passcode system backend and UI infrastructure verified by architect review.
+
+**Remaining Work**: 
+- Integrate unlock dialog into News/Events composers for scoped posting
+- Enable grade/class posting by activating scoped News/Events tabs
+- Personalized Schedule calendar
+- Admin teacher management
+- Teacher review system
 
 ## User Preferences
 
