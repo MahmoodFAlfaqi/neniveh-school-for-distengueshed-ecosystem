@@ -158,6 +158,18 @@ export const teacherReviews = pgTable("teacher_reviews", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Profile Comments - user-to-user comments/reviews
+export const profileComments = pgTable("profile_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  profileUserId: varchar("profile_user_id").notNull().references(() => users.id, { onDelete: "cascade" }), // Whose profile
+  authorId: varchar("author_id").notNull().references(() => users.id, { onDelete: "cascade" }), // Who wrote it
+  
+  content: text("content").notNull(),
+  rating: integer("rating"), // Optional 1-5 stars
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   posts: many(posts),
@@ -165,6 +177,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   events: many(events),
   eventRsvps: many(eventRsvps),
   teacherReviews: many(teacherReviews),
+  profileComments: many(profileComments, { relationName: "profileComments" }),
+  authoredComments: many(profileComments, { relationName: "authoredComments" }),
 }));
 
 export const scopesRelations = relations(scopes, ({ many }) => ({
@@ -249,6 +263,19 @@ export const teacherReviewsRelations = relations(teacherReviews, ({ one }) => ({
   }),
 }));
 
+export const profileCommentsRelations = relations(profileComments, ({ one }) => ({
+  profileUser: one(users, {
+    fields: [profileComments.profileUserId],
+    references: [users.id],
+    relationName: "profileComments",
+  }),
+  author: one(users, {
+    fields: [profileComments.authorId],
+    references: [users.id],
+    relationName: "authoredComments",
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -312,6 +339,11 @@ export const insertTeacherReviewSchema = createInsertSchema(teacherReviews).omit
   moderatedById: true,
 });
 
+export const insertProfileCommentSchema = createInsertSchema(profileComments).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -342,3 +374,6 @@ export type Teacher = typeof teachers.$inferSelect;
 
 export type InsertTeacherReview = z.infer<typeof insertTeacherReviewSchema>;
 export type TeacherReview = typeof teacherReviews.$inferSelect;
+
+export type InsertProfileComment = z.infer<typeof insertProfileCommentSchema>;
+export type ProfileComment = typeof profileComments.$inferSelect;

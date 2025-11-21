@@ -9,6 +9,7 @@ import {
   schedules,
   teachers,
   teacherReviews,
+  profileComments,
   type User,
   type InsertUser,
   type Scope,
@@ -29,6 +30,8 @@ import {
   type InsertTeacher,
   type TeacherReview,
   type InsertTeacherReview,
+  type ProfileComment,
+  type InsertProfileComment,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -85,6 +88,10 @@ export interface IStorage {
   getTeacher(id: string): Promise<Teacher | undefined>;
   createTeacherReview(review: InsertTeacherReview): Promise<TeacherReview>;
   getTeacherReviews(teacherId: string): Promise<TeacherReview[]>;
+  
+  // Profile Comments
+  createProfileComment(comment: InsertProfileComment): Promise<ProfileComment>;
+  getProfileComments(profileUserId: string): Promise<ProfileComment[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -528,6 +535,20 @@ export class DatabaseStorage implements IStorage {
       .from(teacherReviews)
       .where(eq(teacherReviews.teacherId, teacherId))
       .orderBy(desc(teacherReviews.createdAt));
+  }
+
+  // ==================== PROFILE COMMENTS ====================
+  async createProfileComment(insertComment: InsertProfileComment): Promise<ProfileComment> {
+    const [comment] = await db.insert(profileComments).values(insertComment).returning();
+    return comment;
+  }
+
+  async getProfileComments(profileUserId: string): Promise<ProfileComment[]> {
+    return await db
+      .select()
+      .from(profileComments)
+      .where(eq(profileComments.profileUserId, profileUserId))
+      .orderBy(desc(profileComments.createdAt));
   }
 }
 
