@@ -4,6 +4,26 @@
 
 A social platform for students, teachers, and administrators that creates a gamified school community experience. The system uses a reputation-based access control system with "Secret Access Codes" and "Digital Keys" to manage content creation across different school scopes (global, stage/grade level, and section/class level). Features include news feeds, event management, class schedules, teacher profiles with reviews, and a comprehensive gamification system with credibility scores and reputation rankings.
 
+## Recent Changes (November 21, 2025)
+
+**Completed: Admin ID Generation & Student Registration Restructure**
+
+1. **Admin Username+ID Pair Generation**: Admins now input username + grade (1-6) + class (A, B, etc.), and the system auto-generates an 8-character alphanumeric student ID. Stored in `adminStudentIds` table with fields: username, studentId, grade, className, isAssigned.
+
+2. **Simplified Student Registration**: Registration form now only requires username + studentId + email + password + phone (optional). Name field removed from UI and auto-derived from username (e.g., "John.Smith" → "John Smith"). Role field removed and auto-set to "student". Grade and className auto-populated from student ID record.
+
+3. **Database Schema Updates**: 
+   - Users table: Added grade/className fields, unique constraint on username
+   - AdminStudentIds table: New table for managing student ID assignment
+   - Role enum: Removed "alumni" (only student/admin now, succession downgrades to student)
+   - createUser() storage method: Handles both admin creation (no studentId validation) and student creation (validates studentId record and auto-assigns)
+
+4. **Special Admin Accounts**: Two pre-seeded admin accounts created: "Mahmood.Fawaz.AL-Faqi" and "Mustafa.Mouied.Al-Ali" with password "NOTHINg27$"
+
+5. **End-to-End Tested**: Full flow verified - admin generates IDs, student registers with generated ID, name derives correctly, auto-login works.
+
+**Next Work**: Restructure navigation for Grade hierarchy (6 grades → classes within each grade), implement passcode posting, reviews system, personalized schedule.
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
