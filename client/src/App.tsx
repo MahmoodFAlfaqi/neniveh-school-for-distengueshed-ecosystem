@@ -11,6 +11,7 @@ import NewsPage from "@/pages/news";
 import EventsPage from "@/pages/events";
 import KeysPage from "@/pages/keys";
 import TeachersPage from "@/pages/teachers";
+import TeacherDetailPage from "@/pages/teacher-detail";
 import SchedulePage from "@/pages/schedule";
 import ProfilePage from "@/pages/profile";
 import SettingsPage from "@/pages/settings";
@@ -93,6 +94,13 @@ function Router() {
         {() => (
           <AuthenticatedLayout>
             <KeysPage />
+          </AuthenticatedLayout>
+        )}
+      </Route>
+      <Route path="/teachers/:id">
+        {() => (
+          <AuthenticatedLayout>
+            <TeacherDetailPage />
           </AuthenticatedLayout>
         )}
       </Route>

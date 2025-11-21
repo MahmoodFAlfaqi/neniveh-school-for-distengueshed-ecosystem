@@ -182,7 +182,9 @@ export const teacherReviews = pgTable("teacher_reviews", {
   moderatedById: varchar("moderated_by_id").references(() => users.id),
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  uniqueTeacherStudent: unique().on(table.teacherId, table.studentId),
+}));
 
 // Profile Comments - user-to-user comments/reviews
 export const profileComments = pgTable("profile_comments", {

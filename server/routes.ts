@@ -770,6 +770,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof Error && error.message.includes("community guidelines")) {
         return res.status(400).json({ message: error.message });
       }
+      // Handle unique constraint violation for duplicate reviews
+      if (error instanceof Error && (error.message.includes("unique") || error.message.includes("duplicate"))) {
+        return res.status(409).json({ message: "You have already submitted a review for this teacher" });
+      }
       res.status(500).json({ message: "Failed to create review" });
     }
   });
