@@ -84,7 +84,7 @@ export interface IStorage {
   
   // Events
   createEvent(event: InsertEvent): Promise<Event>;
-  getEvents(scopeId?: string): Promise<Event[]>;
+  getEvents(scopeId?: string, userId?: string): Promise<any[]>;
   rsvpToEvent(eventId: string, userId: string): Promise<EventRsvp | null>;
   getEventRsvps(eventId: string): Promise<EventRsvp[]>;
   getEventAttendees(eventId: string): Promise<User[]>;
@@ -689,7 +689,7 @@ export class DatabaseStorage implements IStorage {
     return event;
   }
 
-  async getEvents(scopeId?: string): Promise<any[]> {
+  async getEvents(scopeId?: string, userId?: string): Promise<any[]> {
     const baseQuery = db
       .select({
         id: events.id,
@@ -715,11 +715,12 @@ export class DatabaseStorage implements IStorage {
         .where(eq(events.scopeId, scopeId))
         .orderBy(desc(events.startTime));
       
-      // Add RSVP count for each event
+      // Add RSVP count and user's RSVP status for each event
       const eventsWithRsvps = await Promise.all(
         results.map(async (event) => {
           const rsvps = await this.getEventRsvps(event.id);
-          return { ...event, rsvpCount: rsvps.length };
+          const userHasRsvpd = userId ? rsvps.some(r => r.userId === userId) : false;
+          return { ...event, rsvpCount: rsvps.length, userHasRsvpd };
         })
       );
       return eventsWithRsvps;
@@ -727,11 +728,12 @@ export class DatabaseStorage implements IStorage {
     
     const results = await baseQuery.orderBy(desc(events.startTime));
     
-    // Add RSVP count for each event
+    // Add RSVP count and user's RSVP status for each event
     const eventsWithRsvps = await Promise.all(
       results.map(async (event) => {
         const rsvps = await this.getEventRsvps(event.id);
-        return { ...event, rsvpCount: rsvps.length };
+        const userHasRsvpd = userId ? rsvps.some(r => r.userId === userId) : false;
+        return { ...event, rsvpCount: rsvps.length, userHasRsvpd };
       })
     );
     return eventsWithRsvps;

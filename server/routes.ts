@@ -576,7 +576,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/events", requireAuth, async (req, res) => {
     try {
       const scopeId = req.query.scopeId as string | undefined;
-      const events = await storage.getEvents(scopeId);
+      const userId = req.session.userId;
+      const events = await storage.getEvents(scopeId, userId);
       res.json(events);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch events" });

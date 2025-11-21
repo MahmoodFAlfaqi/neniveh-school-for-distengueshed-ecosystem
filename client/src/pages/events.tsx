@@ -35,6 +35,7 @@ type Event = {
   createdByRole: string;
   createdByAvatarUrl: string | null;
   rsvpCount: number;
+  userHasRsvpd: boolean;
 };
 
 type Rsvp = {
@@ -54,7 +55,7 @@ type Attendee = {
   credibilityScore: number;
 };
 
-function EventCard({ event, globalScopeId, userId }: { event: Event; globalScopeId: string; userId: string }) {
+function EventCard({ event, globalScopeId }: { event: Event; globalScopeId: string }) {
   const { toast } = useToast();
   const [showAttendees, setShowAttendees] = useState(false);
 
@@ -67,8 +68,6 @@ function EventCard({ event, globalScopeId, userId }: { event: Event; globalScope
       return response.json();
     },
   });
-
-  const userHasRsvpd = attendees.some(a => a.id === userId);
 
   const rsvpMutation = useMutation({
     mutationFn: async () => {
@@ -155,12 +154,12 @@ function EventCard({ event, globalScopeId, userId }: { event: Event; globalScope
           </Collapsible>
           <Button
             size="sm"
-            variant={userHasRsvpd ? "outline" : "default"}
+            variant={event.userHasRsvpd ? "outline" : "default"}
             onClick={() => rsvpMutation.mutate()}
             disabled={rsvpMutation.isPending}
             data-testid={`button-rsvp-${event.id}`}
           >
-            {userHasRsvpd ? "Cancel RSVP" : "RSVP"}
+            {event.userHasRsvpd ? "Cancel RSVP" : "RSVP"}
           </Button>
         </div>
         
@@ -442,7 +441,6 @@ export default function EventsPage() {
                 key={event.id} 
                 event={event} 
                 globalScopeId={globalScope!.id} 
-                userId={user!.id} 
               />
             ))
           )}
