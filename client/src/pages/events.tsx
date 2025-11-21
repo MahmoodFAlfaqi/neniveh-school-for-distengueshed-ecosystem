@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/collapsible";
 import { ScopeSelector } from "@/components/ScopeSelector";
 import { useHasAccessToScope } from "@/hooks/use-digital-keys";
+import { UserProfileLink } from "@/components/UserProfileLink";
+import { Link } from "wouter";
 
 type Event = {
   id: string;
@@ -113,11 +115,13 @@ function EventCard({ event, globalScopeId }: { event: Event; globalScopeId: stri
               </Badge>
             </div>
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <Avatar className="h-6 w-6">
-                <AvatarImage src={event.createdByAvatarUrl || undefined} />
-                <AvatarFallback>{event.createdByName.charAt(0)}</AvatarFallback>
-              </Avatar>
-              <span>{event.createdByName}</span>
+              <UserProfileLink 
+                userId={event.createdById}
+                name={event.createdByName}
+                avatarUrl={event.createdByAvatarUrl}
+                showAvatar={true}
+                className="text-sm"
+              />
               <Badge variant="outline" className="text-xs">
                 {event.createdByRole}
               </Badge>
@@ -175,21 +179,23 @@ function EventCard({ event, globalScopeId }: { event: Event; globalScopeId: stri
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                 {attendees.map((attendee) => (
                   <div key={attendee.id} className="flex items-center gap-3 p-2 rounded-md bg-muted/50" data-testid={`attendee-${attendee.id}`}>
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={attendee.avatarUrl || undefined} />
-                      <AvatarFallback>{attendee.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{attendee.name}</div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        {attendee.grade && attendee.className && (
-                          <Badge variant="outline" className="text-xs">
-                            Grade {attendee.grade}-{attendee.className}
-                          </Badge>
-                        )}
-                        <span>Score: {attendee.credibilityScore.toFixed(0)}</span>
+                    <Link href={`/profile/${attendee.id}`} className="flex items-center gap-3 flex-1 min-w-0 hover-elevate rounded-md px-1">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={attendee.avatarUrl || undefined} />
+                        <AvatarFallback>{attendee.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{attendee.name}</div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          {attendee.grade && attendee.className && (
+                            <Badge variant="outline" className="text-xs">
+                              Grade {attendee.grade}-{attendee.className}
+                            </Badge>
+                          )}
+                          <span>Score: {attendee.credibilityScore.toFixed(0)}</span>
+                        </div>
                       </div>
-                    </div>
+                    </Link>
                   </div>
                 ))}
               </div>

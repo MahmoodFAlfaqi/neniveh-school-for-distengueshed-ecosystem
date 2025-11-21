@@ -241,9 +241,10 @@ export default function EventDetail() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {attendees.map((attendee) => (
-                  <div
+                  <Link
                     key={attendee.id}
-                    className="flex items-center gap-3 p-3 rounded-lg border"
+                    href={`/profile/${attendee.id}`}
+                    className="flex items-center gap-3 p-3 rounded-lg border hover-elevate"
                     data-testid={`attendee-${attendee.id}`}
                   >
                     <Avatar className="w-10 h-10">
@@ -257,7 +258,7 @@ export default function EventDetail() {
                         {attendee.username}
                       </p>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}

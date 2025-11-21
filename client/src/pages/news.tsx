@@ -12,6 +12,7 @@ import { Heart, MessageSquare, Send, TrendingUp } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ScopeSelector } from "@/components/ScopeSelector";
 import { useHasAccessToScope } from "@/hooks/use-digital-keys";
+import { UserProfileLink } from "@/components/UserProfileLink";
 
 type Post = {
   id: string;
@@ -185,22 +186,19 @@ export default function NewsPage() {
               <Card key={post.id} className="hover-elevate" data-testid={`card-post-${post.id}`}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={post.authorAvatarUrl || undefined} />
-                        <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium" data-testid={`text-author-${post.id}`}>
-                          {post.authorName}
-                        </p>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Badge variant="secondary" className="text-xs">
-                            {post.authorRole}
-                          </Badge>
-                          <span>•</span>
-                          <span>{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
-                        </div>
+                    <div className="flex flex-col gap-2">
+                      <UserProfileLink 
+                        userId={post.authorId}
+                        name={post.authorName}
+                        avatarUrl={post.authorAvatarUrl}
+                        showAvatar={true}
+                      />
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground pl-1">
+                        <Badge variant="secondary" className="text-xs">
+                          {post.authorRole}
+                        </Badge>
+                        <span>•</span>
+                        <span>{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
