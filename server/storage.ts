@@ -85,8 +85,9 @@ export interface IStorage {
   // Events
   createEvent(event: InsertEvent): Promise<Event>;
   getEvents(scopeId?: string): Promise<Event[]>;
-  rsvpToEvent(eventId: string, userId: string): Promise<EventRsvp>;
+  rsvpToEvent(eventId: string, userId: string): Promise<EventRsvp | null>;
   getEventRsvps(eventId: string): Promise<EventRsvp[]>;
+  getEventAttendees(eventId: string): Promise<User[]>;
   
   // Schedules
   createSchedule(schedule: InsertSchedule): Promise<Schedule>;
@@ -736,17 +737,68 @@ export class DatabaseStorage implements IStorage {
     return eventsWithRsvps;
   }
 
-  async rsvpToEvent(eventId: string, userId: string): Promise<EventRsvp> {
-    const [rsvp] = await db.insert(eventRsvps).values({ eventId, userId }).returning();
+  async rsvpToEvent(eventId: string, userId: string): Promise<EventRsvp | null> {
+    // Check if user already RSVP'd
+    const existingRsvp = await db
+      .select()
+      .from(eventRsvps)
+      .where(and(eq(eventRsvps.eventId, eventId), eq(eventRsvps.userId, userId)))
+      .limit(1);
     
-    // Recalculate user's reputation after RSVP
-    await this.calculateUserReputation(userId);
-    
-    return rsvp;
+    if (existingRsvp.length > 0) {
+      // User already RSVP'd - remove the RSVP (toggle off)
+      await db
+        .delete(eventRsvps)
+        .where(and(eq(eventRsvps.eventId, eventId), eq(eventRsvps.userId, userId)));
+      
+      // Recalculate user's reputation after un-RSVP
+      await this.calculateUserReputation(userId);
+      
+      return null; // Return null to indicate RSVP was removed
+    } else {
+      // User hasn't RSVP'd - add the RSVP (toggle on)
+      const [rsvp] = await db.insert(eventRsvps).values({ eventId, userId }).returning();
+      
+      // Recalculate user's reputation after RSVP
+      await this.calculateUserReputation(userId);
+      
+      return rsvp;
+    }
   }
 
   async getEventRsvps(eventId: string): Promise<EventRsvp[]> {
     return await db.select().from(eventRsvps).where(eq(eventRsvps.eventId, eventId));
+  }
+
+  async getEventAttendees(eventId: string): Promise<User[]> {
+    const attendees = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        studentId: users.studentId,
+        email: users.email,
+        phone: users.phone,
+        password: users.password,
+        name: users.name,
+        role: users.role,
+        isSpecialAdmin: users.isSpecialAdmin,
+        grade: users.grade,
+        className: users.className,
+        credibilityScore: users.credibilityScore,
+        reputationScore: users.reputationScore,
+        accountStatus: users.accountStatus,
+        transportDetails: users.transportDetails,
+        avatarUrl: users.avatarUrl,
+        bio: users.bio,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+      })
+      .from(eventRsvps)
+      .innerJoin(users, eq(eventRsvps.userId, users.id))
+      .where(eq(eventRsvps.eventId, eventId))
+      .orderBy(users.name);
+    
+    return attendees;
   }
 
   // ==================== SCHEDULES ====================

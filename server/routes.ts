@@ -603,6 +603,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/events/:id/attendees", requireAuth, async (req, res) => {
+    try {
+      const attendees = await storage.getEventAttendees(req.params.id);
+      res.json(attendees);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch event attendees" });
+    }
+  });
+
   // ==================== SCHEDULES ====================
   
   // Create schedule entry (requires section key)

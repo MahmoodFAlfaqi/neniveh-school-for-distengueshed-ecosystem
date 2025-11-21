@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, real, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, real, pgEnum, unique } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -133,7 +133,9 @@ export const eventRsvps = pgTable("event_rsvps", {
   eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   rsvpedAt: timestamp("rsvped_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  uniqueEventUser: unique().on(table.eventId, table.userId),
+}));
 
 // Schedules (class timetables)
 export const schedules = pgTable("schedules", {

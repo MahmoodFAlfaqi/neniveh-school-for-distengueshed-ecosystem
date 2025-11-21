@@ -11,8 +11,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, MapPin, Clock, Users, Plus } from "lucide-react";
+import { Calendar, MapPin, Clock, Users, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 type Event = {
   id: string;
@@ -38,6 +43,162 @@ type Rsvp = {
   userId: string;
   rsvpedAt: string;
 };
+
+type Attendee = {
+  id: string;
+  name: string;
+  username: string;
+  avatarUrl: string | null;
+  grade: number | null;
+  className: string | null;
+  credibilityScore: number;
+};
+
+function EventCard({ event, globalScopeId, userId }: { event: Event; globalScopeId: string; userId: string }) {
+  const { toast } = useToast();
+  const [showAttendees, setShowAttendees] = useState(false);
+
+  const { data: attendees = [], isLoading: loadingAttendees } = useQuery<Attendee[]>({
+    queryKey: ["/api/events", event.id, "attendees"],
+    enabled: showAttendees,
+    queryFn: async () => {
+      const response = await fetch(`/api/events/${event.id}/attendees`);
+      if (!response.ok) throw new Error("Failed to fetch attendees");
+      return response.json();
+    },
+  });
+
+  const userHasRsvpd = attendees.some(a => a.id === userId);
+
+  const rsvpMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/events/${event.id}/rsvp`, {});
+    },
+    onSuccess: (result) => {
+      if (result === null) {
+        toast({
+          title: "RSVP cancelled",
+          description: "You've been removed from the event attendance list",
+        });
+      } else {
+        toast({
+          title: "RSVP confirmed",
+          description: "You've been added to the event attendance list",
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/events", globalScopeId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events", event.id, "attendees"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "RSVP failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <Card className="hover-elevate" data-testid={`card-event-${event.id}`}>
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <CardTitle data-testid={`text-event-title-${event.id}`}>
+                {event.title}
+              </CardTitle>
+              <Badge variant={event.eventType === "curricular" ? "default" : "secondary"}>
+                {event.eventType}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <Avatar className="h-6 w-6">
+                <AvatarImage src={event.createdByAvatarUrl || undefined} />
+                <AvatarFallback>{event.createdByName.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <span>{event.createdByName}</span>
+              <Badge variant="outline" className="text-xs">
+                {event.createdByRole}
+              </Badge>
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {event.description && (
+          <p className="text-muted-foreground">{event.description}</p>
+        )}
+        <div className="flex flex-wrap gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-muted-foreground" />
+            <span>{format(new Date(event.startTime), "PPp")}</span>
+          </div>
+          {event.location && (
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-muted-foreground" />
+              <span>{event.location}</span>
+            </div>
+          )}
+        </div>
+      </CardContent>
+      <Separator />
+      <CardFooter className="py-3 flex-col items-start gap-3">
+        <div className="w-full flex items-center justify-between">
+          <Collapsible open={showAttendees} onOpenChange={setShowAttendees} className="flex items-center gap-2">
+            <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover-elevate px-2 py-1 rounded-md" data-testid={`button-toggle-attendees-${event.id}`}>
+              <Users className="w-4 h-4" />
+              <span data-testid={`text-rsvp-count-${event.id}`}>
+                {event.rsvpCount} {event.rsvpCount === 1 ? "attendee" : "attendees"}
+              </span>
+              {showAttendees ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </CollapsibleTrigger>
+          </Collapsible>
+          <Button
+            size="sm"
+            variant={userHasRsvpd ? "outline" : "default"}
+            onClick={() => rsvpMutation.mutate()}
+            disabled={rsvpMutation.isPending}
+            data-testid={`button-rsvp-${event.id}`}
+          >
+            {userHasRsvpd ? "Cancel RSVP" : "RSVP"}
+          </Button>
+        </div>
+        
+        <Collapsible open={showAttendees} onOpenChange={setShowAttendees} className="w-full">
+          <CollapsibleContent>
+            {loadingAttendees ? (
+              <div className="text-sm text-muted-foreground">Loading attendees...</div>
+            ) : attendees.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No attendees yet</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                {attendees.map((attendee) => (
+                  <div key={attendee.id} className="flex items-center gap-3 p-2 rounded-md bg-muted/50" data-testid={`attendee-${attendee.id}`}>
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={attendee.avatarUrl || undefined} />
+                      <AvatarFallback>{attendee.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm truncate">{attendee.name}</div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {attendee.grade && attendee.className && (
+                          <Badge variant="outline" className="text-xs">
+                            Grade {attendee.grade}-{attendee.className}
+                          </Badge>
+                        )}
+                        <span>Score: {attendee.credibilityScore.toFixed(0)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+      </CardFooter>
+    </Card>
+  );
+}
 
 export default function EventsPage() {
   const { toast } = useToast();
@@ -121,35 +282,11 @@ export default function EventsPage() {
     },
   });
 
-  const rsvpMutation = useMutation({
-    mutationFn: async (eventId: string) => {
-      return await apiRequest("POST", `/api/events/${eventId}/rsvp`, {});
-    },
-    onSuccess: () => {
-      toast({
-        title: "RSVP confirmed",
-        description: "You've been added to the event attendance list",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/events", globalScope?.id] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "RSVP failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.title.trim() && formData.startTime) {
       createEventMutation.mutate(formData);
     }
-  };
-
-  const handleRsvp = (eventId: string) => {
-    rsvpMutation.mutate(eventId);
   };
 
   return (
@@ -301,66 +438,12 @@ export default function EventsPage() {
             </Card>
           ) : (
             events.map((event) => (
-              <Card key={event.id} className="hover-elevate" data-testid={`card-event-${event.id}`}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CardTitle data-testid={`text-event-title-${event.id}`}>
-                          {event.title}
-                        </CardTitle>
-                        <Badge variant={event.eventType === "curricular" ? "default" : "secondary"}>
-                          {event.eventType}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={event.createdByAvatarUrl || undefined} />
-                          <AvatarFallback>{event.createdByName.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <span>{event.createdByName}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {event.createdByRole}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {event.description && (
-                    <p className="text-muted-foreground">{event.description}</p>
-                  )}
-                  <div className="flex flex-wrap gap-4 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <span>{format(new Date(event.startTime), "PPp")}</span>
-                    </div>
-                    {event.location && (
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-muted-foreground" />
-                        <span>{event.location}</span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-                <Separator />
-                <CardFooter className="py-3 justify-between">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Users className="w-4 h-4" />
-                    <span data-testid={`text-rsvp-count-${event.id}`}>
-                      {event.rsvpCount} {event.rsvpCount === 1 ? "attendee" : "attendees"}
-                    </span>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => handleRsvp(event.id)}
-                    disabled={rsvpMutation.isPending}
-                    data-testid={`button-rsvp-${event.id}`}
-                  >
-                    RSVP
-                  </Button>
-                </CardFooter>
-              </Card>
+              <EventCard 
+                key={event.id} 
+                event={event} 
+                globalScopeId={globalScope!.id} 
+                userId={user!.id} 
+              />
             ))
           )}
         </div>
