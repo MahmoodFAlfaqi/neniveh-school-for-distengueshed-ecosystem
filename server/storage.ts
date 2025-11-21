@@ -406,21 +406,67 @@ export class DatabaseStorage implements IStorage {
     return post;
   }
 
-  async getPosts(scopeId?: string | null): Promise<Post[]> {
+  async getPosts(scopeId?: string | null): Promise<any[]> {
     if (scopeId === null || scopeId === undefined) {
-      // Get public square posts (no scope)
-      return await db
-        .select()
+      // Get public square posts (no scope) with author info
+      const results = await db
+        .select({
+          id: posts.id,
+          content: posts.content,
+          authorId: posts.authorId,
+          scopeId: posts.scopeId,
+          credibilityRating: posts.credibilityRating,
+          mediaUrl: posts.mediaUrl,
+          mediaType: posts.mediaType,
+          createdAt: posts.createdAt,
+          authorName: users.name,
+          authorRole: users.role,
+          authorAvatarUrl: users.avatarUrl,
+        })
         .from(posts)
+        .leftJoin(users, eq(posts.authorId, users.id))
         .where(sql`${posts.scopeId} IS NULL`)
         .orderBy(desc(posts.createdAt));
+      
+      // Transform to ensure author always exists
+      return results.map(post => ({
+        ...post,
+        author: {
+          name: post.authorName || "Unknown User",
+          role: post.authorRole || "student",
+          avatarUrl: post.authorAvatarUrl,
+        },
+      }));
     }
     
-    return await db
-      .select()
+    const results = await db
+      .select({
+        id: posts.id,
+        content: posts.content,
+        authorId: posts.authorId,
+        scopeId: posts.scopeId,
+        credibilityRating: posts.credibilityRating,
+        mediaUrl: posts.mediaUrl,
+        mediaType: posts.mediaType,
+        createdAt: posts.createdAt,
+        authorName: users.name,
+        authorRole: users.role,
+        authorAvatarUrl: users.avatarUrl,
+      })
       .from(posts)
+      .leftJoin(users, eq(posts.authorId, users.id))
       .where(eq(posts.scopeId, scopeId))
       .orderBy(desc(posts.createdAt));
+    
+    // Transform to ensure author always exists
+    return results.map(post => ({
+      ...post,
+      author: {
+        name: post.authorName || "Unknown User",
+        role: post.authorRole || "student",
+        avatarUrl: post.authorAvatarUrl,
+      },
+    }));
   }
 
   async getPost(id: string): Promise<Post | undefined> {

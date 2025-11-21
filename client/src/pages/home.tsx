@@ -3,529 +3,466 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
+import { Heart, MessageCircle, Share2, Calendar, Trophy, Users, TrendingUp } from "lucide-react";
+
+type User = {
+  id: string;
+  name: string;
+  role: string;
+  credibilityScore: number;
+  reputationScore: number;
+  accountStatus: string;
+};
+
+type Scope = {
+  id: string;
+  name: string;
+  description?: string;
+  type: string;
+  accessCode: string;
+};
+
+type Post = {
+  id: string;
+  content: string;
+  authorId: string;
+  scopeId: string | null;
+  credibilityRating: number;
+  mediaUrl?: string;
+  mediaType?: string;
+  createdAt: string;
+  author?: {
+    name: string;
+    role: string;
+    avatarUrl?: string;
+  };
+};
+
+type Event = {
+  id: string;
+  title: string;
+  description?: string;
+  date: string;
+  location?: string;
+  type: string;
+  scopeId: string;
+  createdById: string;
+  createdAt: string;
+};
 
 export default function Home() {
   const { toast } = useToast();
-  
-  // Auth state
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  
-  // Access code state
-  const [selectedScope, setSelectedScope] = useState("");
-  const [accessCode, setAccessCode] = useState("");
-  
-  // Post state
+  const [selectedScope, setSelectedScope] = useState<string | null>(null);
   const [postContent, setPostContent] = useState("");
-  const [postScope, setPostScope] = useState<string | null>(null);
-  
-  // Admin handover state
-  const [successorEmail, setSuccessorEmail] = useState("");
-  
-  // Fetch current user (from session)
-  const { data: currentUser, isLoading: userLoading } = useQuery<any>({
+
+  const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
-    retry: false,
   });
-  
-  // Fetch scopes
-  const { data: scopes = [] } = useQuery<any[]>({
+
+  const { data: scopes = [] } = useQuery<Scope[]>({
     queryKey: ["/api/scopes"],
-    enabled: !!currentUser,
   });
-  
-  // Fetch user's digital keys
+
+  const { data: posts = [], isLoading: postsLoading } = useQuery<Post[]>({
+    queryKey: ["/api/posts", selectedScope],
+  });
+
+  const { data: events = [] } = useQuery<Event[]>({
+    queryKey: ["/api/events"],
+  });
+
   const { data: digitalKeys = [] } = useQuery<any[]>({
     queryKey: ["/api/keys"],
-    enabled: !!currentUser,
   });
-  
-  // Fetch posts
-  const { data: posts = [] } = useQuery<any[]>({
+
+  // Get recent activity - all recent posts regardless of scope
+  const { data: recentActivity = [] } = useQuery<Post[]>({
     queryKey: ["/api/posts"],
-    enabled: !!currentUser,
   });
-  
-  // Auth mutations
-  const loginMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/auth/login", { email, password });
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      toast({ title: "Login successful", description: `Welcome, ${data.user.name}!` });
-    },
-    onError: () => {
-      toast({ title: "Login failed", description: "Invalid credentials", variant: "destructive" });
-    },
-  });
-  
-  const registerMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/auth/register", { email, password, name, role: "student" });
-    },
-    onSuccess: (data: any) => {
-      toast({ title: "Registration successful", description: "Please log in" });
-      setAuthMode("login");
-    },
-    onError: () => {
-      toast({ title: "Registration failed", variant: "destructive" });
-    },
-  });
-  
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/auth/logout", {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      toast({ title: "Logged out successfully" });
-    },
-  });
-  
-  // Access code mutation
-  const unlockScopeMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/keys/unlock", {
-        scopeId: selectedScope,
-        accessCode,
-      });
-    },
-    onSuccess: (data: any) => {
-      toast({ title: "Success!", description: data.message });
-      queryClient.invalidateQueries({ queryKey: ["/api/keys"] });
-      setAccessCode("");
-    },
-    onError: (error: any) => {
-      toast({ title: "Failed", description: error.message || "Incorrect access code", variant: "destructive" });
-    },
-  });
-  
-  // Post creation mutation
+
   const createPostMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/posts", {
-        content: postContent,
-        scopeId: postScope,
-      });
+    mutationFn: async (data: { content: string; scopeId: string | null }) => {
+      await apiRequest("POST", "/api/posts", data);
     },
     onSuccess: () => {
-      toast({ title: "Post created!" });
-      queryClient.invalidateQueries({ queryKey: ["/api/posts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/posts", selectedScope] });
       setPostContent("");
-      
-      // Recalculate reputation
-      calculateReputationMutation.mutate();
-    },
-    onError: (error: any) => {
-      toast({ title: "Failed to create post", description: error.message, variant: "destructive" });
-    },
-  });
-  
-  // Calculate reputation
-  const calculateReputationMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/reputation/calculate", {});
-    },
-    onSuccess: (data: any) => {
-      toast({ title: "Reputation updated", description: `Score: ${data.reputation.toFixed(2)}` });
-      
-      // Refresh user data
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-    },
-  });
-  
-  // Admin handover mutation
-  const handoverMutation = useMutation({
-    mutationFn: async (successorId: string) => {
-      return apiRequest("POST", "/api/admin/handover", {
-        successorId,
-        notes: `Handover from ${currentUser.name}`,
+      toast({
+        title: "Post created successfully",
       });
     },
-    onSuccess: (data: any) => {
-      toast({ title: "Admin privileges transferred", description: data.message });
-      
-      // Refresh user to show new role
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-    },
-    onError: (error: any) => {
-      toast({ title: "Handover failed", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create post",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
-  
-  const handleAuth = () => {
-    if (authMode === "login") {
-      loginMutation.mutate();
-    } else {
-      registerMutation.mutate();
+
+  const handleCreatePost = () => {
+    if (!postContent.trim()) {
+      toast({
+        title: "Post content is required",
+        variant: "destructive",
+      });
+      return;
     }
+
+    createPostMutation.mutate({
+      content: postContent,
+      scopeId: selectedScope,
+    });
   };
-  
-  if (userLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
-    );
-  }
-  
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>School Community Ecosystem</CardTitle>
-            <CardDescription>
-              {authMode === "login" ? "Login to your account" : "Create a new account"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {authMode === "register" && (
-              <div className="space-y-2">
-                <Label htmlFor="name" data-testid="label-name">Name</Label>
-                <Input
-                  id="name"
-                  data-testid="input-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
-                />
-              </div>
-            )}
-            
-            <div className="space-y-2">
-              <Label htmlFor="email" data-testid="label-email">Email</Label>
-              <Input
-                id="email"
-                data-testid="input-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="password" data-testid="label-password">Password</Label>
-              <Input
-                id="password"
-                data-testid="input-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-              />
-            </div>
-            
-            <Button
-              data-testid="button-auth"
-              onClick={handleAuth}
-              className="w-full"
-              disabled={loginMutation.isPending || registerMutation.isPending}
-            >
-              {authMode === "login" ? "Login" : "Register"}
-            </Button>
-            
-            <Button
-              data-testid="button-toggle-mode"
-              variant="ghost"
-              onClick={() => setAuthMode(authMode === "login" ? "register" : "login")}
-              className="w-full"
-            >
-              {authMode === "login" ? "Need an account? Register" : "Have an account? Login"}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-  
+
+  const getUserInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const getCredibilityBadge = (rating: number) => {
+    if (rating >= 75) return { text: "High", variant: "default" as const };
+    if (rating >= 50) return { text: "Medium", variant: "secondary" as const };
+    return { text: "Low", variant: "destructive" as const };
+  };
+
   return (
-    <div className="min-h-screen bg-background p-4 space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Welcome, {currentUser.name}</span>
-            <Button
-              data-testid="button-logout"
-              variant="outline"
-              onClick={() => logoutMutation.mutate()}
-            >
-              Logout
-            </Button>
-          </CardTitle>
-          <CardDescription>Testing Backend Logic</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <div className="text-sm text-muted-foreground">Role</div>
-              <Badge variant={currentUser.role === "admin" ? "default" : "secondary"} data-testid="badge-role">
-                {currentUser.role}
-              </Badge>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground">Credibility</div>
-              <div className="text-lg font-semibold" data-testid="text-credibility">
-                {currentUser.credibilityScore?.toFixed(1) || "50.0"}
-              </div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground">Reputation</div>
-              <div className="text-lg font-semibold" data-testid="text-reputation">
-                {currentUser.reputationScore?.toFixed(1) || "0.0"}
-              </div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground">Account Status</div>
-              <Badge 
-                variant={currentUser.accountStatus === "threatened" ? "destructive" : "secondary"}
-                data-testid="badge-status"
+    <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - User Stats & Leaderboard */}
+        <div className="space-y-6">
+          {user && (
+            <Card data-testid="card-user-stats">
+              <CardHeader>
+                <CardTitle>Your Profile</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <Avatar className="w-16 h-16">
+                    <AvatarFallback className="text-xl">
+                      {getUserInitials(user.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <p className="font-semibold text-lg">{user.name}</p>
+                    <Badge variant="outline">{user.role}</Badge>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <Trophy className="w-4 h-4 text-amber-500" />
+                      <p className="text-2xl font-bold">{user.credibilityScore}</p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Credibility</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <TrendingUp className="w-4 h-4 text-blue-500" />
+                      <p className="text-2xl font-bold">{user.reputationScore}</p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Reputation</p>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="text-sm font-medium">Account Status</p>
+                    <Badge variant={user.accountStatus === "active" ? "default" : "destructive"}>
+                      {user.accountStatus}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Upcoming Events</CardTitle>
+              <CardDescription>{events.length} events scheduled</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {events.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No upcoming events</p>
+              ) : (
+                <div className="space-y-3">
+                  {events.slice(0, 5).map((event) => (
+                    <div
+                      key={event.id}
+                      className="flex items-start gap-3 p-3 rounded-lg border hover-elevate"
+                      data-testid={`event-${event.id}`}
+                    >
+                      <Calendar className="w-4 h-4 mt-1 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">{event.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(event.date).toLocaleDateString()}
+                        </p>
+                        <Badge variant="outline" className="text-xs mt-1">
+                          {event.type}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Center Column - News Feed */}
+        <div className="space-y-6">
+          {/* Scope Selector */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Select Scope</CardTitle>
+              <CardDescription>Choose where to view and post content</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Select
+                value={selectedScope || "public"}
+                onValueChange={(value) => setSelectedScope(value === "public" ? null : value)}
               >
-                {currentUser.accountStatus || "active"}
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Digital Keys Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>🔑 Digital Keys (Access Code System)</CardTitle>
-          <CardDescription>
-            Enter an access code once to unlock a scope permanently
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label data-testid="label-scope">Select Scope</Label>
-              <Select value={selectedScope} onValueChange={setSelectedScope}>
                 <SelectTrigger data-testid="select-scope">
-                  <SelectValue placeholder="Choose a scope" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {scopes.map((scope: any) => (
+                  <SelectItem value="public">Public Square (Global)</SelectItem>
+                  {scopes.map((scope) => (
                     <SelectItem key={scope.id} value={scope.id}>
-                      {scope.name} ({scope.type})
+                      {scope.name} - {scope.type}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label data-testid="label-access-code">Access Code</Label>
-              <div className="flex gap-2">
-                <Input
-                  data-testid="input-access-code"
-                  value={accessCode}
-                  onChange={(e) => setAccessCode(e.target.value)}
-                  placeholder="Enter access code"
-                />
+            </CardContent>
+          </Card>
+
+          {/* Create Post */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Create Post</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Textarea
+                placeholder="What's on your mind?"
+                value={postContent}
+                onChange={(e) => setPostContent(e.target.value)}
+                className="min-h-24"
+                data-testid="textarea-post-content"
+              />
+              <div className="flex justify-end">
                 <Button
-                  data-testid="button-unlock"
-                  onClick={() => unlockScopeMutation.mutate()}
-                  disabled={!selectedScope || !accessCode || unlockScopeMutation.isPending}
+                  onClick={handleCreatePost}
+                  disabled={createPostMutation.isPending}
+                  data-testid="button-create-post"
                 >
-                  Unlock
+                  {createPostMutation.isPending ? "Posting..." : "Post"}
                 </Button>
               </div>
-            </div>
+            </CardContent>
+          </Card>
+
+          {/* News Feed */}
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold">News Feed</h2>
+            {postsLoading ? (
+              <Card>
+                <CardContent className="py-12">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : posts.length === 0 ? (
+              <Card>
+                <CardContent className="py-12">
+                  <p className="text-center text-muted-foreground">
+                    No posts yet. Be the first to share something!
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              posts.map((post) => {
+                const credibilityBadge = getCredibilityBadge(post.credibilityRating);
+                return (
+                  <Card key={post.id} data-testid={`post-${post.id}`}>
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarFallback>
+                            {post.author ? getUserInitials(post.author.name) : "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold">{post.author?.name || "Unknown User"}</p>
+                            {post.author && (
+                              <Badge variant="outline" className="text-xs">
+                                {post.author.role}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(post.createdAt).toLocaleDateString()}
+                            </p>
+                            <Badge variant={credibilityBadge.variant} className="text-xs">
+                              {credibilityBadge.text}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="whitespace-pre-wrap">{post.content}</p>
+                      
+                      {post.mediaUrl && (
+                        <div className="rounded-lg border overflow-hidden">
+                          {post.mediaType === "image" ? (
+                            <img
+                              src={post.mediaUrl}
+                              alt="Post media"
+                              className="w-full max-h-96 object-cover"
+                            />
+                          ) : (
+                            <div className="p-4 flex items-center gap-2">
+                              <span className="text-sm">{post.mediaUrl}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center gap-6 pt-2 border-t">
+                        <button 
+                          className="flex items-center gap-2 text-sm text-muted-foreground hover-elevate px-3 py-2 rounded-md"
+                          data-testid={`button-like-${post.id}`}
+                        >
+                          <Heart className="w-4 h-4" />
+                          <span>Like</span>
+                        </button>
+                        <button 
+                          className="flex items-center gap-2 text-sm text-muted-foreground hover-elevate px-3 py-2 rounded-md"
+                          data-testid={`button-comment-${post.id}`}
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          <span>Comment</span>
+                        </button>
+                        <button 
+                          className="flex items-center gap-2 text-sm text-muted-foreground hover-elevate px-3 py-2 rounded-md"
+                          data-testid={`button-share-${post.id}`}
+                        >
+                          <Share2 className="w-4 h-4" />
+                          <span>Share</span>
+                        </button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
           </div>
-          
-          <Separator />
-          
-          <div>
-            <div className="text-sm font-medium mb-2">Your Digital Keys ({digitalKeys.length})</div>
-            <div className="flex flex-wrap gap-2">
-              {digitalKeys.length === 0 && (
-                <div className="text-sm text-muted-foreground" data-testid="text-no-keys">
-                  No keys yet. Enter an access code above to unlock a scope.
+        </div>
+
+        {/* Right Column - Activity Panel */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Activity</CardTitle>
+              <CardDescription>Recent posts ({recentActivity.slice(0, 5).length})</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {recentActivity.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No recent activity</p>
+              ) : (
+                <div className="space-y-3">
+                  {recentActivity.slice(0, 5).map((post: Post) => (
+                    <div key={post.id} className="flex gap-2 p-2 rounded-lg border">
+                      <Avatar className="w-8 h-8">
+                        <AvatarFallback className="text-xs">
+                          {post.author ? getUserInitials(post.author.name) : "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">
+                          {post.author?.name || "Unknown"}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {post.content.slice(0, 60)}...
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(post.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
-              {digitalKeys.map((key: any) => (
-                <Badge key={key.id} variant="outline" data-testid={`badge-key-${key.scopeId}`}>
-                  Key #{key.scopeId.slice(0, 8)}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Admin Handover Section */}
-      {currentUser.role === "admin" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>👑 Admin Handover Protocol</CardTitle>
-            <CardDescription>
-              Transfer admin privileges to a successor (you'll become Alumni)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="destructive" data-testid="button-open-handover">
-                  Initiate Handover
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Transfer Admin Privileges</DialogTitle>
-                  <DialogDescription>
-                    This action will transfer all admin privileges to the successor and downgrade your account to Alumni status.
-                  </DialogDescription>
-                </DialogHeader>
-                
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Digital Keys</CardTitle>
+              <CardDescription>Unlocked scopes ({digitalKeys.length})</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {digitalKeys.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No keys unlocked yet</p>
+              ) : (
                 <div className="space-y-2">
-                  <Label data-testid="label-successor">Successor Email</Label>
-                  <Input
-                    data-testid="input-successor"
-                    value={successorEmail}
-                    onChange={(e) => setSuccessorEmail(e.target.value)}
-                    placeholder="successor@email.com"
-                  />
+                  {digitalKeys.map((key: any) => (
+                    <div key={key.id} className="flex items-center gap-2 p-2 rounded-lg border">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">Scope: {key.scopeId.slice(0, 12)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Unlocked {new Date(key.unlockedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                
-                <DialogFooter>
-                  <Button
-                    data-testid="button-confirm-handover"
-                    variant="destructive"
-                    onClick={async () => {
-                      try {
-                        // Search for user by email
-                        const user = await apiRequest("GET", `/api/users/search?email=${encodeURIComponent(successorEmail)}`, {});
-                        if (user?.id) {
-                          handoverMutation.mutate(user.id);
-                        }
-                      } catch (error) {
-                        toast({ title: "User not found", variant: "destructive" });
-                      }
-                    }}
-                    disabled={!successorEmail || handoverMutation.isPending}
-                  >
-                    Confirm Transfer
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </CardContent>
-        </Card>
-      )}
-      
-      {/* Post Creation Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>📝 Create Post</CardTitle>
-          <CardDescription>Post to Public Square or restricted scopes</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label data-testid="label-post-scope">Post Scope</Label>
-            <Select value={postScope || "public"} onValueChange={(v) => setPostScope(v === "public" ? null : v)}>
-              <SelectTrigger data-testid="select-post-scope">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="public">Public Square (No Code Required)</SelectItem>
-                {scopes.map((scope: any) => (
-                  <SelectItem key={scope.id} value={scope.id}>
-                    {scope.name} ({scope.type})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="space-y-2">
-            <Label data-testid="label-post-content">Content</Label>
-            <Input
-              data-testid="input-post-content"
-              value={postContent}
-              onChange={(e) => setPostContent(e.target.value)}
-              placeholder="What's on your mind?"
-            />
-          </div>
-          
-          <Button
-            data-testid="button-create-post"
-            onClick={() => createPostMutation.mutate()}
-            disabled={!postContent || createPostMutation.isPending}
-          >
-            Create Post
-          </Button>
-        </CardContent>
-      </Card>
-      
-      {/* Posts Display */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Posts ({posts.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {posts.length === 0 && (
-            <div className="text-sm text-muted-foreground" data-testid="text-no-posts">
-              No posts yet. Create one above!
-            </div>
-          )}
-          {posts.slice(0, 5).map((post: any) => (
-            <Card key={post.id} data-testid={`post-${post.id}`}>
-              <CardContent className="pt-4">
-                <div className="text-sm">{post.content}</div>
-                <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
-                  <Badge variant="outline">Credibility: {post.credibilityRating?.toFixed(1)}</Badge>
-                  <Badge variant="secondary">
-                    {post.scopeId ? `Scope: ${post.scopeId.slice(0, 8)}` : "Public"}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </CardContent>
-      </Card>
-      
-      {/* Reputation Calculator */}
-      <Card>
-        <CardHeader>
-          <CardTitle>🎯 Reputation Engine</CardTitle>
-          <CardDescription>Calculate your reputation based on activity, credibility, and participation</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            data-testid="button-calculate-reputation"
-            onClick={() => calculateReputationMutation.mutate()}
-            disabled={calculateReputationMutation.isPending}
-          >
-            Recalculate Reputation
-          </Button>
-        </CardContent>
-      </Card>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Leaderboard</CardTitle>
+              <CardDescription>Top contributors</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {user && (
+                  <div className="flex items-center gap-3 p-2 rounded-lg border">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-semibold text-sm">
+                      1
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{user.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {user.reputationScore} points
+                      </p>
+                    </div>
+                    <Trophy className="w-4 h-4 text-amber-500" />
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
