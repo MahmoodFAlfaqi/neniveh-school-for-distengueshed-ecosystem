@@ -708,16 +708,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Get single teacher
+  // Get single teacher with reviews and average rating
   app.get("/api/teachers/:id", requireAuth, async (req, res) => {
     try {
-      const teacher = await storage.getTeacher(req.params.id);
+      const result = await storage.getTeacherWithReviews(req.params.id);
+      if (!result) {
+        return res.status(404).json({ message: "Teacher not found" });
+      }
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch teacher" });
+    }
+  });
+
+  // Update teacher (admin only)
+  app.patch("/api/teachers/:id", requireAdmin, async (req, res) => {
+    try {
+      const updates = req.body;
+      const teacher = await storage.updateTeacher(req.params.id, updates);
       if (!teacher) {
         return res.status(404).json({ message: "Teacher not found" });
       }
       res.json(teacher);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch teacher" });
+      res.status(500).json({ message: "Failed to update teacher" });
+    }
+  });
+
+  // Delete teacher (admin only)
+  app.delete("/api/teachers/:id", requireAdmin, async (req, res) => {
+    try {
+      const deleted = await storage.deleteTeacher(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Teacher not found" });
+      }
+      res.json({ message: "Teacher deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete teacher" });
     }
   });
   
