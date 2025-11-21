@@ -144,18 +144,6 @@ export default function GradeDetail() {
           </TabsList>
 
           <TabsContent value="news" className="space-y-4 mt-6">
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <Lock className="w-12 h-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">
-                  Passcode Required to Post
-                </h3>
-                <p className="text-sm text-muted-foreground max-w-md">
-                  Only students with the grade passcode can post news here. Contact your grade representative for access.
-                </p>
-              </CardContent>
-            </Card>
-
             {postsLoading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
@@ -207,18 +195,6 @@ export default function GradeDetail() {
           </TabsContent>
 
           <TabsContent value="events" className="space-y-4 mt-6">
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <Lock className="w-12 h-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">
-                  Passcode Required to Create Events
-                </h3>
-                <p className="text-sm text-muted-foreground max-w-md">
-                  Only students with the grade passcode can create events here. Contact your grade representative for access.
-                </p>
-              </CardContent>
-            </Card>
-
             {eventsLoading ? (
               <div className="space-y-4">
                 {[1, 2].map((i) => (
