@@ -785,33 +785,13 @@ export class DatabaseStorage implements IStorage {
 
   async getEventAttendees(eventId: string): Promise<User[]> {
     const attendees = await db
-      .select({
-        id: users.id,
-        username: users.username,
-        studentId: users.studentId,
-        email: users.email,
-        phone: users.phone,
-        password: users.password,
-        name: users.name,
-        role: users.role,
-        isSpecialAdmin: users.isSpecialAdmin,
-        grade: users.grade,
-        className: users.className,
-        credibilityScore: users.credibilityScore,
-        reputationScore: users.reputationScore,
-        accountStatus: users.accountStatus,
-        transportDetails: users.transportDetails,
-        avatarUrl: users.avatarUrl,
-        bio: users.bio,
-        createdAt: users.createdAt,
-        updatedAt: users.updatedAt,
-      })
+      .select()
       .from(eventRsvps)
       .innerJoin(users, eq(eventRsvps.userId, users.id))
       .where(eq(eventRsvps.eventId, eventId))
       .orderBy(users.name);
     
-    return attendees;
+    return attendees.map(row => row.users);
   }
 
   // ==================== SCHEDULES ====================
