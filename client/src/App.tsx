@@ -9,6 +9,7 @@ import Home from "@/pages/home";
 import AuthPage from "@/pages/auth";
 import NewsPage from "@/pages/news";
 import EventsPage from "@/pages/events";
+import EventDetailPage from "@/pages/event-detail";
 import KeysPage from "@/pages/keys";
 import TeachersPage from "@/pages/teachers";
 import TeacherDetailPage from "@/pages/teacher-detail";
@@ -80,6 +81,13 @@ function Router() {
         {() => (
           <AuthenticatedLayout>
             <NewsPage />
+          </AuthenticatedLayout>
+        )}
+      </Route>
+      <Route path="/events/:id">
+        {() => (
+          <AuthenticatedLayout>
+            <EventDetailPage />
           </AuthenticatedLayout>
         )}
       </Route>

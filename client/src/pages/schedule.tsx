@@ -7,6 +7,7 @@ import { Calendar, Clock, User as UserIcon, BookOpen, Edit, Save, X } from "luci
 import { useState, useMemo } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 import {
   Select,
   SelectContent,
@@ -61,9 +62,13 @@ type Scope = {
 type Event = {
   id: string;
   title: string;
+  description: string | null;
   date: string;
   type: string;
   scopeId: string | null;
+  startTime: string;
+  endTime: string | null;
+  location: string | null;
 };
 
 type RSVP = {
@@ -323,6 +328,75 @@ export default function SchedulePage() {
                 );
               })}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Event List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Your Events</CardTitle>
+            <CardDescription>
+              Click on any event to view full details
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {relevantEvents.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No upcoming events
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {relevantEvents.map(event => {
+                  const isRsvped = rsvpedEventIds.has(event.id);
+                  const eventDate = new Date(event.startTime);
+                  
+                  return (
+                    <Link
+                      key={event.id}
+                      href={`/events/${event.id}`}
+                      data-testid={`link-event-${event.id}`}
+                    >
+                      <div className="p-4 rounded-lg border hover-elevate cursor-pointer">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold text-lg">{event.title}</h3>
+                              {isRsvped && (
+                                <span className="text-xs px-2 py-1 bg-primary text-primary-foreground rounded">
+                                  Attending
+                                </span>
+                              )}
+                            </div>
+                            {event.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                                {event.description}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {eventDate.toLocaleDateString('en-US', { 
+                                  weekday: 'short', 
+                                  month: 'short', 
+                                  day: 'numeric',
+                                  hour: 'numeric',
+                                  minute: '2-digit'
+                                })}
+                              </div>
+                              {event.location && (
+                                <div className="flex items-center gap-1">
+                                  📍 {event.location}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 
