@@ -125,13 +125,21 @@ export default function NewsPage() {
           </CardHeader>
           <form onSubmit={handleSubmitPost}>
             <CardContent className="space-y-4">
-              <Textarea
-                placeholder="What's happening in our school community?"
-                value={newPost}
-                onChange={(e) => setNewPost(e.target.value)}
-                className="min-h-24 resize-none border-0 text-base focus-visible:ring-0"
-                data-testid="textarea-new-post"
-              />
+              <div className="space-y-1">
+                <Textarea
+                  placeholder="What's happening in our school community?"
+                  value={newPost}
+                  onChange={(e) => setNewPost(e.target.value)}
+                  className="min-h-24 resize-none border-0 text-base focus-visible:ring-0"
+                  data-testid="textarea-new-post"
+                  maxLength={4000}
+                />
+                <div className="flex justify-end">
+                  <span className={`text-xs ${newPost.length > 4000 ? "text-destructive" : "text-muted-foreground"}`} data-testid="text-character-count">
+                    {newPost.length}/4000
+                  </span>
+                </div>
+              </div>
               <Separator />
               <ScopeSelector
                 value={selectedScope}
@@ -143,7 +151,7 @@ export default function NewsPage() {
             <CardFooter className="justify-end">
               <Button
                 type="submit"
-                disabled={!newPost.trim() || createPostMutation.isPending || (selectedScope !== null && !hasAccess)}
+                disabled={!newPost.trim() || newPost.length > 4000 || createPostMutation.isPending || (selectedScope !== null && !hasAccess)}
                 data-testid="button-submit-post"
               >
                 <Send className="w-4 h-4 mr-2" />

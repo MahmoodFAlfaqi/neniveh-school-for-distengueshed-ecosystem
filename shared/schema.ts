@@ -409,19 +409,27 @@ export const insertAdminStudentIdSchema = createInsertSchema(adminStudentIds)
     className: z.string().trim().min(1, "Class name is required"),
   });
 
-export const insertPostSchema = createInsertSchema(posts).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  credibilityRating: true,
-  likesCount: true,
-  commentsCount: true,
-});
+export const insertPostSchema = createInsertSchema(posts)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+    credibilityRating: true,
+    likesCount: true,
+    commentsCount: true,
+  })
+  .extend({
+    content: z.string().trim().min(1, "Content is required").max(4000, "Content must not exceed 4000 characters"),
+  });
 
-export const insertEventSchema = createInsertSchema(events).omit({
-  id: true,
-  createdAt: true,
-});
+export const insertEventSchema = createInsertSchema(events)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .extend({
+    description: z.string().trim().min(1, "Description is required").max(4000, "Description must not exceed 4000 characters"),
+  });
 
 export const insertEventRsvpSchema = createInsertSchema(eventRsvps).omit({
   id: true,

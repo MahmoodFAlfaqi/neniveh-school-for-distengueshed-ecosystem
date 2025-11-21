@@ -341,7 +341,13 @@ export default function EventsPage() {
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="min-h-24"
                     data-testid="textarea-event-description"
+                    maxLength={4000}
                   />
+                  <div className="flex justify-end">
+                    <span className={`text-xs ${formData.description.length > 4000 ? "text-destructive" : "text-muted-foreground"}`} data-testid="text-character-count">
+                      {formData.description.length}/4000
+                    </span>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
