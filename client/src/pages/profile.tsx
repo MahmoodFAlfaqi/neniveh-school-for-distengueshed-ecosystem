@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Star, Award, TrendingUp, User as UserIcon, Calendar } from "lucide-react";
+import { PeerRatingForm } from "@/components/PeerRatingForm";
 
 type User = {
   id: string;
@@ -175,16 +176,6 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {!isOwnProfile && user.role === "student" && (
-                <div>
-                  <Link href={`/profile/${userId}/rate`}>
-                    <Button data-testid="button-rate-student">
-                      <Star className="w-4 h-4 mr-2" />
-                      Rate Student
-                    </Button>
-                  </Link>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -263,6 +254,14 @@ export default function ProfilePage() {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {!isOwnProfile && currentUser && (
+          <PeerRatingForm
+            ratedUserId={user.id}
+            ratedUserName={user.name}
+            currentUserId={currentUser.id}
+          />
         )}
       </div>
     </div>

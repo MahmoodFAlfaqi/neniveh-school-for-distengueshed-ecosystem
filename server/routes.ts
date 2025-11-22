@@ -931,7 +931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ratedUserId = req.params.userId;
       const raterUserId = req.session.userId!;
       
-      // Prevent self-rating
+      // Prevent self-rating (server-side validation)
       if (ratedUserId === raterUserId) {
         return res.status(400).json({ message: "You cannot rate yourself" });
       }
@@ -942,11 +942,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      // Parse and validate the rating data
+      // Extract rating scores from request body (exclude ratedUserId and raterUserId)
+      const { ratedUserId: _, raterUserId: __, ...scores } = req.body;
+      
+      // Parse and validate the rating data - derive IDs from route/session only
       const ratingData = insertPeerRatingSchema.parse({
-        ...req.body,
+        ...scores,
         ratedUserId,
-        raterUserId,
+        raterUserId, // Always use session user ID, never trust client
       });
       
       const rating = await storage.submitPeerRating(ratingData);
