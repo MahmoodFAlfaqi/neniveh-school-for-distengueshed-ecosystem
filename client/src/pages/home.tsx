@@ -84,7 +84,13 @@ export default function Home() {
 
   // Helper function to get date string (YYYY-MM-DD)
   const getDateString = (date: Date) => {
-    return date.toISOString().split('T')[0];
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+      return null;
+    }
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   // Map events by date string
@@ -92,16 +98,28 @@ export default function Home() {
     const map: Record<string, Event[]> = {};
     
     events.forEach(event => {
-      // Parse the event date - handle both ISO strings and other formats
-      let eventDate = new Date(event.date);
-      // Set to midnight to compare properly
-      eventDate.setHours(0, 0, 0, 0);
-      const dateStr = getDateString(eventDate);
-      
-      if (!map[dateStr]) {
-        map[dateStr] = [];
+      try {
+        // Parse the event date
+        const eventDate = new Date(event.date);
+        
+        // Check if date is valid
+        if (!(eventDate instanceof Date) || isNaN(eventDate.getTime())) {
+          return;
+        }
+        
+        // Set to midnight
+        eventDate.setHours(0, 0, 0, 0);
+        const dateStr = getDateString(eventDate);
+        
+        if (dateStr) {
+          if (!map[dateStr]) {
+            map[dateStr] = [];
+          }
+          map[dateStr].push(event);
+        }
+      } catch (e) {
+        // Silently skip invalid dates
       }
-      map[dateStr].push(event);
     });
     
     return map;
@@ -175,7 +193,7 @@ export default function Home() {
                   <div className="grid grid-cols-7 gap-1">
                     {calendarDays.map((date, idx) => {
                       const dateStr = getDateString(date);
-                      const dayEvents = eventsByDate[dateStr] || [];
+                      const dayEvents = dateStr ? (eventsByDate[dateStr] || []) : [];
                       const isToday = date.getTime() === today.getTime();
                       const isPast = date.getTime() < today.getTime();
 
