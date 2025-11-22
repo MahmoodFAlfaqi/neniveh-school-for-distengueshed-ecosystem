@@ -22,6 +22,18 @@ type StudentId = {
   assignedAt: string | null;
 };
 
+type Student = {
+  id: string;
+  username: string;
+  name: string;
+  grade: number | null;
+  className: string | null;
+  credibilityScore: number;
+  reputationScore: number;
+  createdAt: string;
+  assignedDate: string | null;
+};
+
 export default function AdminPage() {
   const { toast } = useToast();
   const [username, setUsername] = useState("");
@@ -76,6 +88,36 @@ export default function AdminPage() {
       });
     },
   });
+
+  const { data: students, isLoading: studentsLoading } = useQuery<Student[]>({
+    queryKey: ["/api/admin/students"],
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest("DELETE", `/api/admin/student/${userId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Student account deleted",
+        description: "Student account and all associated data has been removed successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/students"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete student account",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteStudent = (userId: string, studentName: string) => {
+    if (window.confirm(`Are you sure you want to delete ${studentName}'s account and all associated data? This action cannot be undone.`)) {
+      deleteAccountMutation.mutate(userId);
+    }
+  };
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -228,6 +270,65 @@ export default function AdminPage() {
                         </Button>
                       )}
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Student Accounts</CardTitle>
+            <CardDescription>
+              All registered student accounts. You can delete accounts here, which will remove all associated data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {studentsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : !students || students.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                No student accounts registered yet.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {students.map((student) => (
+                  <div
+                    key={student.id}
+                    className="flex items-center justify-between p-4 rounded-lg border hover-elevate"
+                    data-testid={`student-account-${student.id}`}
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="flex flex-col">
+                        <span className="font-semibold">{student.name}</span>
+                        <code className="text-sm font-mono text-muted-foreground">
+                          @{student.username}
+                        </code>
+                      </div>
+                      {student.grade && student.className && (
+                        <Badge variant="outline">
+                          Grade {student.grade}-{student.className}
+                        </Badge>
+                      )}
+                      <Badge variant="outline">
+                        Credibility: {student.credibilityScore.toFixed(1)}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">
+                        Joined {new Date(student.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDeleteStudent(student.id, student.name)}
+                      disabled={deleteAccountMutation.isPending}
+                      data-testid={`button-delete-account-${student.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 ))}
               </div>

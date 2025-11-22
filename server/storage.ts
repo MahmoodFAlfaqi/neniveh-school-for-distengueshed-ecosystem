@@ -329,6 +329,56 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async deleteStudentAccount(userId: string): Promise<boolean> {
+    try {
+      return await db.transaction(async (tx) => {
+        // Delete all posts by the user
+        await tx.delete(posts).where(eq(posts.authorId, userId));
+        
+        // Delete all post comments by the user
+        await tx.delete(postComments).where(eq(postComments.authorId, userId));
+        
+        // Delete all post reactions by the user
+        await tx.delete(postReactions).where(eq(postReactions.userId, userId));
+        
+        // Delete all post accuracy ratings by the user
+        await tx.delete(postAccuracyRatings).where(eq(postAccuracyRatings.userId, userId));
+        
+        // Delete all profile comments by the user
+        await tx.delete(profileComments).where(eq(profileComments.authorId, userId));
+        
+        // Delete all profile comments on the user's profile
+        await tx.delete(profileComments).where(eq(profileComments.profileUserId, userId));
+        
+        // Delete all event RSVPs by the user
+        await tx.delete(eventRsvps).where(eq(eventRsvps.userId, userId));
+        
+        // Delete all event comments by the user
+        await tx.delete(eventComments).where(eq(eventComments.authorId, userId));
+        
+        // Delete all teacher reviews by the user
+        await tx.delete(teacherReviews).where(eq(teacherReviews.studentId, userId));
+        
+        // Delete all peer ratings where user is the rater
+        await tx.delete(peerRatings).where(eq(peerRatings.raterUserId, userId));
+        
+        // Delete all peer ratings where user is being rated
+        await tx.delete(peerRatings).where(eq(peerRatings.ratedUserId, userId));
+        
+        // Delete all digital keys (unlocked scopes)
+        await tx.delete(digitalKeys).where(eq(digitalKeys.userId, userId));
+        
+        // Finally, delete the user record
+        const result = await tx.delete(users).where(eq(users.id, userId));
+        
+        return result.rowCount ? result.rowCount > 0 : false;
+      });
+    } catch (error) {
+      console.error("Failed to delete student account:", error);
+      return false;
+    }
+  }
+
   // ==================== STUDENT ID MANAGEMENT ====================
   
   /**
@@ -400,6 +450,23 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(adminStudentIds)
       .orderBy(desc(adminStudentIds.createdAt));
+  }
+
+  /**
+   * Get all assigned students (students with assigned user IDs) for admin management
+   */
+  async getAssignedStudents(): Promise<(User & { assignedDate: string | null })[]> {
+    const result = await db
+      .select({
+        ...users,
+        assignedDate: adminStudentIds.assignedAt,
+      })
+      .from(users)
+      .leftJoin(adminStudentIds, eq(adminStudentIds.assignedToUserId, users.id))
+      .where(eq(users.role, "student"))
+      .orderBy(desc(users.createdAt));
+    
+    return result as any;
   }
 
   /**

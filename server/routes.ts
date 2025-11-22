@@ -300,6 +300,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all assigned students (admin only)
+  app.get("/api/admin/students", requireAdmin, async (req, res) => {
+    try {
+      const students = await storage.getAssignedStudents();
+      res.json(students);
+    } catch (error) {
+      console.error("Failed to fetch assigned students:", error);
+      res.status(500).json({ message: "Failed to fetch assigned students" });
+    }
+  });
+
   // Delete student ID (admin only, only unassigned IDs)
   app.delete("/api/admin/student-ids/:id", requireAdmin, async (req, res) => {
     try {
@@ -317,6 +328,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to delete student ID:", error);
       res.status(500).json({ message: "Failed to delete student ID" });
+    }
+  });
+
+  // Delete student account (admin only) - deletes all related data and the user
+  app.delete("/api/admin/student/:userId", requireAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      
+      // Prevent admin from deleting themselves
+      if (userId === req.session.userId) {
+        return res.status(400).json({ 
+          message: "Cannot delete your own admin account" 
+        });
+      }
+      
+      // Verify the user exists and is a student (not an admin)
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      if (user.role === "admin") {
+        return res.status(400).json({ 
+          message: "Cannot delete admin accounts using this endpoint" 
+        });
+      }
+      
+      const success = await storage.deleteStudentAccount(userId);
+      
+      if (!success) {
+        return res.status(500).json({ 
+          message: "Failed to delete student account" 
+        });
+      }
+      
+      res.json({ message: "Student account deleted successfully" });
+    } catch (error) {
+      console.error("Failed to delete student account:", error);
+      res.status(500).json({ message: "Failed to delete student account" });
     }
   });
 
