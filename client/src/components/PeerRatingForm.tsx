@@ -37,6 +37,8 @@ const METRICS = [
 
 export function PeerRatingForm({ ratedUserId, ratedUserName, currentUserId }: PeerRatingFormProps) {
   const { toast } = useToast();
+  
+  const [expandForm, setExpandForm] = useState(false);
 
   const [ratings, setRatings] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {};
@@ -127,74 +129,89 @@ export function PeerRatingForm({ ratedUserId, ratedUserName, currentUserId }: Pe
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Rate {ratedUserName}</CardTitle>
-        <CardDescription>
-          Rate your peer on these 15 performance metrics. Your rating will be anonymous and combined with others.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="p-3 pt-0">
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="space-y-2">
-            {METRICS.map((metric) => (
-              <Collapsible
-                key={metric.key}
-                open={expandedMetrics[metric.key]}
-                onOpenChange={(open) =>
-                  setExpandedMetrics((prev) => ({ ...prev, [metric.key]: open }))
-                }
-              >
-                <CollapsibleTrigger className="w-full text-left" data-testid={`trigger-metric-${metric.key}`}>
-                  <div className="flex items-center justify-between p-3 rounded-lg border hover-elevate">
-                    <div className="flex-1">
-                      <div className="font-medium text-sm">{metric.label}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {metric.description}
+      <button
+        onClick={() => setExpandForm(!expandForm)}
+        className="w-full hover-elevate active-elevate-2"
+        data-testid="button-toggle-rating-form"
+      >
+        <CardHeader className="cursor-pointer">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 text-left">
+              <CardTitle>Rate {ratedUserName}</CardTitle>
+              <CardDescription>
+                Rate your peer on these 15 performance metrics. Your rating will be anonymous and combined with others.
+              </CardDescription>
+            </div>
+            <ChevronDown 
+              className={`w-5 h-5 transition-transform duration-200 flex-shrink-0 ${expandForm ? "rotate-180" : ""}`}
+            />
+          </div>
+        </CardHeader>
+      </button>
+      {expandForm && (
+        <CardContent className="p-3 pt-0">
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="space-y-2">
+              {METRICS.map((metric) => (
+                <Collapsible
+                  key={metric.key}
+                  open={expandedMetrics[metric.key]}
+                  onOpenChange={(open) =>
+                    setExpandedMetrics((prev) => ({ ...prev, [metric.key]: open }))
+                  }
+                >
+                  <CollapsibleTrigger className="w-full text-left" data-testid={`trigger-metric-${metric.key}`}>
+                    <div className="flex items-center justify-between p-3 rounded-lg border hover-elevate">
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{metric.label}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {metric.description}
+                        </div>
                       </div>
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform ${
+                          expandedMetrics[metric.key] ? "rotate-180" : ""
+                        }`}
+                      />
                     </div>
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform ${
-                        expandedMetrics[metric.key] ? "rotate-180" : ""
-                      }`}
-                    />
-                  </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="pt-2 pb-3 px-3">
-                  <div className="flex gap-1 justify-end">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setRating(metric.key, star)}
-                        className="hover-elevate active-elevate-2 rounded p-1"
-                        data-testid={`button-rate-${metric.key}-${star}`}
-                      >
-                        <Star
-                          className={`h-6 w-6 ${
-                            star <= ratings[metric.key]
-                              ? "fill-yellow-400 text-yellow-400"
-                              : "text-muted-foreground"
-                          }`}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
-          </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-2 pb-3 px-3">
+                    <div className="flex gap-1 justify-end">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setRating(metric.key, star)}
+                          className="hover-elevate active-elevate-2 rounded p-1"
+                          data-testid={`button-rate-${metric.key}-${star}`}
+                        >
+                          <Star
+                            className={`h-6 w-6 ${
+                              star <= ratings[metric.key]
+                                ? "fill-yellow-400 text-yellow-400"
+                                : "text-muted-foreground"
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              ))}
+            </div>
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button 
-              type="submit" 
-              disabled={submitRatingMutation.isPending}
-              data-testid="button-submit-rating"
-            >
-              {submitRatingMutation.isPending ? "Submitting..." : existingRating ? "Update Rating" : "Submit Rating"}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button 
+                type="submit" 
+                disabled={submitRatingMutation.isPending}
+                data-testid="button-submit-rating"
+              >
+                {submitRatingMutation.isPending ? "Submitting..." : existingRating ? "Update Rating" : "Submit Rating"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      )}
     </Card>
   );
 }
