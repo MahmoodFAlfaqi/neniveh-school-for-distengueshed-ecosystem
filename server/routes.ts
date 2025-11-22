@@ -889,9 +889,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create profile comment
   app.post("/api/users/:userId/comments", requireAuth, async (req, res) => {
     try {
-      // Moderate content before saving (only if comment is provided)
-      if (req.body.comment?.trim()) {
-        await requireModeration(req.body.comment);
+      // Prevent self-commenting (server-side validation)
+      if (req.params.userId === req.session.userId) {
+        return res.status(400).json({ message: "You cannot comment on your own profile" });
+      }
+      
+      // Moderate content before saving (only if content is provided)
+      if (req.body.content?.trim()) {
+        await requireModeration(req.body.content);
       }
       
       const commentData = insertProfileCommentSchema.parse({

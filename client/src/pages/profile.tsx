@@ -1,12 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Star, Award, TrendingUp, User as UserIcon, Calendar } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Star, Award, TrendingUp, User as UserIcon, Calendar, MessageSquare } from "lucide-react";
 import { PeerRatingForm } from "@/components/PeerRatingForm";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import { UserProfileLink } from "@/components/UserProfileLink";
 
 type User = {
   id: string;
@@ -44,6 +49,18 @@ type StatMetric = {
   label: string;
   arabicLabel: string;
   isInverse?: boolean;
+};
+
+type ProfileComment = {
+  id: string;
+  profileUserId: string;
+  content: string;
+  rating: number | null;
+  createdAt: string;
+  authorId: string;
+  authorName?: string;
+  authorRole?: string;
+  authorAvatarUrl?: string | null;
 };
 
 const STAT_METRICS: StatMetric[] = [
@@ -263,7 +280,158 @@ export default function ProfilePage() {
             currentUserId={currentUser.id}
           />
         )}
+
+        <ProfileCommentsSection userId={user.id} currentUserId={currentUser?.id} />
       </div>
     </div>
+  );
+}
+
+function ProfileCommentsSection({ userId, currentUserId }: { userId: string; currentUserId?: string }) {
+  const { toast } = useToast();
+  const [commentText, setCommentText] = useState("");
+  
+  const isOwnProfile = userId === currentUserId;
+  
+  const { data: comments = [], isLoading } = useQuery<ProfileComment[]>({
+    queryKey: ["/api/users", userId, "comments"],
+    enabled: !!userId,
+  });
+
+  const createCommentMutation = useMutation({
+    mutationFn: async (content: string) => {
+      return await apiRequest(`/api/users/${userId}/comments`, {
+        method: "POST",
+        body: JSON.stringify({ content }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", userId, "comments"] });
+      setCommentText("");
+      toast({
+        title: "Comment posted",
+        description: "Your comment has been added successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to post comment",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmitComment = () => {
+    if (!commentText.trim()) {
+      toast({
+        title: "Comment required",
+        description: "Please enter a comment before submitting.",
+        variant: "destructive",
+      });
+      return;
+    }
+    createCommentMutation.mutate(commentText);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <MessageSquare className="w-5 h-5" />
+          Comments
+        </CardTitle>
+        <CardDescription>
+          {comments.length === 0 ? "No comments yet" : `${comments.length} comment${comments.length === 1 ? "" : "s"}`}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {currentUserId && !isOwnProfile && (
+          <div className="space-y-2">
+            <Textarea
+              data-testid="input-comment"
+              placeholder="Write a comment..."
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              className="resize-none"
+              rows={3}
+            />
+            <Button
+              data-testid="button-submit-comment"
+              onClick={handleSubmitComment}
+              disabled={createCommentMutation.isPending || !commentText.trim()}
+            >
+              {createCommentMutation.isPending ? "Posting..." : "Post Comment"}
+            </Button>
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex gap-3">
+                <Skeleton className="w-10 h-10 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : comments.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <MessageSquare className="w-12 h-12 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No comments yet. Be the first to comment!</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {comments.map((comment) => (
+              <div
+                key={comment.id}
+                className="flex gap-3 p-3 rounded-lg border"
+                data-testid={`comment-${comment.id}`}
+              >
+                <UserProfileLink userId={comment.authorId}>
+                  <Avatar className="w-10 h-10">
+                    {comment.authorAvatarUrl && <AvatarImage src={comment.authorAvatarUrl} />}
+                    <AvatarFallback>
+                      {comment.authorName
+                        ?.split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .toUpperCase()
+                        .slice(0, 2) || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                </UserProfileLink>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <UserProfileLink userId={comment.authorId}>
+                      <p className="font-semibold text-sm">{comment.authorName || "Unknown User"}</p>
+                    </UserProfileLink>
+                    {comment.authorRole && (
+                      <Badge variant="outline" className="text-xs">
+                        {comment.authorRole}
+                      </Badge>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(comment.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-sm" data-testid={`comment-content-${comment.id}`}>{comment.content}</p>
+                  {comment.rating && (
+                    <div className="flex items-center gap-1 mt-2">
+                      {Array.from({ length: comment.rating }).map((_, i) => (
+                        <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

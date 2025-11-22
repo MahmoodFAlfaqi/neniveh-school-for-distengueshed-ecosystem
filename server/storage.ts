@@ -928,12 +928,25 @@ export class DatabaseStorage implements IStorage {
     return comment;
   }
 
-  async getProfileComments(profileUserId: string): Promise<ProfileComment[]> {
-    return await db
-      .select()
+  async getProfileComments(profileUserId: string): Promise<Array<ProfileComment & { authorName?: string; authorRole?: string; authorAvatarUrl?: string | null }>> {
+    const results = await db
+      .select({
+        id: profileComments.id,
+        profileUserId: profileComments.profileUserId,
+        content: profileComments.content,
+        rating: profileComments.rating,
+        createdAt: profileComments.createdAt,
+        authorId: profileComments.authorId,
+        authorName: users.name,
+        authorRole: users.role,
+        authorAvatarUrl: users.avatarUrl,
+      })
       .from(profileComments)
+      .leftJoin(users, eq(profileComments.authorId, users.id))
       .where(eq(profileComments.profileUserId, profileUserId))
       .orderBy(desc(profileComments.createdAt));
+    
+    return results as Array<ProfileComment & { authorName?: string; authorRole?: string; authorAvatarUrl?: string | null }>;
   }
 
   // ==================== PEER RATINGS ====================
