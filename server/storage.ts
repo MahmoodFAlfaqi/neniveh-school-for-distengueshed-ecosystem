@@ -18,6 +18,8 @@ import {
   peerRatings,
   settings,
   passwordResetTokens,
+  failedLoginAttempts,
+  rememberMeTokens,
   type User,
   type InsertUser,
   type Scope,
@@ -56,6 +58,10 @@ import {
   type InsertSetting,
   type PasswordResetToken,
   type InsertPasswordResetToken,
+  type FailedLoginAttempt,
+  type InsertFailedLoginAttempt,
+  type RememberMeToken,
+  type InsertRememberMeToken,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
@@ -229,6 +235,113 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return user;
+  }
+
+  // ==================== FAILED LOGIN TRACKING ====================
+  
+  async getFailedLoginAttempts(username: string) {
+    const [attempt] = await db
+      .select()
+      .from(failedLoginAttempts)
+      .where(eq(failedLoginAttempts.username, sql`LOWER(${username})`));
+    return attempt;
+  }
+
+  async recordFailedLogin(username: string): Promise<void> {
+    const existing = await this.getFailedLoginAttempts(username);
+    
+    if (existing) {
+      const newCount = existing.attemptCount + 1;
+      const isLocked = newCount >= 3;
+      const lockDuration = 15 * 60 * 1000; // 15 minutes in ms
+      
+      await db
+        .update(failedLoginAttempts)
+        .set({
+          attemptCount: newCount,
+          lastAttemptAt: new Date(),
+          lockedUntil: isLocked ? new Date(Date.now() + lockDuration) : null,
+        })
+        .where(eq(failedLoginAttempts.id, existing.id));
+    } else {
+      await db.insert(failedLoginAttempts).values({
+        username: username.toLowerCase(),
+        attemptCount: 1,
+        lastAttemptAt: new Date(),
+      });
+    }
+  }
+
+  async clearFailedLoginAttempts(username: string): Promise<void> {
+    await db
+      .delete(failedLoginAttempts)
+      .where(eq(failedLoginAttempts.username, sql`LOWER(${username})`));
+  }
+
+  async isAccountLocked(username: string): Promise<boolean> {
+    const attempt = await this.getFailedLoginAttempts(username);
+    
+    if (!attempt || !attempt.lockedUntil) {
+      return false;
+    }
+    
+    // Check if lock has expired
+    if (new Date() > attempt.lockedUntil) {
+      // Lock expired, clear the record
+      await this.clearFailedLoginAttempts(username);
+      return false;
+    }
+    
+    return true;
+  }
+
+  // ==================== REMEMBER ME TOKENS ====================
+  
+  async createRememberMeToken(
+    userId: string, 
+    token: string, 
+    deviceFingerprint?: string
+  ): Promise<void> {
+    const sevenDays = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+    
+    await db.insert(rememberMeTokens).values({
+      userId,
+      token,
+      deviceFingerprint,
+      expiresAt: new Date(Date.now() + sevenDays),
+    });
+  }
+
+  async getRememberMeToken(token: string) {
+    const [tokenRecord] = await db
+      .select()
+      .from(rememberMeTokens)
+      .where(eq(rememberMeTokens.token, token));
+    return tokenRecord;
+  }
+
+  async updateRememberMeTokenActivity(tokenId: string): Promise<void> {
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+    
+    await db
+      .update(rememberMeTokens)
+      .set({
+        lastUsedAt: new Date(),
+        expiresAt: new Date(Date.now() + sevenDays), // Extend expiry on each use
+      })
+      .where(eq(rememberMeTokens.id, tokenId));
+  }
+
+  async deleteRememberMeToken(token: string): Promise<void> {
+    await db
+      .delete(rememberMeTokens)
+      .where(eq(rememberMeTokens.token, token));
+  }
+
+  async cleanupExpiredRememberMeTokens(): Promise<void> {
+    await db
+      .delete(rememberMeTokens)
+      .where(sql`${rememberMeTokens.expiresAt} < ${new Date()}`);
   }
 
   async getStudentsByClass(grade: number, className: string): Promise<User[]> {
