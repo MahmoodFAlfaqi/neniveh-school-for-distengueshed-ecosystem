@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -116,6 +116,11 @@ export default function AuthPage() {
                 <Button type="submit" className="w-full" disabled={loginMutation.isPending} data-testid="button-login">
                   {loginMutation.isPending ? "Logging in..." : "Login"}
                 </Button>
+                <div className="text-center">
+                  <Link href="/forgot-password" className="text-sm text-primary hover:underline" data-testid="link-forgot-password">
+                    Forgot password?
+                  </Link>
+                </div>
               </form>
             </TabsContent>
             

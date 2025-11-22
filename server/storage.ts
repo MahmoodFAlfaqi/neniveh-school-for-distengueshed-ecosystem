@@ -17,6 +17,7 @@ import {
   profileComments,
   peerRatings,
   settings,
+  passwordResetTokens,
   type User,
   type InsertUser,
   type Scope,
@@ -53,6 +54,8 @@ import {
   type InsertPeerRating,
   type Setting,
   type InsertSetting,
+  type PasswordResetToken,
+  type InsertPasswordResetToken,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
@@ -175,6 +178,11 @@ export interface IStorage {
   // Settings
   getSetting(key: string): Promise<Setting | undefined>;
   setSetting(key: string, value: string): Promise<Setting>;
+
+  // Password Recovery
+  createPasswordResetToken(userId: string): Promise<string>;
+  validatePasswordResetToken(token: string): Promise<User | undefined>;
+  resetPassword(token: string, newPassword: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1760,6 +1768,68 @@ export class DatabaseStorage implements IStorage {
         })
         .returning();
       return inserted;
+    }
+  }
+
+  // ==================== PASSWORD RESET ====================
+  async createPasswordResetToken(userId: string): Promise<string> {
+    // Generate a random token
+    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    
+    // Delete any existing tokens for this user
+    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
+    
+    // Create new token (expires in 1 hour)
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    await db.insert(passwordResetTokens).values({
+      userId,
+      token,
+      expiresAt,
+    });
+    
+    return token;
+  }
+
+  async validatePasswordResetToken(token: string): Promise<User | undefined> {
+    const [resetToken] = await db
+      .select()
+      .from(passwordResetTokens)
+      .where(eq(passwordResetTokens.token, token));
+
+    if (!resetToken || resetToken.expiresAt < new Date()) {
+      return undefined;
+    }
+
+    const user = await this.getUser(resetToken.userId);
+    return user;
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<boolean> {
+    try {
+      return await db.transaction(async (tx) => {
+        const [resetToken] = await tx
+          .select()
+          .from(passwordResetTokens)
+          .where(eq(passwordResetTokens.token, token));
+
+        if (!resetToken || resetToken.expiresAt < new Date()) {
+          return false;
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        await tx
+          .update(users)
+          .set({ password: hashedPassword })
+          .where(eq(users.id, resetToken.userId));
+
+        await tx.delete(passwordResetTokens).where(eq(passwordResetTokens.token, token));
+
+        return true;
+      });
+    } catch (error) {
+      console.error("Failed to reset password:", error);
+      return false;
     }
   }
 }

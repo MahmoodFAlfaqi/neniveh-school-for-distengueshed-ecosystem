@@ -134,9 +134,17 @@ Drizzle ORM with a PostgreSQL dialect is used for database interactions. The sch
 
 ## Recent Changes (November 22, 2025)
 
-1. **Color System Overhaul**: Updated index.css with modern vibrant colors (purple, teal, coral) for both light and dark modes
-2. **Home Page Redesign**: Completely redesigned with 4-stat card grid, hero section, quick actions, modern calendar preview, and featured news section
-3. **Sidebar Enhancement**: Added gradient branding, modern navigation styling, admin distinction with golden accents
-4. **Header Styling**: Sticky header with backdrop blur, gradient backgrounds, modern typography
-5. **Design System**: Implemented glassmorphism, colored shadows, smooth transitions, and premium spacing throughout
-6. **Dark/Light Mode**: All changes preserve and enhance both theme modes with proper color mapping and contrast
+1. **Account Cleanup**: Deleted 6 accounts (Kena, FGSDG, test.admin, and 3 student accounts), keeping only Mahmood.Fawaz.AL-Faqi and Mustafa.Mouied.Al-Ali admin accounts
+2. **Password Recovery Feature**: Added complete password recovery system:
+   - New `password_reset_tokens` table in database schema
+   - Backend endpoints: `/api/auth/forgot-password`, `/api/auth/validate-reset-token`, `/api/auth/reset-password`
+   - Token generation with 1-hour expiration
+   - Frontend forgot password page at `/forgot-password`
+   - "Forgot password?" link on login tab
+   - Email/phone-based password recovery support (email implemented, phone ready for email service integration)
+3. **Shrink Mechanism**: Added collapsible header to "Rate User" card matching Individual Performance Metrics pattern
+4. **Student Account Deletion Fix**: Fixed foreign key constraint error by properly deleting admin_student_ids before deleting user accounts
+5. **Color System Overhaul**: Updated index.css with modern vibrant colors (purple, teal, coral)
+6. **Home Page Redesign**: 4-stat card grid, hero section, quick actions, calendar preview, featured news
+7. **Design System**: Glassmorphism, colored shadows, smooth transitions, premium spacing
+8. **Dark/Light Mode**: All features preserve both theme modes with proper contrast

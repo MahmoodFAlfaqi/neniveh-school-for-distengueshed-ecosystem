@@ -204,6 +204,15 @@ export const settings = pgTable("settings", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Password Reset Tokens for password recovery
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(), // Random secure token
+  expiresAt: timestamp("expires_at").notNull(), // Token expires after 1 hour
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Teacher Reviews
 export const teacherReviews = pgTable("teacher_reviews", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -639,3 +648,11 @@ export const insertSettingSchema = createInsertSchema(settings).omit({
 
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
 export type Setting = typeof settings.$inferSelect;
+
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;

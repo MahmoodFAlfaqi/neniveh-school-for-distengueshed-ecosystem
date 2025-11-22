@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/contexts/theme";
 import { AppSidebar } from "@/components/app-sidebar";
 import Home from "@/pages/home";
 import AuthPage from "@/pages/auth";
+import ForgotPasswordPage from "@/pages/forgot-password";
 import NewsPage from "@/pages/news";
 import EventsPage from "@/pages/events";
 import EventDetailPage from "@/pages/event-detail";
@@ -76,6 +77,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
+      <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/">
         {() => (
           <AuthenticatedLayout>
