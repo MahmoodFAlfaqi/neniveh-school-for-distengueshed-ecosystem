@@ -70,7 +70,7 @@ function calculateAverageRating(user: any): number {
     .map(key => user[key])
     .filter((score): score is number => score !== null && score !== undefined);
   
-  if (validScores.length === 0) return 0;
+  if (validScores.length === 0) return 3;
   
   const sum = validScores.reduce((acc, score) => acc + score, 0);
   return sum / validScores.length;

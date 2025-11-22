@@ -309,7 +309,7 @@ export default function ProfilePage() {
                     if (metric.isInverse && score !== null) {
                       score = 6 - score;
                     }
-                    const displayScore = score || 0;
+                    const displayScore = score ?? 3;
                     
                     return (
                       <div
