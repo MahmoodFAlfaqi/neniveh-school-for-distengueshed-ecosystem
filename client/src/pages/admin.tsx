@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, Copy, Check } from "lucide-react";
+import { Trash2, Plus, Copy, Check, ChevronUp, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 type StudentId = {
@@ -34,12 +34,18 @@ type Student = {
   assignedDate: string | null;
 };
 
+type SortField = "name" | "grade" | "class" | "date";
+type SortDirection = "asc" | "desc";
+
 export default function AdminPage() {
   const { toast } = useToast();
   const [username, setUsername] = useState("");
   const [grade, setGrade] = useState("");
   const [className, setClassName] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   const { data: studentIds, isLoading } = useQuery<StudentId[]>({
     queryKey: ["/api/admin/student-ids"],
@@ -139,6 +145,50 @@ export default function AdminPage() {
       description: "Student ID copied to clipboard",
     });
   };
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const filteredAndSortedStudents = useMemo(() => {
+    if (!students) return [];
+    
+    let filtered = students.filter((student) => {
+      const searchLower = searchQuery.toLowerCase();
+      return (
+        student.name.toLowerCase().includes(searchLower) ||
+        student.username.toLowerCase().includes(searchLower)
+      );
+    });
+
+    filtered.sort((a, b) => {
+      let compareValue = 0;
+
+      switch (sortField) {
+        case "name":
+          compareValue = a.name.localeCompare(b.name);
+          break;
+        case "grade":
+          compareValue = (a.grade || 0) - (b.grade || 0);
+          break;
+        case "class":
+          compareValue = (a.className || "").localeCompare(b.className || "");
+          break;
+        case "date":
+          compareValue = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          break;
+      }
+
+      return sortDirection === "asc" ? compareValue : -compareValue;
+    });
+
+    return filtered;
+  }, [students, searchQuery, sortField, sortDirection]);
 
   return (
     <div className="container max-w-6xl mx-auto p-6">
@@ -284,55 +334,110 @@ export default function AdminPage() {
               All registered student accounts. You can delete accounts here, which will remove all associated data.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            {studentsLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : !students || students.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
-                No student accounts registered yet.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {students.map((student) => (
-                  <div
-                    key={student.id}
-                    className="flex items-center justify-between p-4 rounded-lg border hover-elevate"
-                    data-testid={`student-account-${student.id}`}
+          <CardContent className="p-3 pt-0">
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="search-students">Search by Name or Username</Label>
+                  <Input
+                    id="search-students"
+                    placeholder="Search student..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    data-testid="input-search-students"
+                  />
+                </div>
+
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant={sortField === "name" ? "default" : "outline"}
+                    onClick={() => toggleSort("name")}
+                    data-testid="button-sort-name"
                   >
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className="flex flex-col">
-                        <span className="font-semibold">{student.name}</span>
-                        <code className="text-sm font-mono text-muted-foreground">
-                          @{student.username}
-                        </code>
-                      </div>
-                      {student.grade && student.className && (
-                        <Badge variant="outline">
-                          Grade {student.grade}-{student.className}
-                        </Badge>
-                      )}
-                      <Badge variant="outline">
-                        Credibility: {student.credibilityScore.toFixed(1)}
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">
-                        Joined {new Date(student.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleDeleteStudent(student.id, student.name)}
-                      disabled={deleteAccountMutation.isPending}
-                      data-testid={`button-delete-account-${student.id}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
+                    Name
+                    {sortField === "name" && (
+                      sortDirection === "asc" ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={sortField === "grade" ? "default" : "outline"}
+                    onClick={() => toggleSort("grade")}
+                    data-testid="button-sort-grade"
+                  >
+                    Grade
+                    {sortField === "grade" && (
+                      sortDirection === "asc" ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={sortField === "class" ? "default" : "outline"}
+                    onClick={() => toggleSort("class")}
+                    data-testid="button-sort-class"
+                  >
+                    Section
+                    {sortField === "class" && (
+                      sortDirection === "asc" ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />
+                    )}
+                  </Button>
+                </div>
               </div>
-            )}
+
+              {studentsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : !students || students.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  No student accounts registered yet.
+                </p>
+              ) : filteredAndSortedStudents.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  No students match your search criteria.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {filteredAndSortedStudents.map((student) => (
+                    <div
+                      key={student.id}
+                      className="flex items-center justify-between p-4 rounded-lg border hover-elevate"
+                      data-testid={`student-account-${student.id}`}
+                    >
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className="flex flex-col">
+                          <span className="font-semibold">{student.name}</span>
+                          <code className="text-sm font-mono text-muted-foreground">
+                            @{student.username}
+                          </code>
+                        </div>
+                        {student.grade && student.className && (
+                          <Badge variant="outline">
+                            Grade {student.grade}-{student.className}
+                          </Badge>
+                        )}
+                        <Badge variant="outline">
+                          Credibility: {student.credibilityScore.toFixed(1)}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          Joined {new Date(student.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDeleteStudent(student.id, student.name)}
+                        disabled={deleteAccountMutation.isPending}
+                        data-testid={`button-delete-account-${student.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
