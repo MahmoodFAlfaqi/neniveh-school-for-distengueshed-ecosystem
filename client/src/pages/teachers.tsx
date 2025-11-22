@@ -1,13 +1,25 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Link } from "wouter";
-import { Star, Plus, UserPlus } from "lucide-react";
+import { Star, Plus, UserPlus, Trash2 } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { useState } from "react";
 import { TeacherManagementDialog } from "@/components/TeacherManagementDialog";
+import { apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type Teacher = {
   id: string;
@@ -25,11 +37,34 @@ type TeacherWithStats = {
 
 export default function TeachersPage() {
   const { user } = useUser();
+  const { toast } = useToast();
   const [isManagementOpen, setIsManagementOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
 
   const { data: teachers, isLoading } = useQuery<Teacher[]>({
     queryKey: ["/api/teachers"],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (teacherId: string) => {
+      await apiRequest("DELETE", `/api/admin/teacher/${teacherId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teachers"] });
+      toast({
+        title: "Success",
+        description: "Teacher account has been deleted",
+      });
+      setTeacherToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete teacher account",
+        variant: "destructive",
+      });
+    },
   });
 
   const handleAddTeacher = () => {
@@ -40,6 +75,10 @@ export default function TeachersPage() {
   const handleEditTeacher = (teacher: Teacher) => {
     setSelectedTeacher(teacher);
     setIsManagementOpen(true);
+  };
+
+  const handleDeleteTeacher = (teacher: Teacher) => {
+    setTeacherToDelete(teacher);
   };
 
   const renderStars = (rating: number) => {
@@ -66,11 +105,11 @@ export default function TeachersPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">Teachers</h1>
-          <p className="text-muted-foreground mt-1">Browse teacher profiles and student reviews</p>
+    <div className="container mx-auto p-6 max-w-7xl space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight" data-testid="text-page-title">Teachers</h1>
+          <p className="text-base text-muted-foreground">Browse teacher profiles and student reviews</p>
         </div>
         {user?.role === "admin" && (
           <Button onClick={handleAddTeacher} data-testid="button-add-teacher">
@@ -163,6 +202,17 @@ export default function TeachersPage() {
                       >
                         Edit
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleDeleteTeacher(teacher);
+                        }}
+                        data-testid={`button-delete-teacher-${teacher.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   )}
                 </CardContent>
@@ -195,6 +245,31 @@ export default function TeachersPage() {
         onOpenChange={setIsManagementOpen}
         teacher={selectedTeacher}
       />
+
+      <AlertDialog open={!!teacherToDelete} onOpenChange={(open) => !open && setTeacherToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Teacher Account</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{teacherToDelete?.name}</strong>? This will permanently remove their account and all associated data including reviews and posts. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-3 justify-end">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (teacherToDelete) {
+                  deleteMutation.mutate(teacherToDelete.id);
+                }
+              }}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

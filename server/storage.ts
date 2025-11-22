@@ -87,6 +87,8 @@ export interface IStorage {
   updateUserCredibility(userId: string, newScore: number): Promise<User | undefined>;
   updateUserReputation(userId: string, newScore: number): Promise<User | undefined>;
   deleteUser(userId: string): Promise<boolean>;
+  deleteStudentAccount(userId: string): Promise<boolean>;
+  deleteTeacherAccount(teacherId: string): Promise<boolean>;
   
   // Student ID Management (Admin only)
   createStudentId(username: string, grade: number, className: string, adminId: string): Promise<AdminStudentId>;
@@ -375,6 +377,71 @@ export class DatabaseStorage implements IStorage {
       });
     } catch (error) {
       console.error("Failed to delete student account:", error);
+      return false;
+    }
+  }
+
+  async deleteTeacherAccount(teacherId: string): Promise<boolean> {
+    try {
+      return await db.transaction(async (tx) => {
+        // Get the teacher record first to find the associated userId
+        const [teacher] = await tx
+          .select()
+          .from(teachers)
+          .where(eq(teachers.id, teacherId));
+        
+        if (!teacher) {
+          throw new Error("Teacher not found");
+        }
+
+        const userId = teacher.userId;
+
+        // Delete all teacher reviews for this teacher
+        await tx.delete(teacherReviews).where(eq(teacherReviews.teacherId, teacherId));
+        
+        // Delete the teacher record itself
+        await tx.delete(teachers).where(eq(teachers.id, teacherId));
+        
+        // If teacher has an associated user account, delete all their data
+        if (userId) {
+          // Delete all posts by the teacher
+          await tx.delete(posts).where(eq(posts.authorId, userId));
+          
+          // Delete all post comments by the teacher
+          await tx.delete(postComments).where(eq(postComments.authorId, userId));
+          
+          // Delete all post reactions by the teacher
+          await tx.delete(postReactions).where(eq(postReactions.userId, userId));
+          
+          // Delete all post accuracy ratings by the teacher
+          await tx.delete(postAccuracyRatings).where(eq(postAccuracyRatings.userId, userId));
+          
+          // Delete all profile comments by the teacher
+          await tx.delete(profileComments).where(eq(profileComments.authorId, userId));
+          
+          // Delete all profile comments on the teacher's profile
+          await tx.delete(profileComments).where(eq(profileComments.profileUserId, userId));
+          
+          // Delete all event RSVPs by the teacher
+          await tx.delete(eventRsvps).where(eq(eventRsvps.userId, userId));
+          
+          // Delete all event comments by the teacher
+          await tx.delete(eventComments).where(eq(eventComments.authorId, userId));
+          
+          // Delete all schedules associated with this teacher (if any stored that way)
+          // Note: schedules are typically just text fields, so cascading should handle it
+          
+          // Delete all digital keys (unlocked scopes)
+          await tx.delete(digitalKeys).where(eq(digitalKeys.userId, userId));
+          
+          // Finally, delete the user record
+          await tx.delete(users).where(eq(users.id, userId));
+        }
+        
+        return true;
+      });
+    } catch (error) {
+      console.error("Failed to delete teacher account:", error);
       return false;
     }
   }

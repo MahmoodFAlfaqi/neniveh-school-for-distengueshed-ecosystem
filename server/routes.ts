@@ -370,6 +370,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete teacher account (admin only) - deletes all related data
+  app.delete("/api/admin/teacher/:teacherId", requireAdmin, async (req, res) => {
+    try {
+      const { teacherId } = req.params;
+      
+      const success = await storage.deleteTeacherAccount(teacherId);
+      
+      if (!success) {
+        return res.status(500).json({ 
+          message: "Failed to delete teacher account" 
+        });
+      }
+      
+      res.json({ message: "Teacher account deleted successfully" });
+    } catch (error) {
+      console.error("Failed to delete teacher account:", error);
+      res.status(500).json({ message: "Failed to delete teacher account" });
+    }
+  });
+
   // ==================== ACCESS CODE / DIGITAL KEY SYSTEM ====================
   
   // Verify and unlock scope (uses authenticated user from session)
