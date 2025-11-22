@@ -60,7 +60,7 @@ export default function Home() {
       .slice(0, 2);
   };
 
-  const upcomingEvents = events.slice(0, 5);
+  const upcomingEvents = events.slice(0, 3);
 
   // Calendar logic
   const getDaysInMonth = (date: Date) => {
@@ -167,81 +167,78 @@ export default function Home() {
 
             {/* Mini Calendar */}
             <Link href="/schedule" className="md:col-span-2">
-              <Card className="hover-elevate active-elevate-2 cursor-pointer h-full" data-testid="card-upcoming-events">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between mb-4">
+              <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid="card-upcoming-events">
+                <CardContent className="pt-4">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-5 h-5 text-primary" />
                       <h2 className="text-lg font-semibold">Calendar</h2>
                     </div>
-                    <span className="text-xs font-medium text-muted-foreground">
+                  </div>
+
+                  {/* Month Navigation */}
+                  <div className="flex items-center justify-between mb-3 px-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        prevMonth();
+                      }}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm font-medium">
                       {calendarDate.toLocaleString('default', { month: 'short', year: 'numeric' })}
                     </span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        nextMonth();
+                      }}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
                   </div>
 
-                  <div className="space-y-4">
-                    {/* Month Navigation */}
-                    <div className="flex items-center justify-between">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          prevMonth();
-                        }}
+                  {/* Compact Calendar Grid */}
+                  <div className="grid grid-cols-7 gap-1 mb-3 px-1">
+                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => (
+                      <div key={day} className="text-center text-[0.65rem] font-bold text-muted-foreground py-1">
+                        {day}
+                      </div>
+                    ))}
+                    {calendarDays.map((day, idx) => (
+                      <div
+                        key={idx}
+                        className={`aspect-square flex items-center justify-center text-[0.7rem] rounded-md ${
+                          day === null 
+                            ? '' 
+                            : eventDates.includes(day)
+                            ? 'bg-primary/30 text-primary font-bold'
+                            : 'text-foreground'
+                        }`}
                       >
-                        <ChevronLeft className="w-4 h-4" />
-                      </Button>
-                      <span className="text-sm font-medium">
-                        {calendarDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
-                      </span>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          nextMonth();
-                        }}
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Button>
-                    </div>
-
-                    {/* Calendar Grid */}
-                    <div className="grid grid-cols-7 gap-1">
-                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                        <div key={day} className="text-center text-xs font-semibold text-muted-foreground py-2">
-                          {day}
-                        </div>
-                      ))}
-                      {calendarDays.map((day, idx) => (
-                        <div
-                          key={idx}
-                          className={`aspect-square flex items-center justify-center text-xs rounded-lg ${
-                            day === null 
-                              ? 'text-muted-foreground/20' 
-                              : eventDates.includes(day)
-                              ? 'bg-primary/20 text-primary font-semibold'
-                              : 'text-foreground hover:bg-muted/50'
-                          } transition-colors`}
-                        >
-                          {day}
-                        </div>
-                      ))}
-                    </div>
+                        {day}
+                      </div>
+                    ))}
                   </div>
 
-                  {/* Events List */}
+                  {/* Upcoming Events */}
                   {upcomingEvents.length > 0 && (
-                    <div className="mt-4 pt-4 border-t space-y-2">
+                    <div className="space-y-1">
                       {upcomingEvents.map((event) => (
                         <div
                           key={event.id}
-                          className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors text-sm"
+                          className="flex items-center gap-2 p-2 rounded-lg bg-rose-50/50 dark:bg-rose-950/30 text-sm"
                           data-testid={`event-${event.id}`}
                         >
-                          <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-                          <p className="truncate flex-1">{event.title}</p>
+                          <div className="w-1.5 h-1.5 rounded-full bg-rose-600 dark:bg-rose-400 flex-shrink-0" />
+                          <p className="truncate flex-1 text-xs">{event.title}</p>
                         </div>
                       ))}
                     </div>
@@ -274,7 +271,7 @@ export default function Home() {
                   {recentPosts.slice(0, 6).map((post: Post) => (
                     <div 
                       key={post.id} 
-                      className="p-4 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors group"
+                      className="p-4 rounded-lg bg-rose-50/50 dark:bg-rose-950/20 hover:bg-rose-100/50 dark:hover:bg-rose-950/40 transition-colors group"
                       data-testid={`post-preview-${post.id}`}
                     >
                       <div className="flex items-start gap-3 mb-3">
