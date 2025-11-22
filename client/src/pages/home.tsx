@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Calendar, Trophy, TrendingUp, Newspaper, Clock } from "lucide-react";
+import { Calendar, Trophy, TrendingUp, Newspaper, Clock, BookOpen, Music } from "lucide-react";
 import { Link } from "wouter";
 import { useMemo } from "react";
 
@@ -31,8 +31,9 @@ type Post = {
 type Event = {
   id: string;
   title: string;
-  date: string;
-  type: string;
+  startTime: string;
+  eventType: "curricular" | "extracurricular";
+  location?: string;
 };
 
 export default function Home() {
@@ -99,8 +100,8 @@ export default function Home() {
     
     events.forEach(event => {
       try {
-        // Parse the event date
-        const eventDate = new Date(event.date);
+        // Parse the event date from startTime
+        const eventDate = new Date(event.startTime);
         
         // Check if date is valid
         if (!(eventDate instanceof Date) || isNaN(eventDate.getTime())) {
@@ -124,6 +125,25 @@ export default function Home() {
     
     return map;
   }, [events]);
+
+  // Get event type icon and color
+  const getEventTypeStyle = (eventType: string) => {
+    if (eventType === "curricular") {
+      return {
+        bg: "bg-violet-600/30 dark:bg-violet-400/30",
+        text: "text-violet-700 dark:text-violet-300",
+        icon: BookOpen,
+        label: "Class",
+      };
+    } else {
+      return {
+        bg: "bg-amber-600/30 dark:bg-amber-400/30",
+        text: "text-amber-700 dark:text-amber-300",
+        icon: Music,
+        label: "Activity",
+      };
+    }
+  };
 
   return (
     <div className="h-full overflow-y-auto bg-gradient-to-br from-background via-background to-muted/20">
@@ -186,7 +206,7 @@ export default function Home() {
                 <CardContent className="pt-3 pb-3">
                   <h2 className="text-sm font-semibold flex items-center gap-1 mb-2">
                     <Calendar className="w-3.5 h-3.5" />
-                    Upcoming
+                    Upcoming Events
                   </h2>
 
                   {/* 15-Day Calendar Grid */}
@@ -202,7 +222,7 @@ export default function Home() {
                           key={idx}
                           className={`text-center text-[0.65rem] p-1 rounded-sm min-h-12 flex flex-col ${
                             isToday
-                              ? 'bg-primary/30 text-primary font-bold'
+                              ? 'bg-primary/30 text-primary font-bold border-2 border-primary'
                               : isPast
                               ? 'bg-muted/30 text-muted-foreground'
                               : 'bg-background'
@@ -210,16 +230,22 @@ export default function Home() {
                         >
                           <div className="font-semibold">{date.getDate()}</div>
                           <div className="text-[0.5rem] flex-1 flex flex-col justify-center gap-0.5 overflow-hidden">
-                            {dayEvents.slice(0, 2).map((event, eventIdx) => (
-                              <div
-                                key={eventIdx}
-                                className="truncate bg-rose-600/30 dark:bg-rose-400/30 text-rose-700 dark:text-rose-300 px-0.5 rounded-sm line-clamp-1"
-                                title={event.title}
-                                data-testid={`event-${event.id}`}
-                              >
-                                {event.title}
-                              </div>
-                            ))}
+                            {dayEvents.slice(0, 2).map((event, eventIdx) => {
+                              const typeStyle = getEventTypeStyle(event.eventType);
+                              const TypeIcon = typeStyle.icon;
+                              
+                              return (
+                                <div
+                                  key={eventIdx}
+                                  className={`flex items-center gap-0.5 px-0.5 rounded-sm line-clamp-1 ${typeStyle.bg} ${typeStyle.text}`}
+                                  title={`${typeStyle.label}: ${event.title}`}
+                                  data-testid={`event-${event.id}`}
+                                >
+                                  <TypeIcon className="w-2 h-2 flex-shrink-0" />
+                                  <span className="truncate">{event.title}</span>
+                                </div>
+                              );
+                            })}
                             {dayEvents.length > 2 && (
                               <div className="text-[0.5rem] text-muted-foreground">+{dayEvents.length - 2}</div>
                             )}
@@ -227,6 +253,18 @@ export default function Home() {
                         </div>
                       );
                     })}
+                  </div>
+
+                  {/* Legend */}
+                  <div className="mt-2 flex gap-2 text-[0.5rem]">
+                    <div className="flex items-center gap-0.5">
+                      <BookOpen className="w-2 h-2 text-violet-600 dark:text-violet-400" />
+                      <span className="text-muted-foreground">Class</span>
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      <Music className="w-2 h-2 text-amber-600 dark:text-amber-400" />
+                      <span className="text-muted-foreground">Activity</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
