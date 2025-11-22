@@ -201,11 +201,23 @@
   * {
     @apply border-border;
   }
-  body {
+  html, body {
     @apply bg-background text-foreground;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+  }
+  body {
+    min-height: 100vh;
+    min-height: 100dvh; /* Better mobile support */
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold tracking-tight;
+  }
+  
+  /* Prevent horizontal scroll on all elements */
+  * {
+    box-sizing: border-box;
   }
 }
 
@@ -281,5 +293,38 @@
   
   .animate-pulse-slow {
     animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Custom scrollbar styling - minimal and clean */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.3);
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Mobile touch optimization */
+  @media (max-width: 768px) {
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* Better button sizing for touch */
+    button, a {
+      min-height: 44px;
+      min-width: 44px;
+    }
   }
 }
