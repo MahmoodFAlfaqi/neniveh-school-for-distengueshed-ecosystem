@@ -47,6 +47,24 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+// Non-visitor middleware (prevent read-only visitors from making changes)
+async function requireNonVisitor(req: Request, res: Response, next: NextFunction) {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+  
+  const user = await storage.getUser(req.session.userId);
+  if (!user) {
+    return res.status(401).json({ message: "User not found" });
+  }
+  
+  if (user.role === "visitor") {
+    return res.status(403).json({ message: "Visitors cannot perform this action. Please login as a student or admin." });
+  }
+  
+  next();
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== AUTHENTICATION ====================
   
@@ -405,7 +423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update user profile (own profile only)
-  app.patch("/api/users/:userId/profile", requireAuth, async (req, res) => {
+  app.patch("/api/users/:userId/profile", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       const userId = req.params.userId;
       const currentUserId = req.session.userId!;
@@ -616,7 +634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== ACCESS CODE / DIGITAL KEY SYSTEM ====================
   
   // Verify and unlock scope (uses authenticated user from session)
-  app.post("/api/keys/unlock", requireAuth, async (req, res) => {
+  app.post("/api/keys/unlock", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       const { scopeId, accessCode } = req.body;
       const userId = req.session.userId!; // From authenticated session
@@ -717,7 +735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== CREDIBILITY & REPUTATION ENGINE ====================
   
   // Calculate authenticated user's reputation
-  app.post("/api/reputation/calculate", requireAuth, async (req, res) => {
+  app.post("/api/reputation/calculate", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       const reputation = await storage.calculateUserReputation(req.session.userId!);
       res.json({ reputation });
@@ -890,7 +908,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== POSTS ====================
   
   // Create post (uses authenticated user) with optional file upload
-  app.post("/api/posts", requireAuth, upload.single('media'), async (req, res) => {
+  app.post("/api/posts", requireAuth, requireNonVisitor, upload.single('media'), async (req, res) => {
     try {
       // Moderate content before saving (only if content is provided)
       if (req.body.content?.trim()) {
@@ -942,7 +960,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Edit post (author only)
-  app.patch("/api/posts/:id", requireAuth, async (req, res) => {
+  app.patch("/api/posts/:id", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       const postId = req.params.id;
       const userId = req.session.userId!;
@@ -1022,7 +1040,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Like a post (toggle)
-  app.post("/api/posts/:id/like", requireAuth, async (req, res) => {
+  app.post("/api/posts/:id/like", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       const postId = req.params.id;
       const userId = req.session.userId!;
@@ -1058,7 +1076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Rate post accuracy (1-5 stars)
-  app.post("/api/posts/:id/rate-accuracy", requireAuth, async (req, res) => {
+  app.post("/api/posts/:id/rate-accuracy", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       const postId = req.params.id;
       const userId = req.session.userId!;
@@ -1080,7 +1098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== EVENTS ====================
   
   // Create event
-  app.post("/api/events", requireAuth, async (req, res) => {
+  app.post("/api/events", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       // Moderate event description before saving (only if description is provided)
       if (req.body.description?.trim()) {
@@ -1146,7 +1164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // RSVP to event
-  app.post("/api/events/:id/rsvp", requireAuth, async (req, res) => {
+  app.post("/api/events/:id/rsvp", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       const rsvp = await storage.rsvpToEvent(req.params.id, req.session.userId!);
       res.json(rsvp);
@@ -1187,7 +1205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== SCHEDULES ====================
   
   // Create schedule entry (requires section key)
-  app.post("/api/schedules", requireAuth, async (req, res) => {
+  app.post("/api/schedules", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       const scheduleData = insertScheduleSchema.parse(req.body);
       
@@ -1218,7 +1236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update schedule entry (requires section key)
-  app.patch("/api/schedules/:id", requireAuth, async (req, res) => {
+  app.patch("/api/schedules/:id", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       const { teacherName, subject, scopeId } = req.body;
       
@@ -1245,7 +1263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk update schedules for a scope (requires section key or admin)
-  app.patch("/api/schedules/:scopeId/bulk", requireAuth, async (req, res) => {
+  app.patch("/api/schedules/:scopeId/bulk", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       const { scopeId } = req.params;
       const { updates } = req.body;
@@ -1336,7 +1354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create teacher review
-  app.post("/api/teachers/:id/reviews", requireAuth, async (req, res) => {
+  app.post("/api/teachers/:id/reviews", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       // Moderate review comment before saving (only if comment is provided)
       if (req.body.comment?.trim()) {
@@ -1378,7 +1396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== PROFILE COMMENTS ====================
   
   // Create profile comment
-  app.post("/api/users/:userId/comments", requireAuth, async (req, res) => {
+  app.post("/api/users/:userId/comments", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       // Prevent self-commenting (server-side validation)
       if (req.params.userId === req.session.userId) {
@@ -1420,7 +1438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== POST COMMENTS ====================
-  app.post("/api/posts/:postId/comments", requireAuth, async (req, res) => {
+  app.post("/api/posts/:postId/comments", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       const commentData = insertPostCommentSchema.parse({
         ...req.body,
@@ -1448,7 +1466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== EVENT COMMENTS ====================
-  app.post("/api/events/:eventId/comments", requireAuth, async (req, res) => {
+  app.post("/api/events/:eventId/comments", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       const commentData = insertEventCommentSchema.parse({
         ...req.body,
@@ -1478,7 +1496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== PEER RATINGS ====================
   
   // Submit or update a peer rating
-  app.post("/api/users/:userId/rate", requireAuth, async (req, res) => {
+  app.post("/api/users/:userId/rate", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       const ratedUserId = req.params.userId;
       const raterUserId = req.session.userId!;
