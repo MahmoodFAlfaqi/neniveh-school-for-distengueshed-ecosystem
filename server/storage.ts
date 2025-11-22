@@ -274,12 +274,14 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async updateUserProfile(userId: string, updates: { bio?: string; avatarUrl?: string }): Promise<User | undefined> {
+  async updateUserProfile(userId: string, updates: { bio?: string; avatarUrl?: string; grade?: number; className?: string }): Promise<User | undefined> {
     const [user] = await db
       .update(users)
       .set({ 
         bio: updates.bio,
         avatarUrl: updates.avatarUrl,
+        grade: updates.grade,
+        className: updates.className,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId))

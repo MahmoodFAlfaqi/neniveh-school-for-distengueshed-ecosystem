@@ -233,14 +233,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You can only edit your own profile" });
       }
       
-      const { bio, avatarUrl } = req.body;
+      const { bio, avatarUrl, grade, className } = req.body;
       
       // Moderate bio before updating
       if (bio && typeof bio === "string" && bio.trim()) {
         await requireModeration(bio);
       }
       
-      const updated = await storage.updateUserProfile(userId, { bio, avatarUrl });
+      const updated = await storage.updateUserProfile(userId, { bio, avatarUrl, grade, className });
       
       if (!updated) {
         return res.status(404).json({ message: "User not found" });

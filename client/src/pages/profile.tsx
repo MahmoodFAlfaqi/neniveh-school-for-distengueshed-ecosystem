@@ -14,6 +14,7 @@ import { useState } from "react";
 import { UserProfileLink } from "@/components/UserProfileLink";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocation } from "wouter";
 
 type User = {
@@ -107,6 +108,8 @@ export default function ProfilePage() {
   const userId = params?.userId;
   const [editingProfile, setEditingProfile] = useState(false);
   const [editBio, setEditBio] = useState("");
+  const [editGrade, setEditGrade] = useState("");
+  const [editClassName, setEditClassName] = useState("");
   const { toast } = useToast();
 
   const { data: user, isLoading } = useQuery<User>({
@@ -118,8 +121,8 @@ export default function ProfilePage() {
   });
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: { bio: string }) => {
-      return await apiRequest("PATCH", `/api/users/${currentUser?.id}/profile`, { bio: data.bio });
+    mutationFn: async (data: { bio: string; grade?: number; className?: string }) => {
+      return await apiRequest("PATCH", `/api/users/${currentUser?.id}/profile`, data);
     },
     onSuccess: () => {
       toast({
@@ -142,13 +145,19 @@ export default function ProfilePage() {
   const handleEditProfile = () => {
     if (user) {
       setEditBio(user.bio || "");
+      setEditGrade(user.grade?.toString() || "");
+      setEditClassName(user.className || "");
       setEditingProfile(true);
     }
   };
 
   const handleSaveProfile = () => {
     if (currentUser?.id === user?.id) {
-      updateProfileMutation.mutate({ bio: editBio });
+      updateProfileMutation.mutate({
+        bio: editBio,
+        grade: editGrade ? parseInt(editGrade) : undefined,
+        className: editClassName || undefined,
+      });
     }
   };
 
@@ -458,9 +467,41 @@ export default function ProfilePage() {
         <DialogContent data-testid="dialog-edit-profile">
           <DialogHeader>
             <DialogTitle>Edit Profile</DialogTitle>
-            <DialogDescription>Update your profile bio and information.</DialogDescription>
+            <DialogDescription>Update your profile information.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="grade" className="text-sm font-medium">Grade</label>
+              <Select value={editGrade} onValueChange={setEditGrade}>
+                <SelectTrigger id="grade" data-testid="select-edit-grade">
+                  <SelectValue placeholder="Select grade" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 4, 5, 6].map((g) => (
+                    <SelectItem key={g} value={g.toString()}>
+                      Grade {g}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="className" className="text-sm font-medium">Class</label>
+              <Select value={editClassName} onValueChange={setEditClassName}>
+                <SelectTrigger id="className" data-testid="select-edit-class">
+                  <SelectValue placeholder="Select class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {["A", "B", "C", "D"].map((cls) => (
+                    <SelectItem key={cls} value={cls}>
+                      {cls}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <label htmlFor="bio" className="text-sm font-medium">Bio</label>
               <Textarea
