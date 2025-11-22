@@ -160,11 +160,6 @@ export default function ClassDetail() {
                         <p className="text-sm text-muted-foreground truncate">
                           @{student.username}
                         </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="text-xs">
-                            Score: {student.credibilityScore}
-                          </Badge>
-                        </div>
                       </div>
                     </CardHeader>
                   </Card>
