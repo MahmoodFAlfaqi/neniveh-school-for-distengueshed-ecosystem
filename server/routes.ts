@@ -27,8 +27,14 @@ import { z } from "zod";
 import { requireModeration } from "./moderation";
 import { upload, getMediaType } from "./upload";
 
-// Authentication middleware
+// Authentication middleware (allows both logged-in users and visitors)
 function requireAuth(req: Request, res: Response, next: NextFunction) {
+  // Allow visitors with session-only access
+  if (req.session.isVisitor) {
+    return next();
+  }
+  
+  // Require userId for regular users
   if (!req.session.userId) {
     return res.status(401).json({ message: "Authentication required" });
   }
@@ -436,6 +442,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get current user (from session)
   app.get("/api/auth/me", requireAuth, async (req, res) => {
     try {
+      // Return visitor session data if visitor
+      if (req.session.isVisitor && req.session.visitorData) {
+        return res.json(req.session.visitorData);
+      }
+
       const user = await storage.getUser(req.session.userId!);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
