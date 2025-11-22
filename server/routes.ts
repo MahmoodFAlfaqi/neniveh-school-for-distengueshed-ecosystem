@@ -224,6 +224,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email,
         studentId: `ADMIN_${Date.now()}`, // Unique admin student ID
         role: "admin",
+        credibilityScore: 100,
+        reputationScore: 0,
+        accountStatus: "active",
+        initiativeScore: 0,
+        communicationScore: 0,
+        cooperationScore: 0,
+        kindnessScore: 0,
+        perseveranceScore: 0,
+        fitnessScore: 0,
+        playingSkillsScore: 0,
+        inClassMisconductScore: 0,
+        outClassMisconductScore: 0,
+        literaryScienceScore: 0,
+        naturalScienceScore: 0,
+        electronicScienceScore: 0,
+        confidenceScore: 0,
+        temperScore: 0,
+        cheerfulnessScore: 0,
       }).returning();
       
       // Set session
