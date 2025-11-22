@@ -137,8 +137,8 @@ export default function Home() {
       };
     } else {
       return {
-        bg: "bg-amber-600/30 dark:bg-amber-400/30",
-        text: "text-amber-700 dark:text-amber-300",
+        bg: "bg-cyan-600/30 dark:bg-cyan-400/30",
+        text: "text-cyan-700 dark:text-cyan-300",
         icon: Music,
         label: "Activity",
       };
@@ -262,7 +262,7 @@ export default function Home() {
                       <span className="text-muted-foreground">Class</span>
                     </div>
                     <div className="flex items-center gap-0.5">
-                      <Music className="w-2 h-2 text-amber-600 dark:text-amber-400" />
+                      <Music className="w-2 h-2 text-cyan-600 dark:text-cyan-400" />
                       <span className="text-muted-foreground">Activity</span>
                     </div>
                   </div>
