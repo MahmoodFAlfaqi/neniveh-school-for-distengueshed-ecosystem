@@ -27,7 +27,9 @@ The frontend is built with React, TypeScript, and Vite, utilizing Shadcn UI (bas
 -   **Authentication System**: Three-tier system for Admins, Students, and Visitors.
     -   **Admin Auth**: Requires one-time invitation code, unique credentials, auto-generated student IDs, separate UI flow, 7-day persistent login.
     -   **Student Auth**: Standard username/password, 7-day persistent login, full account creation.
-    -   **Visitor Access**: Session-only, read-only, single-click access.
+    -   **Visitor Access**: Session-only, read-only, single-click access with restricted UI.
+        -   **Hidden from Visitors**: Profile card, Schedule/Calendar card, Community Highlights section on home page; Profile and Schedule links in sidebar.
+        -   **Visible to Visitors**: Activity Status card, Quick Access card, all other navigation (Home, News, Grades, Events, Teachers, Settings, Support).
     -   **Security**: Failed login tracking (3 attempts, 15-min lockout), `remember-me` tokens with sliding expiration, HttpOnly cookies, PostgreSQL-backed sessions.
     -   **Password Recovery**: Includes `password_reset_tokens` table, backend endpoints for forgot/reset password, token validation, and a frontend page.
 -   **Admin Account Seeding**: Automatic creation of 2 admin accounts on server startup, configured via environment variables.

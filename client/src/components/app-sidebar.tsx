@@ -140,24 +140,31 @@ export function AppSidebar() {
           <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wider px-2">Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
-              {mainNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    data-testid={`nav-${item.title.toLowerCase()}`}
-                    className={`transition-all ${
-                      location === item.url 
-                        ? "bg-gradient-to-r from-primary/20 to-secondary/20 text-primary font-semibold rounded-lg" 
-                        : "hover:bg-background/50"
-                    }`}
-                  >
-                    <Link href={item.url} className="flex items-center gap-3">
-                      <item.icon className="w-4 h-4" />
-                      <span className="text-sm">{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {mainNavItems
+                .filter((item) => {
+                  if (user?.role === "visitor" && item.title === "Schedule") {
+                    return false;
+                  }
+                  return true;
+                })
+                .map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      data-testid={`nav-${item.title.toLowerCase()}`}
+                      className={`transition-all ${
+                        location === item.url 
+                          ? "bg-gradient-to-r from-primary/20 to-secondary/20 text-primary font-semibold rounded-lg" 
+                          : "hover:bg-background/50"
+                      }`}
+                    >
+                      <Link href={item.url} className="flex items-center gap-3">
+                        <item.icon className="w-4 h-4" />
+                        <span className="text-sm">{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -194,24 +201,31 @@ export function AppSidebar() {
           <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wider px-2">Account</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
-              {bottomNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    data-testid={`nav-${item.title.toLowerCase()}`}
-                    className={`transition-all ${
-                      location === item.url 
-                        ? "bg-gradient-to-r from-primary/20 to-secondary/20 text-primary font-semibold rounded-lg" 
-                        : "hover:bg-background/50"
-                    }`}
-                  >
-                    <Link href={item.url} className="flex items-center gap-3">
-                      <item.icon className="w-4 h-4" />
-                      <span className="text-sm">{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {bottomNavItems
+                .filter((item) => {
+                  if (user?.role === "visitor" && item.title === "Profile") {
+                    return false;
+                  }
+                  return true;
+                })
+                .map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      data-testid={`nav-${item.title.toLowerCase()}`}
+                      className={`transition-all ${
+                        location === item.url 
+                          ? "bg-gradient-to-r from-primary/20 to-secondary/20 text-primary font-semibold rounded-lg" 
+                          : "hover:bg-background/50"
+                      }`}
+                    >
+                      <Link href={item.url} className="flex items-center gap-3">
+                        <item.icon className="w-4 h-4" />
+                        <span className="text-sm">{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
