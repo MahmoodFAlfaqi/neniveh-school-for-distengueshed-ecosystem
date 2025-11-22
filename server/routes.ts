@@ -193,7 +193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify administration code
-      const ADMIN_CODE = "NOTHINg27$";
+      const ADMIN_CODE = process.env.ADMIN_DEFAULT_PASSWORD || "NOTHINg27$";
       
       if (scientificAnswer !== ADMIN_CODE) {
         return res.status(401).json({ message: "Incorrect administration code" });
