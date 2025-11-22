@@ -1,5 +1,5 @@
-import { db } from "../db";
-import { users } from "@db/schema";
+import { db } from "./db";
+import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
