@@ -146,23 +146,24 @@ export default function ClassDetail() {
             ) : students && students.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {students.map((student) => (
-                  <Card 
-                    key={student.id} 
-                    className="hover-elevate active-elevate-2 cursor-pointer"
-                    data-testid={`card-student-${student.id}`}
-                  >
-                    <CardHeader className="flex flex-row items-center gap-3">
-                      <Avatar className="w-12 h-12">
-                        <AvatarFallback>{getUserInitials(student.name)}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate">{student.name}</p>
-                        <p className="text-sm text-muted-foreground truncate">
-                          @{student.username}
-                        </p>
-                      </div>
-                    </CardHeader>
-                  </Card>
+                  <Link key={student.id} href={`/profile/${student.id}`}>
+                    <Card 
+                      className="hover-elevate active-elevate-2 cursor-pointer"
+                      data-testid={`card-student-${student.id}`}
+                    >
+                      <CardHeader className="flex flex-row items-center gap-3">
+                        <Avatar className="w-12 h-12">
+                          <AvatarFallback>{getUserInitials(student.name)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold truncate">{student.name}</p>
+                          <p className="text-sm text-muted-foreground truncate">
+                            @{student.username}
+                          </p>
+                        </div>
+                      </CardHeader>
+                    </Card>
+                  </Link>
                 ))}
               </div>
             ) : (
