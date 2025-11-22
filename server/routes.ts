@@ -255,7 +255,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Admin registration error:", error);
-      res.status(500).json({ message: "Admin registration failed" });
+      if (error instanceof Error) {
+        console.error("Error details:", error.message);
+        console.error("Error stack:", error.stack);
+      }
+      res.status(500).json({ message: "Admin registration failed", error: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
