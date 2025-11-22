@@ -14,6 +14,8 @@ import {
   insertTeacherReviewSchema,
   insertScopeSchema,
   insertProfileCommentSchema,
+  insertPostCommentSchema,
+  insertEventCommentSchema,
   insertAdminStudentIdSchema,
   insertPeerRatingSchema,
 } from "@shared/schema";
@@ -959,6 +961,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users/:userId/comments", requireAuth, async (req, res) => {
     try {
       const comments = await storage.getProfileComments(req.params.userId);
+      res.json(comments);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch comments" });
+    }
+  });
+
+  // ==================== POST COMMENTS ====================
+  app.post("/api/posts/:postId/comments", requireAuth, async (req, res) => {
+    try {
+      if (req.body.content?.trim()) {
+        await requireModeration(req.body.content);
+      }
+      
+      const commentData = insertPostCommentSchema.parse({
+        ...req.body,
+        postId: req.params.postId,
+        authorId: req.session.userId!,
+      });
+      
+      const comment = await storage.createPostComment(commentData);
+      res.json(comment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      if (error instanceof Error && error.message.includes("community guidelines")) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to create comment" });
+    }
+  });
+
+  app.get("/api/posts/:postId/comments", requireAuth, async (req, res) => {
+    try {
+      const comments = await storage.getPostComments(req.params.postId);
+      res.json(comments);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch comments" });
+    }
+  });
+
+  // ==================== EVENT COMMENTS ====================
+  app.post("/api/events/:eventId/comments", requireAuth, async (req, res) => {
+    try {
+      if (req.body.content?.trim()) {
+        await requireModeration(req.body.content);
+      }
+      
+      const commentData = insertEventCommentSchema.parse({
+        ...req.body,
+        eventId: req.params.eventId,
+        authorId: req.session.userId!,
+      });
+      
+      const comment = await storage.createEventComment(commentData);
+      res.json(comment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      if (error instanceof Error && error.message.includes("community guidelines")) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to create comment" });
+    }
+  });
+
+  app.get("/api/events/:eventId/comments", requireAuth, async (req, res) => {
+    try {
+      const comments = await storage.getEventComments(req.params.eventId);
       res.json(comments);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch comments" });

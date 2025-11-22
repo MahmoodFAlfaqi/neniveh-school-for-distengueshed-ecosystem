@@ -137,6 +137,14 @@ export interface IStorage {
   createTeacherReview(review: InsertTeacherReview): Promise<TeacherReview>;
   getTeacherReviews(teacherId: string): Promise<TeacherReview[]>;
   
+  // Post Comments
+  createPostComment(comment: InsertPostComment): Promise<PostComment>;
+  getPostComments(postId: string): Promise<PostComment[]>;
+
+  // Event Comments
+  createEventComment(comment: InsertEventComment): Promise<EventComment>;
+  getEventComments(eventId: string): Promise<EventComment[]>;
+
   // Profile Comments
   createProfileComment(comment: InsertProfileComment): Promise<ProfileComment>;
   getProfileComments(profileUserId: string): Promise<ProfileComment[]>;
@@ -1103,6 +1111,62 @@ export class DatabaseStorage implements IStorage {
       .from(teacherReviews)
       .where(eq(teacherReviews.teacherId, teacherId))
       .orderBy(desc(teacherReviews.createdAt));
+  }
+
+  // ==================== POST COMMENTS ====================
+  async createPostComment(insertComment: InsertPostComment): Promise<PostComment> {
+    const [comment] = await db.insert(postComments).values(insertComment).returning();
+    await db
+      .update(posts)
+      .set({ commentsCount: sql`${posts.commentsCount} + 1` })
+      .where(eq(posts.id, insertComment.postId));
+    return comment;
+  }
+
+  async getPostComments(postId: string): Promise<Array<PostComment & { authorName?: string; authorRole?: string; authorAvatarUrl?: string | null }>> {
+    const results = await db
+      .select({
+        id: postComments.id,
+        postId: postComments.postId,
+        content: postComments.content,
+        createdAt: postComments.createdAt,
+        authorId: postComments.authorId,
+        authorName: users.name,
+        authorRole: users.role,
+        authorAvatarUrl: users.avatarUrl,
+      })
+      .from(postComments)
+      .leftJoin(users, eq(postComments.authorId, users.id))
+      .where(eq(postComments.postId, postId))
+      .orderBy(desc(postComments.createdAt));
+    
+    return results as Array<PostComment & { authorName?: string; authorRole?: string; authorAvatarUrl?: string | null }>;
+  }
+
+  // ==================== EVENT COMMENTS ====================
+  async createEventComment(insertComment: InsertEventComment): Promise<EventComment> {
+    const [comment] = await db.insert(eventComments).values(insertComment).returning();
+    return comment;
+  }
+
+  async getEventComments(eventId: string): Promise<Array<EventComment & { authorName?: string; authorRole?: string; authorAvatarUrl?: string | null }>> {
+    const results = await db
+      .select({
+        id: eventComments.id,
+        eventId: eventComments.eventId,
+        content: eventComments.content,
+        createdAt: eventComments.createdAt,
+        authorId: eventComments.authorId,
+        authorName: users.name,
+        authorRole: users.role,
+        authorAvatarUrl: users.avatarUrl,
+      })
+      .from(eventComments)
+      .leftJoin(users, eq(eventComments.authorId, users.id))
+      .where(eq(eventComments.eventId, eventId))
+      .orderBy(desc(eventComments.createdAt));
+    
+    return results as Array<EventComment & { authorName?: string; authorRole?: string; authorAvatarUrl?: string | null }>;
   }
 
   // ==================== PROFILE COMMENTS ====================
