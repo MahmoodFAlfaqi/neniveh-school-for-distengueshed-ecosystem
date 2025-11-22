@@ -2,10 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Calendar, Trophy, TrendingUp, Newspaper, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, Trophy, TrendingUp, Newspaper, Clock } from "lucide-react";
 import { Link } from "wouter";
-import { useState, useMemo } from "react";
-import { Button } from "@/components/ui/button";
 
 type User = {
   id: string;
@@ -49,8 +47,6 @@ export default function Home() {
     queryKey: ["/api/events"],
   });
 
-  const [calendarDate, setCalendarDate] = useState(new Date());
-
   const getUserInitials = (name: string) => {
     return name
       .split(" ")
@@ -60,185 +56,84 @@ export default function Home() {
       .slice(0, 2);
   };
 
-  const upcomingEvents = events.slice(0, 3);
-
-  // Calendar logic
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-  };
-
-  const calendarDays = useMemo(() => {
-    const days = [];
-    const daysInMonth = getDaysInMonth(calendarDate);
-    const firstDay = getFirstDayOfMonth(calendarDate);
-
-    for (let i = 0; i < firstDay; i++) {
-      days.push(null);
-    }
-
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(i);
-    }
-
-    return days;
-  }, [calendarDate]);
-
-  const eventDates = useMemo(() => {
-    return events.map(e => new Date(e.date).getDate()).filter(d => !isNaN(d));
-  }, [events]);
-
-  const prevMonth = () => {
-    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1));
-  };
-
-  const nextMonth = () => {
-    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1));
-  };
+  const upcomingEvents = events.slice(0, 2);
 
   return (
     <div className="h-full overflow-y-auto bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+      <div className="max-w-6xl mx-auto px-4 py-6 space-y-4">
         
         {/* Hero Section */}
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
             Welcome back{user ? `, ${user.name.split(' ')[0]}` : ''}!
           </h1>
-          <p className="text-lg text-muted-foreground">
-            Stay updated with your school community
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Your school community updates
           </p>
         </div>
 
         {/* Stats Grid */}
         {user && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             
             {/* Profile Card */}
-            <Card className="md:col-span-1 hover-elevate" data-testid="card-user-stats">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <Avatar className="w-12 h-12">
-                    <AvatarFallback className="text-base font-semibold">
+            <Card className="hover-elevate" data-testid="card-user-stats">
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <Avatar className="w-10 h-10">
+                    <AvatarFallback className="text-sm font-semibold">
                       {getUserInitials(user.name)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate" data-testid="text-user-name">{user.name}</p>
-                    <Badge variant="secondary" className="mt-1 text-xs">{user.role}</Badge>
+                    <p className="font-semibold text-sm truncate" data-testid="text-user-name">{user.name}</p>
+                    <Badge variant="secondary" className="mt-0.5 text-[0.65rem]">{user.role}</Badge>
                   </div>
                 </div>
-                <div className="space-y-3">
-                  <div className="p-3 rounded-lg bg-violet-50 dark:bg-violet-950/20">
+                <div className="space-y-2">
+                  <div className="p-2 rounded-lg bg-violet-50 dark:bg-violet-950/20">
                     <div className="flex items-center gap-2 mb-1">
-                      <Trophy className="w-4 h-4 text-violet-600 dark:text-violet-400" />
-                      <span className="text-xs font-medium text-muted-foreground">Credibility</span>
+                      <Trophy className="w-3 h-3 text-violet-600 dark:text-violet-400" />
+                      <span className="text-[0.65rem] font-medium text-muted-foreground">Credibility</span>
                     </div>
-                    <p className="text-2xl font-bold text-violet-600 dark:text-violet-400" data-testid="text-credibility">
+                    <p className="text-xl font-bold text-violet-600 dark:text-violet-400" data-testid="text-credibility">
                       {user.credibilityScore.toFixed(0)}
                     </p>
                   </div>
-                  <div className="p-3 rounded-lg bg-cyan-50 dark:bg-cyan-950/20">
+                  <div className="p-2 rounded-lg bg-cyan-50 dark:bg-cyan-950/20">
                     <div className="flex items-center gap-2 mb-1">
-                      <TrendingUp className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                      <span className="text-xs font-medium text-muted-foreground">Reputation</span>
+                      <TrendingUp className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
+                      <span className="text-[0.65rem] font-medium text-muted-foreground">Reputation</span>
                     </div>
-                    <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400" data-testid="text-reputation">
+                    <p className="text-xl font-bold text-cyan-600 dark:text-cyan-400" data-testid="text-reputation">
                       {user.reputationScore.toFixed(0)}
                     </p>
-                  </div>
-                  <div className="pt-3 border-t">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-muted-foreground">Status</span>
-                      <Badge 
-                        variant={user.accountStatus === "active" ? "default" : "destructive"}
-                        className="text-xs"
-                      >
-                        {user.accountStatus}
-                      </Badge>
-                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Mini Calendar */}
+            {/* Quick Events */}
             <Link href="/schedule" className="md:col-span-2">
-              <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid="card-upcoming-events">
+              <Card className="hover-elevate active-elevate-2 cursor-pointer h-full" data-testid="card-upcoming-events">
                 <CardContent className="pt-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-5 h-5 text-primary" />
-                      <h2 className="text-lg font-semibold">Calendar</h2>
-                    </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Calendar className="w-4 h-4 text-primary" />
+                    <h2 className="text-sm font-semibold">Upcoming</h2>
                   </div>
-
-                  {/* Month Navigation */}
-                  <div className="flex items-center justify-between mb-3 px-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        prevMonth();
-                      }}
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    <span className="text-sm font-medium">
-                      {calendarDate.toLocaleString('default', { month: 'short', year: 'numeric' })}
-                    </span>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        nextMonth();
-                      }}
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-
-                  {/* Compact Calendar Grid */}
-                  <div className="grid grid-cols-7 gap-1 mb-3 px-1">
-                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => (
-                      <div key={day} className="text-center text-[0.65rem] font-bold text-muted-foreground py-1">
-                        {day}
-                      </div>
-                    ))}
-                    {calendarDays.map((day, idx) => (
-                      <div
-                        key={idx}
-                        className={`aspect-square flex items-center justify-center text-[0.7rem] rounded-md ${
-                          day === null 
-                            ? '' 
-                            : eventDates.includes(day)
-                            ? 'bg-primary/30 text-primary font-bold'
-                            : 'text-foreground'
-                        }`}
-                      >
-                        {day}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Upcoming Events */}
-                  {upcomingEvents.length > 0 && (
+                  
+                  {upcomingEvents.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No events</p>
+                  ) : (
                     <div className="space-y-1">
                       {upcomingEvents.map((event) => (
                         <div
                           key={event.id}
-                          className="flex items-center gap-2 p-2 rounded-lg bg-rose-50/50 dark:bg-rose-950/30 text-sm"
+                          className="flex items-center gap-2 p-1.5 rounded-lg bg-rose-50/50 dark:bg-rose-950/30 text-xs"
                           data-testid={`event-${event.id}`}
                         >
-                          <div className="w-1.5 h-1.5 rounded-full bg-rose-600 dark:bg-rose-400 flex-shrink-0" />
-                          <p className="truncate flex-1 text-xs">{event.title}</p>
+                          <div className="w-1 h-1 rounded-full bg-rose-600 dark:bg-rose-400 flex-shrink-0" />
+                          <p className="truncate flex-1">{event.title}</p>
                         </div>
                       ))}
                     </div>
@@ -252,50 +147,47 @@ export default function Home() {
         {/* News & Activity Section */}
         <Link href="/news">
           <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid="card-news-preview">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Newspaper className="w-5 h-5 text-primary" />
-                <h2 className="text-lg font-semibold">Latest News</h2>
-                <span className="text-xs font-medium text-muted-foreground ml-auto">
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Newspaper className="w-4 h-4 text-primary" />
+                <h2 className="text-sm font-semibold">Latest News</h2>
+                <span className="text-xs text-muted-foreground ml-auto">
                   {recentPosts.length} posts
                 </span>
               </div>
 
               {recentPosts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Newspaper className="w-12 h-12 text-muted-foreground/20 mb-2" />
-                  <p className="text-sm text-muted-foreground">No posts yet</p>
-                </div>
+                <p className="text-xs text-muted-foreground text-center py-4">No posts yet</p>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                   {recentPosts.slice(0, 6).map((post: Post) => (
                     <div 
                       key={post.id} 
-                      className="p-4 rounded-lg bg-rose-50/50 dark:bg-rose-950/20 hover:bg-rose-100/50 dark:hover:bg-rose-950/40 transition-colors group"
+                      className="p-3 rounded-lg bg-rose-50/50 dark:bg-rose-950/20 hover:bg-rose-100/50 dark:hover:bg-rose-950/40 transition-colors group"
                       data-testid={`post-preview-${post.id}`}
                     >
-                      <div className="flex items-start gap-3 mb-3">
-                        <Avatar className="w-9 h-9 flex-shrink-0">
-                          <AvatarFallback className="text-xs font-semibold">
+                      <div className="flex items-start gap-2 mb-2">
+                        <Avatar className="w-7 h-7 flex-shrink-0">
+                          <AvatarFallback className="text-[0.6rem] font-semibold">
                             {post.author ? getUserInitials(post.author.name) : "U"}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold truncate">
+                          <p className="text-xs font-semibold truncate">
                             {post.author?.name || "Unknown"}
                           </p>
                           {post.author && (
-                            <Badge variant="outline" className="text-xs mt-0.5">
+                            <Badge variant="outline" className="text-[0.6rem] mt-0.5">
                               {post.author.role}
                             </Badge>
                           )}
                         </div>
                       </div>
-                      <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                      <p className="text-xs text-muted-foreground line-clamp-2 mb-1">
                         {post.content}
                       </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Clock className="w-3 h-3" />
+                      <div className="flex items-center gap-1 text-[0.65rem] text-muted-foreground">
+                        <Clock className="w-2.5 h-2.5" />
                         {new Date(post.createdAt).toLocaleDateString()}
                       </div>
                     </div>
