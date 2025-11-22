@@ -90,13 +90,6 @@ export default function AuthPage() {
             
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="text-sm">
-                    <strong>Admin Login:</strong> Mahmood.Fawaz.AL-Faqi or Mustafa.Mouied.Al-Ali
-                  </AlertDescription>
-                </Alert>
-                
                 <div className="space-y-2">
                   <Label htmlFor="login-username">Username</Label>
                   <Input
