@@ -2,10 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Calendar, Trophy, TrendingUp, Newspaper, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, Trophy, TrendingUp, Newspaper, Clock } from "lucide-react";
 import { Link } from "wouter";
-import { useState, useMemo } from "react";
-import { Button } from "@/components/ui/button";
+import { useMemo } from "react";
 
 type User = {
   id: string;
@@ -49,8 +48,6 @@ export default function Home() {
     queryKey: ["/api/events"],
   });
 
-  const [calendarDate, setCalendarDate] = useState(new Date());
-
   const getUserInitials = (name: string) => {
     return name
       .split(" ")
@@ -60,42 +57,44 @@ export default function Home() {
       .slice(0, 2);
   };
 
-  // Calendar logic
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-  };
-
+  // Generate 15-day window: 1 day before to 14 days ahead
   const calendarDays = useMemo(() => {
     const days = [];
-    const daysInMonth = getDaysInMonth(calendarDate);
-    const firstDay = getFirstDayOfMonth(calendarDate);
-
-    for (let i = 0; i < firstDay; i++) {
-      days.push(null);
+    const today = new Date();
+    
+    // Start from yesterday
+    const startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - 1);
+    
+    // Generate 15 days
+    for (let i = 0; i < 15; i++) {
+      const date = new Date(startDate);
+      date.setDate(date.getDate() + i);
+      days.push(date);
     }
-
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(i);
-    }
-
+    
     return days;
-  }, [calendarDate]);
+  }, []);
 
-  const eventDates = useMemo(() => {
-    return events.map(e => new Date(e.date).getDate()).filter(d => !isNaN(d));
+  // Map events by date
+  const eventsByDate = useMemo(() => {
+    const map: Record<string, Event[]> = {};
+    
+    events.forEach(event => {
+      const eventDate = new Date(event.date);
+      const dateKey = eventDate.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+      
+      if (!map[dateKey]) {
+        map[dateKey] = [];
+      }
+      map[dateKey].push(event);
+    });
+    
+    return map;
   }, [events]);
 
-  const prevMonth = () => {
-    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1));
-  };
-
-  const nextMonth = () => {
-    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1));
-  };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   return (
     <div className="h-full overflow-y-auto bg-gradient-to-br from-background via-background to-muted/20">
@@ -152,70 +151,52 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            {/* Mini Calendar */}
+            {/* Compact Calendar with Events */}
             <Link href="/schedule" className="md:col-span-2">
               <Card className="hover-elevate active-elevate-2 cursor-pointer h-full" data-testid="card-upcoming-events">
                 <CardContent className="pt-3 pb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-sm font-semibold flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5" />
-                      Calendar
-                    </h2>
-                    <span className="text-[0.65rem] text-muted-foreground">
-                      {calendarDate.toLocaleString('default', { month: 'short', year: 'numeric' })}
-                    </span>
-                  </div>
+                  <h2 className="text-sm font-semibold flex items-center gap-1 mb-2">
+                    <Calendar className="w-3.5 h-3.5" />
+                    Upcoming
+                  </h2>
 
-                  {/* Month Navigation */}
-                  <div className="flex items-center justify-between mb-2 px-1">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        prevMonth();
-                      }}
-                    >
-                      <ChevronLeft className="w-3 h-3" />
-                    </Button>
-                    <span className="text-[0.7rem] font-medium">
-                      {calendarDate.toLocaleString('default', { month: 'short', year: 'numeric' })}
-                    </span>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        nextMonth();
-                      }}
-                    >
-                      <ChevronRight className="w-3 h-3" />
-                    </Button>
-                  </div>
+                  {/* 15-Day Calendar Grid */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {calendarDays.map((date, idx) => {
+                      const dateKey = date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                      const dayEvents = eventsByDate[dateKey] || [];
+                      const isToday = date.getTime() === today.getTime();
+                      const isPast = date.getTime() < today.getTime();
 
-                  {/* Compact Calendar Grid */}
-                  <div className="grid grid-cols-7 gap-0.5 px-1">
-                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => (
-                      <div key={day} className="text-center text-[0.55rem] font-bold text-muted-foreground py-0.5">
-                        {day}
-                      </div>
-                    ))}
-                    {calendarDays.map((day, idx) => (
-                      <div
-                        key={idx}
-                        className={`aspect-square flex items-center justify-center text-[0.6rem] rounded-sm ${
-                          day === null 
-                            ? '' 
-                            : eventDates.includes(day)
-                            ? 'bg-primary/40 text-primary font-bold'
-                            : 'text-foreground'
-                        }`}
-                      >
-                        {day}
-                      </div>
-                    ))}
+                      return (
+                        <div
+                          key={idx}
+                          className={`text-center text-[0.65rem] p-1 rounded-sm min-h-12 flex flex-col ${
+                            isToday
+                              ? 'bg-primary/30 text-primary font-bold'
+                              : isPast
+                              ? 'bg-muted/30 text-muted-foreground'
+                              : 'bg-background'
+                          }`}
+                        >
+                          <div className="font-semibold">{date.getDate()}</div>
+                          <div className="text-[0.5rem] flex-1 flex flex-col justify-center gap-0.5 overflow-hidden">
+                            {dayEvents.slice(0, 2).map((event, eventIdx) => (
+                              <div
+                                key={eventIdx}
+                                className="truncate bg-rose-600/30 dark:bg-rose-400/30 text-rose-700 dark:text-rose-300 px-0.5 rounded-sm line-clamp-1"
+                                title={event.title}
+                              >
+                                {event.title}
+                              </div>
+                            ))}
+                            {dayEvents.length > 2 && (
+                              <div className="text-[0.5rem] text-muted-foreground">+{dayEvents.length - 2}</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
