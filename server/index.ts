@@ -1,10 +1,15 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedAdminAccounts } from "./seed-admins";
+import { storage } from "./storage";
 
 const app = express();
+
+// Cookie parser middleware (for remember-me tokens)
+app.use(cookieParser());
 
 // Session configuration
 app.use(
@@ -19,6 +24,49 @@ app.use(
     },
   })
 );
+
+// Remember-me token middleware (automatically restore sessions)
+app.use(async (req, res, next) => {
+  // Skip if already authenticated
+  if (req.session.userId) {
+    return next();
+  }
+
+  // Check for remember-me token
+  const token = req.cookies?.remember_token;
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const tokenRecord = await storage.getRememberMeToken(token);
+    
+    if (!tokenRecord) {
+      // Invalid token, clear cookie
+      res.clearCookie('remember_token');
+      return next();
+    }
+
+    // Check if token is expired
+    if (new Date() > tokenRecord.expiresAt) {
+      // Expired, delete from database and clear cookie
+      await storage.deleteRememberMeToken(token);
+      res.clearCookie('remember_token');
+      return next();
+    }
+
+    // Valid token - restore session
+    req.session.userId = tokenRecord.userId;
+    
+    // Update last used time and extend expiration
+    await storage.updateRememberMeTokenActivity(tokenRecord.id);
+    
+    next();
+  } catch (error) {
+    console.error("Remember-me token validation error:", error);
+    next();
+  }
+});
 
 // Extend Express session type
 declare module "express-session" {
