@@ -251,11 +251,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Admin registration error:", error);
-      if (error instanceof Error) {
-        console.error("Error details:", error.message);
-        console.error("Error stack:", error.stack);
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      const errorType = error instanceof Error ? error.constructor.name : "Unknown";
+      console.error(`Error type: ${errorType}`);
+      console.error(`Error message: ${errorMsg}`);
+      if (error instanceof Error && error.stack) {
+        console.error("Stack trace:", error.stack);
       }
-      res.status(500).json({ message: "Admin registration failed", error: error instanceof Error ? error.message : "Unknown error" });
+      
+      // Provide more specific error messages
+      let userMessage = "Admin registration failed";
+      if (errorMsg.includes("unique") || errorMsg.includes("already exists")) {
+        userMessage = "Username or email already registered";
+      } else if (errorMsg.includes("database") || errorMsg.includes("connection")) {
+        userMessage = "Database connection error - please try again";
+      }
+      
+      res.status(500).json({ 
+        message: userMessage, 
+        error: errorMsg,
+        debug: {
+          type: errorType,
+          details: errorMsg
+        }
+      });
     }
   });
 
@@ -321,7 +340,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Admin login error:", error);
-      res.status(500).json({ message: "Login failed" });
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      const errorType = error instanceof Error ? error.constructor.name : "Unknown";
+      console.error(`Error type: ${errorType}, Message: ${errorMsg}`);
+      if (error instanceof Error && error.stack) {
+        console.error("Stack trace:", error.stack);
+      }
+      res.status(500).json({ 
+        message: "Admin login failed", 
+        error: errorMsg,
+        debug: {
+          type: errorType,
+          details: errorMsg
+        }
+      });
     }
   });
 
