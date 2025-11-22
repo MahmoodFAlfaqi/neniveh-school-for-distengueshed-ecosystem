@@ -2,8 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Calendar, Trophy, TrendingUp, Newspaper, Clock } from "lucide-react";
+import { Calendar, Trophy, TrendingUp, Newspaper, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
+import { useState, useMemo } from "react";
+import { Button } from "@/components/ui/button";
 
 type User = {
   id: string;
@@ -47,6 +49,8 @@ export default function Home() {
     queryKey: ["/api/events"],
   });
 
+  const [calendarDate, setCalendarDate] = useState(new Date());
+
   const getUserInitials = (name: string) => {
     return name
       .split(" ")
@@ -57,6 +61,43 @@ export default function Home() {
   };
 
   const upcomingEvents = events.slice(0, 5);
+
+  // Calendar logic
+  const getDaysInMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
+
+  const calendarDays = useMemo(() => {
+    const days = [];
+    const daysInMonth = getDaysInMonth(calendarDate);
+    const firstDay = getFirstDayOfMonth(calendarDate);
+
+    for (let i = 0; i < firstDay; i++) {
+      days.push(null);
+    }
+
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(i);
+    }
+
+    return days;
+  }, [calendarDate]);
+
+  const eventDates = useMemo(() => {
+    return events.map(e => new Date(e.date).getDate()).filter(d => !isNaN(d));
+  }, [events]);
+
+  const prevMonth = () => {
+    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1));
+  };
+
+  const nextMonth = () => {
+    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1));
+  };
 
   return (
     <div className="h-full overflow-y-auto bg-gradient-to-br from-background via-background to-muted/20">
@@ -91,21 +132,21 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20">
+                  <div className="p-3 rounded-lg bg-violet-50 dark:bg-violet-950/20">
                     <div className="flex items-center gap-2 mb-1">
-                      <Trophy className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                      <Trophy className="w-4 h-4 text-violet-600 dark:text-violet-400" />
                       <span className="text-xs font-medium text-muted-foreground">Credibility</span>
                     </div>
-                    <p className="text-2xl font-bold text-amber-600 dark:text-amber-400" data-testid="text-credibility">
+                    <p className="text-2xl font-bold text-violet-600 dark:text-violet-400" data-testid="text-credibility">
                       {user.credibilityScore.toFixed(0)}
                     </p>
                   </div>
-                  <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                  <div className="p-3 rounded-lg bg-cyan-50 dark:bg-cyan-950/20">
                     <div className="flex items-center gap-2 mb-1">
-                      <TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <TrendingUp className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
                       <span className="text-xs font-medium text-muted-foreground">Reputation</span>
                     </div>
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400" data-testid="text-reputation">
+                    <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400" data-testid="text-reputation">
                       {user.reputationScore.toFixed(0)}
                     </p>
                   </div>
@@ -124,45 +165,83 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            {/* Upcoming Events */}
+            {/* Mini Calendar */}
             <Link href="/schedule" className="md:col-span-2">
               <Card className="hover-elevate active-elevate-2 cursor-pointer h-full" data-testid="card-upcoming-events">
                 <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Calendar className="w-5 h-5 text-primary" />
-                    <h2 className="text-lg font-semibold">Upcoming Events</h2>
-                    <span className="text-xs font-medium text-muted-foreground ml-auto">
-                      {upcomingEvents.length} events
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5 text-primary" />
+                      <h2 className="text-lg font-semibold">Calendar</h2>
+                    </div>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {calendarDate.toLocaleString('default', { month: 'short', year: 'numeric' })}
                     </span>
                   </div>
-                  
-                  {upcomingEvents.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <Calendar className="w-10 h-10 text-muted-foreground/30 mb-2" />
-                      <p className="text-sm text-muted-foreground">No upcoming events</p>
+
+                  <div className="space-y-4">
+                    {/* Month Navigation */}
+                    <div className="flex items-center justify-between">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          prevMonth();
+                        }}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <span className="text-sm font-medium">
+                        {calendarDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                      </span>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          nextMonth();
+                        }}
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
                     </div>
-                  ) : (
-                    <div className="space-y-2">
+
+                    {/* Calendar Grid */}
+                    <div className="grid grid-cols-7 gap-1">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                        <div key={day} className="text-center text-xs font-semibold text-muted-foreground py-2">
+                          {day}
+                        </div>
+                      ))}
+                      {calendarDays.map((day, idx) => (
+                        <div
+                          key={idx}
+                          className={`aspect-square flex items-center justify-center text-xs rounded-lg ${
+                            day === null 
+                              ? 'text-muted-foreground/20' 
+                              : eventDates.includes(day)
+                              ? 'bg-primary/20 text-primary font-semibold'
+                              : 'text-foreground hover:bg-muted/50'
+                          } transition-colors`}
+                        >
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Events List */}
+                  {upcomingEvents.length > 0 && (
+                    <div className="mt-4 pt-4 border-t space-y-2">
                       {upcomingEvents.map((event) => (
                         <div
                           key={event.id}
-                          className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                          className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors text-sm"
                           data-testid={`event-${event.id}`}
                         >
-                          <div className="flex flex-col items-center justify-center w-10 h-10 rounded-md bg-primary/10 text-primary text-center flex-shrink-0">
-                            <span className="text-[0.6rem] font-bold">
-                              {new Date(event.date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
-                            </span>
-                            <span className="text-sm font-bold leading-none">
-                              {new Date(event.date).getDate()}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{event.title}</p>
-                            <Badge variant="outline" className="text-xs mt-1">
-                              {event.type}
-                            </Badge>
-                          </div>
+                          <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+                          <p className="truncate flex-1">{event.title}</p>
                         </div>
                       ))}
                     </div>
