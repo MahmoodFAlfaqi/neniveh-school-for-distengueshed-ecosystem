@@ -338,7 +338,7 @@ export default function NewsPage() {
                   )}
                 </CardContent>
                 <Separator />
-                <CardFooter className="py-3 flex-col items-start gap-3 w-full">
+                <CardFooter className="py-3 flex-col items-start gap-3 w-full sticky top-0 z-10 bg-card">
                   <div className="flex gap-4 w-full items-center justify-between">
                     <div className="flex gap-4">
                       <Button
@@ -494,7 +494,7 @@ function PostCommentSection({ postId }: { postId: string }) {
         </div>
       </div>
 
-      <div className="space-y-2 max-h-64 overflow-y-auto">
+      <div className="space-y-2 max-h-[200px] overflow-y-auto">
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading comments...</p>
         ) : comments.length === 0 ? (
