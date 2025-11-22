@@ -316,7 +316,7 @@ export default function AuthPage() {
                         required
                         data-testid="input-admin-scientific-answer"
                       />
-                      <p className="text-xs text-muted-foreground">This is a one-time invitation code</p>
+                      <p className="text-xs text-muted-foreground">You will need the admin invitation code provided by the system administrator</p>
                     </div>
                     
                     <div className="space-y-2">
