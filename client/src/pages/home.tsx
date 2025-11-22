@@ -164,41 +164,43 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             
             {/* Profile Card */}
-            <Card className="hover-elevate" data-testid="card-user-stats">
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <Avatar className="w-10 h-10">
-                    <AvatarFallback className="text-sm font-semibold">
-                      {getUserInitials(user.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate" data-testid="text-user-name">{user.name}</p>
-                    <Badge variant="secondary" className="mt-0.5 text-[0.65rem]">{user.role}</Badge>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="p-2 rounded-lg bg-violet-50 dark:bg-violet-950/20">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Trophy className="w-3 h-3 text-violet-600 dark:text-violet-400" />
-                      <span className="text-[0.65rem] font-medium text-muted-foreground">Credibility</span>
+            <Link href="/profile">
+              <Card className="hover-elevate active-elevate-2 cursor-pointer h-full" data-testid="card-user-stats">
+                <CardContent className="pt-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Avatar className="w-10 h-10">
+                      <AvatarFallback className="text-sm font-semibold">
+                        {getUserInitials(user.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate" data-testid="text-user-name">{user.name}</p>
+                      <Badge variant="secondary" className="mt-0.5 text-[0.65rem]">{user.role}</Badge>
                     </div>
-                    <p className="text-xl font-bold text-violet-600 dark:text-violet-400" data-testid="text-credibility">
-                      {user.credibilityScore.toFixed(0)}
-                    </p>
                   </div>
-                  <div className="p-2 rounded-lg bg-cyan-50 dark:bg-cyan-950/20">
-                    <div className="flex items-center gap-2 mb-1">
-                      <TrendingUp className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
-                      <span className="text-[0.65rem] font-medium text-muted-foreground">Reputation</span>
+                  <div className="space-y-2">
+                    <div className="p-2 rounded-lg bg-violet-50 dark:bg-violet-950/20">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Trophy className="w-3 h-3 text-violet-600 dark:text-violet-400" />
+                        <span className="text-[0.65rem] font-medium text-muted-foreground">Credibility</span>
+                      </div>
+                      <p className="text-xl font-bold text-violet-600 dark:text-violet-400" data-testid="text-credibility">
+                        {user.credibilityScore.toFixed(0)}
+                      </p>
                     </div>
-                    <p className="text-xl font-bold text-cyan-600 dark:text-cyan-400" data-testid="text-reputation">
-                      {user.reputationScore.toFixed(0)}
-                    </p>
+                    <div className="p-2 rounded-lg bg-cyan-50 dark:bg-cyan-950/20">
+                      <div className="flex items-center gap-2 mb-1">
+                        <TrendingUp className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
+                        <span className="text-[0.65rem] font-medium text-muted-foreground">Reputation</span>
+                      </div>
+                      <p className="text-xl font-bold text-cyan-600 dark:text-cyan-400" data-testid="text-reputation">
+                        {user.reputationScore.toFixed(0)}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Link>
 
             {/* Compact Calendar with Events */}
             <Link href="/schedule" className="md:col-span-2">

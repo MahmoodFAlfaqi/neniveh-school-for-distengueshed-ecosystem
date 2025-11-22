@@ -52,7 +52,7 @@ import {
   type InsertPeerRating,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
 const CREDIBILITY_THRESHOLD_FOR_THREAT = 25.0; // Below this, account becomes "threatened"
@@ -893,20 +893,36 @@ export class DatabaseStorage implements IStorage {
         result = created;
       }
 
-      // Recalculate post author's credibility based on average post accuracy ratings
+      // Recalculate post author's credibility based on ALL accuracy ratings across ALL their posts
       const post = await this.getPost(postId);
       if (post) {
         try {
-          const allRatings = await db
-            .select()
-            .from(postAccuracyRatings)
-            .where(eq(postAccuracyRatings.postId, postId));
+          // Get all posts by the author
+          const authorPosts = await db
+            .select({ id: posts.id })
+            .from(posts)
+            .where(eq(posts.authorId, post.authorId));
           
-          const avgAccuracy = allRatings.length > 0
-            ? (allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length) * 20
-            : 50;
+          const postIds = authorPosts.map(p => p.id);
           
-          await this.updatePostCredibility(postId, avgAccuracy);
+          // Get all accuracy ratings for all author's posts
+          let allAccuracyRatings: any[] = [];
+          if (postIds.length > 0) {
+            allAccuracyRatings = await db
+              .select()
+              .from(postAccuracyRatings)
+              .where(inArray(postAccuracyRatings.postId, postIds));
+          }
+          
+          // Calculate average credibility: average of all ratings * 20
+          let avgCredibility = 50;
+          if (allAccuracyRatings.length > 0) {
+            const sumRatings = allAccuracyRatings.reduce((sum, r) => sum + r.rating, 0);
+            avgCredibility = (sumRatings / allAccuracyRatings.length) * 20;
+          }
+          
+          // Update user credibility
+          await this.updateUserCredibility(post.authorId, avgCredibility);
         } catch (e) {
           // Ignore errors in recalculating credibility
         }
