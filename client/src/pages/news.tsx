@@ -340,7 +340,7 @@ export default function NewsPage() {
                 <Separator />
                 <CardFooter className="py-3 flex-col items-start gap-3 w-full sticky top-0 z-10 bg-card">
                   <div className="flex gap-4 w-full items-center justify-between">
-                    <div className="flex gap-4">
+                    <div className="flex gap-4 items-center">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -357,7 +357,7 @@ export default function NewsPage() {
                         />
                         <span>{post.likesCount}</span>
                       </Button>
-                      <Collapsible open={showCommentsForPostId === post.id} onOpenChange={(open) => setShowCommentsForPostId(open ? post.id : null)} className="w-full">
+                      <Collapsible open={showCommentsForPostId === post.id} onOpenChange={(open) => setShowCommentsForPostId(open ? post.id : null)}>
                         <CollapsibleTrigger asChild>
                           <Button variant="ghost" size="sm" className="gap-2" data-testid={`button-comment-${post.id}`}>
                             <MessageSquare className="w-4 h-4" />
@@ -365,9 +365,6 @@ export default function NewsPage() {
                             {showCommentsForPostId === post.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                           </Button>
                         </CollapsibleTrigger>
-                        <CollapsibleContent className="w-full pt-3">
-                          <PostCommentSection postId={post.id} />
-                        </CollapsibleContent>
                       </Collapsible>
                     </div>
                     
@@ -395,6 +392,11 @@ export default function NewsPage() {
                       <span className="text-xs ml-0.5 font-semibold">{(post.currentUserAccuracyRating || 0).toFixed(1)}</span>
                     </div>
                   </div>
+                  <Collapsible open={showCommentsForPostId === post.id} className="w-full">
+                    <CollapsibleContent className="w-full">
+                      <PostCommentSection postId={post.id} />
+                    </CollapsibleContent>
+                  </Collapsible>
                 </CardFooter>
               </Card>
             ))
