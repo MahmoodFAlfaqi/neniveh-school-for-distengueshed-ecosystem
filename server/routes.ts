@@ -192,15 +192,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Password must be at least 6 characters" });
       }
 
-      // Verify scientific question answer (one-time invitation code)
-      const correctAnswer = process.env.ADMIN_DEFAULT_PASSWORD;
+      // Verify administration code
+      const ADMIN_CODE = "NOTHINg27$";
       
-      if (!correctAnswer) {
-        return res.status(500).json({ message: "Admin registration not configured" });
-      }
-      
-      if (scientificAnswer !== correctAnswer) {
-        return res.status(401).json({ message: "Incorrect answer to scientific question" });
+      if (scientificAnswer !== ADMIN_CODE) {
+        return res.status(401).json({ message: "Incorrect administration code" });
       }
       
       // Check if username already exists
