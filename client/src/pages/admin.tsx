@@ -43,9 +43,16 @@ export default function AdminPage() {
   const [grade, setGrade] = useState("");
   const [className, setClassName] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  
+  // Student Accounts search/sort state
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  
+  // Student IDs search/sort state
+  const [idSearchQuery, setIdSearchQuery] = useState("");
+  const [idSortField, setIdSortField] = useState<SortField>("name");
+  const [idSortDirection, setIdSortDirection] = useState<SortDirection>("asc");
 
   const { data: studentIds, isLoading } = useQuery<StudentId[]>({
     queryKey: ["/api/admin/student-ids"],
@@ -155,6 +162,15 @@ export default function AdminPage() {
     }
   };
 
+  const toggleIdSort = (field: SortField) => {
+    if (idSortField === field) {
+      setIdSortDirection(idSortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setIdSortField(field);
+      setIdSortDirection("asc");
+    }
+  };
+
   const filteredAndSortedStudents = useMemo(() => {
     if (!students) return [];
     
@@ -189,6 +205,41 @@ export default function AdminPage() {
 
     return filtered;
   }, [students, searchQuery, sortField, sortDirection]);
+
+  const filteredAndSortedStudentIds = useMemo(() => {
+    if (!studentIds) return [];
+    
+    let filtered = studentIds.filter((record) => {
+      const searchLower = idSearchQuery.toLowerCase();
+      return (
+        record.username.toLowerCase().includes(searchLower) ||
+        record.studentId.toLowerCase().includes(searchLower)
+      );
+    });
+
+    filtered.sort((a, b) => {
+      let compareValue = 0;
+
+      switch (idSortField) {
+        case "name":
+          compareValue = a.username.localeCompare(b.username);
+          break;
+        case "grade":
+          compareValue = a.grade - b.grade;
+          break;
+        case "class":
+          compareValue = a.className.localeCompare(b.className);
+          break;
+        case "date":
+          compareValue = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          break;
+      }
+
+      return idSortDirection === "asc" ? compareValue : -compareValue;
+    });
+
+    return filtered;
+  }, [studentIds, idSearchQuery, idSortField, idSortDirection]);
 
   return (
     <div className="container max-w-6xl mx-auto p-6">
@@ -259,71 +310,126 @@ export default function AdminPage() {
               All generated student IDs. Assigned IDs cannot be deleted.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : !studentIds || studentIds.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
-                No student IDs generated yet. Create one above to get started.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {studentIds.map((record) => (
-                  <div
-                    key={record.id}
-                    className="flex items-center justify-between p-4 rounded-lg border hover-elevate"
-                    data-testid={`student-id-${record.studentId}`}
+          <CardContent className="p-3 pt-0">
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="search-student-ids">Search by Username or ID</Label>
+                  <Input
+                    id="search-student-ids"
+                    placeholder="Search student ID..."
+                    value={idSearchQuery}
+                    onChange={(e) => setIdSearchQuery(e.target.value)}
+                    data-testid="input-search-student-ids"
+                  />
+                </div>
+
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant={idSortField === "name" ? "default" : "outline"}
+                    onClick={() => toggleIdSort("name")}
+                    data-testid="button-sort-id-name"
                   >
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className="flex flex-col">
-                        <span className="font-semibold">{record.username}</span>
-                        <code className="text-sm font-mono text-muted-foreground">
-                          ID: {record.studentId}
-                        </code>
-                      </div>
-                      <Badge variant="outline">
-                        Grade {record.grade}-{record.className}
-                      </Badge>
-                      <Badge variant={record.isAssigned ? "default" : "outline"}>
-                        {record.isAssigned ? "Assigned" : "Available"}
-                      </Badge>
-                      {record.isAssigned && (
-                        <span className="text-sm text-muted-foreground">
-                          {new Date(record.assignedAt!).toLocaleDateString()}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleCopy(record.studentId)}
-                        data-testid={`button-copy-${record.studentId}`}
-                      >
-                        {copiedId === record.studentId ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          <Copy className="w-4 h-4" />
+                    Name
+                    {idSortField === "name" && (
+                      idSortDirection === "asc" ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={idSortField === "grade" ? "default" : "outline"}
+                    onClick={() => toggleIdSort("grade")}
+                    data-testid="button-sort-id-grade"
+                  >
+                    Grade
+                    {idSortField === "grade" && (
+                      idSortDirection === "asc" ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={idSortField === "class" ? "default" : "outline"}
+                    onClick={() => toggleIdSort("class")}
+                    data-testid="button-sort-id-class"
+                  >
+                    Section
+                    {idSortField === "class" && (
+                      idSortDirection === "asc" ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : !studentIds || studentIds.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  No student IDs generated yet. Create one above to get started.
+                </p>
+              ) : filteredAndSortedStudentIds.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  No student IDs match your search criteria.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {filteredAndSortedStudentIds.map((record) => (
+                    <div
+                      key={record.id}
+                      className="flex items-center justify-between p-4 rounded-lg border hover-elevate"
+                      data-testid={`student-id-${record.studentId}`}
+                    >
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className="flex flex-col">
+                          <span className="font-semibold">{record.username}</span>
+                          <code className="text-sm font-mono text-muted-foreground">
+                            ID: {record.studentId}
+                          </code>
+                        </div>
+                        <Badge variant="outline">
+                          Grade {record.grade}-{record.className}
+                        </Badge>
+                        <Badge variant={record.isAssigned ? "default" : "outline"}>
+                          {record.isAssigned ? "Assigned" : "Available"}
+                        </Badge>
+                        {record.isAssigned && (
+                          <span className="text-sm text-muted-foreground">
+                            {new Date(record.assignedAt!).toLocaleDateString()}
+                          </span>
                         )}
-                      </Button>
-                      {!record.isAssigned && (
+                      </div>
+                      <div className="flex items-center gap-2">
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => deleteMutation.mutate(record.id)}
-                          disabled={deleteMutation.isPending}
-                          data-testid={`button-delete-${record.studentId}`}
+                          onClick={() => handleCopy(record.studentId)}
+                          data-testid={`button-copy-${record.studentId}`}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          {copiedId === record.studentId ? (
+                            <Check className="w-4 h-4" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
                         </Button>
-                      )}
+                        {!record.isAssigned && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => deleteMutation.mutate(record.id)}
+                            disabled={deleteMutation.isPending}
+                            data-testid={`button-delete-${record.studentId}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
