@@ -195,16 +195,16 @@ export default function Home() {
                           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Credibility</span>
                         </div>
                         <p className="text-2xl font-bold text-primary" data-testid="text-credibility">
-                          {user.credibilityScore.toFixed(0)}
+                          {(user.credibilityScore ?? 0).toFixed(0)}
                         </p>
                       </div>
                       <div className="p-4 rounded-xl bg-gradient-to-br from-secondary/10 to-secondary/5 dark:from-secondary/20 dark:to-secondary/10 border border-secondary/20 dark:border-secondary/30">
                         <div className="flex items-center gap-2 mb-2">
-                          <TrendingUp className="w-4 h-4 text-secondary" />
+                          <TrendingUp className="w-4 w-4 text-secondary" />
                           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reputation</span>
                         </div>
                         <p className="text-2xl font-bold text-secondary" data-testid="text-reputation">
-                          {user.reputationScore.toFixed(0)}
+                          {(user.reputationScore ?? 0).toFixed(0)}
                         </p>
                       </div>
                     </div>

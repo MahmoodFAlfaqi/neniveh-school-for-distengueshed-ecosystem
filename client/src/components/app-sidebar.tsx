@@ -89,7 +89,7 @@ const bottomNavItems = [
 ];
 
 export function AppSidebar() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { toast } = useToast();
 
   const { data: user } = useQuery<User>({
@@ -105,6 +105,7 @@ export function AppSidebar() {
       toast({
         title: "Logged out successfully",
       });
+      navigate("/auth");
     },
   });
 
@@ -241,7 +242,7 @@ export function AppSidebar() {
                     {user.role}
                   </Badge>
                   <span className="text-xs text-muted-foreground font-medium">
-                    {user.credibilityScore.toFixed(0)}⭐
+                    {(user.credibilityScore ?? 0).toFixed(0)}⭐
                   </span>
                 </div>
               </div>

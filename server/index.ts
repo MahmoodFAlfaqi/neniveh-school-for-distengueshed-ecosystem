@@ -58,8 +58,23 @@ app.use(async (req, res, next) => {
     // Valid token - restore session
     req.session.userId = tokenRecord.userId;
     
-    // Update last used time and extend expiration
-    await storage.updateRememberMeTokenActivity(tokenRecord.id);
+    try {
+      // Update last used time and extend expiration (both in DB and cookie)
+      await storage.updateRememberMeTokenActivity(tokenRecord.id);
+      
+      // Refresh the cookie with new expiration (7 days from now)
+      res.cookie('remember_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        sameSite: 'lax'
+      });
+    } catch (updateError) {
+      // If update fails, clear the cookie to avoid state divergence
+      console.error("Failed to update remember-me token activity:", updateError);
+      res.clearCookie('remember_token');
+      await storage.deleteRememberMeToken(token);
+    }
     
     next();
   } catch (error) {

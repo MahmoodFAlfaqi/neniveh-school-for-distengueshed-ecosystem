@@ -3,6 +3,7 @@ import express from "express";
 import { createServer, type Server } from "http";
 import { promises as fs } from "fs";
 import path from "path";
+import crypto from "crypto";
 import { storage } from "./storage";
 import { db } from "./db";
 import { 
@@ -282,7 +283,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Handle remember-me functionality
       if (rememberMe) {
-        const crypto = require('crypto');
         const token = crypto.randomBytes(32).toString('hex');
         await storage.createRememberMeToken(user.id, token);
         
@@ -291,6 +291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          sameSite: 'lax'
         });
       }
       
