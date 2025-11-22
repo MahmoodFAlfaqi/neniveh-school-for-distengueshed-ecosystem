@@ -380,6 +380,9 @@ export class DatabaseStorage implements IStorage {
         // Delete all digital keys (unlocked scopes)
         await tx.delete(digitalKeys).where(eq(digitalKeys.userId, userId));
         
+        // Delete admin student IDs assigned to this user
+        await tx.delete(adminStudentIds).where(eq(adminStudentIds.assignedToUserId, userId));
+        
         // Finally, delete the user record
         const result = await tx.delete(users).where(eq(users.id, userId));
         
