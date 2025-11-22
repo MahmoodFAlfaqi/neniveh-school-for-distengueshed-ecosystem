@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Calendar, Trophy, TrendingUp, Newspaper, Clock, BookOpen, Music } from "lucide-react";
+import { Calendar, Trophy, TrendingUp, Newspaper, Clock, BookOpen, Volleyball } from "lucide-react";
 import { Link } from "wouter";
 import { useMemo } from "react";
 
@@ -139,7 +139,7 @@ export default function Home() {
       return {
         bg: "bg-cyan-600/30 dark:bg-cyan-400/30",
         text: "text-cyan-700 dark:text-cyan-300",
-        icon: Music,
+        icon: Volleyball,
         label: "Activity",
       };
     }
@@ -264,7 +264,7 @@ export default function Home() {
                       <span className="text-muted-foreground">Class</span>
                     </div>
                     <div className="flex items-center gap-0.5">
-                      <Music className="w-2 h-2 text-cyan-600 dark:text-cyan-400" />
+                      <Volleyball className="w-2 h-2 text-cyan-600 dark:text-cyan-400" />
                       <span className="text-muted-foreground">Activity</span>
                     </div>
                   </div>
