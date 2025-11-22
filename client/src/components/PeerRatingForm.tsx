@@ -126,7 +126,7 @@ export function PeerRatingForm({ ratedUserId, ratedUserName, currentUserId }: Pe
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid gap-6">
+          <div className="grid gap-6 text-left ml-[0px] mr-[0px] pl-[0px] pr-[0px] text-[17px]">
             {METRICS.map((metric) => (
               <div key={metric.key} className="space-y-2">
                 <div className="flex items-start justify-between">
