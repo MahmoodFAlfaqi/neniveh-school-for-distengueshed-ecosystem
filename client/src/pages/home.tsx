@@ -314,7 +314,7 @@ export default function Home() {
                             `}
                             data-testid={`event-${date.getDate()}`}
                           >
-                            <div className="text-[#000000]">{date.getDate()}</div>
+                            <div className="text-[#141414]">{date.getDate()}</div>
                             {dayEvents.length > 0 && !isToday && (
                               <div className="w-1 h-1 bg-accent rounded-full mt-0.5" />
                             )}
