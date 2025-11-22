@@ -11,8 +11,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, MapPin, Clock, Users, Plus, ChevronDown, ChevronUp, Star } from "lucide-react";
-import { format } from "date-fns";
+import { Calendar, MapPin, Clock, Users, Plus, ChevronDown, ChevronUp, Star, Send } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
+import { Input } from "@/components/ui/input";
 import {
   Collapsible,
   CollapsibleContent,
@@ -68,6 +69,8 @@ type Attendee = {
 function EventCard({ event, globalScopeId }: { event: Event; globalScopeId: string }) {
   const { toast } = useToast();
   const [showAttendees, setShowAttendees] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [commentText, setCommentText] = useState("");
 
   const { data: attendees = [], isLoading: loadingAttendees } = useQuery<Attendee[]>({
     queryKey: ["/api/events", event.id, "attendees"],
@@ -75,6 +78,16 @@ function EventCard({ event, globalScopeId }: { event: Event; globalScopeId: stri
     queryFn: async () => {
       const response = await fetch(`/api/events/${event.id}/attendees`);
       if (!response.ok) throw new Error("Failed to fetch attendees");
+      return response.json();
+    },
+  });
+
+  const { data: comments = [], isLoading: loadingComments } = useQuery<any[]>({
+    queryKey: [`/api/events/${event.id}/comments`],
+    enabled: showComments,
+    queryFn: async () => {
+      const response = await fetch(`/api/events/${event.id}/comments`);
+      if (!response.ok) throw new Error("Failed to fetch comments");
       return response.json();
     },
   });
@@ -104,6 +117,20 @@ function EventCard({ event, globalScopeId }: { event: Event; globalScopeId: stri
         description: error.message,
         variant: "destructive",
       });
+    },
+  });
+
+  const createCommentMutation = useMutation({
+    mutationFn: async (content: string) => {
+      return await apiRequest("POST", `/api/events/${event.id}/comments`, { content });
+    },
+    onSuccess: () => {
+      setCommentText("");
+      queryClient.invalidateQueries({ queryKey: [`/api/events/${event.id}/comments`] });
+      toast({ title: "Comment added", description: "Your comment has been posted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to add comment", description: error.message, variant: "destructive" });
     },
   });
 
@@ -215,6 +242,54 @@ function EventCard({ event, globalScopeId }: { event: Event; globalScopeId: stri
                 ))}
               </div>
             )}
+          </CollapsibleContent>
+        </Collapsible>
+
+        <Separator />
+
+        <Collapsible open={showComments} onOpenChange={setShowComments} className="w-full">
+          <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover-elevate px-2 py-1 rounded-md w-full" data-testid={`button-toggle-comments-${event.id}`}>
+            <MessageSquare className="w-4 h-4" />
+            <span>Comments</span>
+            {showComments ? <ChevronUp className="w-4 h-4 ml-auto" /> : <ChevronDown className="w-4 h-4 ml-auto" />}
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-3 pt-3">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Add a comment..."
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                className="text-sm"
+                data-testid="input-event-comment"
+              />
+              <Button size="sm" onClick={() => createCommentMutation.mutate(commentText)} disabled={!commentText.trim() || createCommentMutation.isPending} data-testid="button-submit-event-comment">
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              {loadingComments ? (
+                <p className="text-sm text-muted-foreground">Loading comments...</p>
+              ) : comments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No comments yet</p>
+              ) : (
+                comments.map((comment) => (
+                  <div key={comment.id} className="flex gap-2 p-2 bg-muted/50 rounded-md text-sm" data-testid={`event-comment-${comment.id}`}>
+                    <Avatar className="h-6 w-6">
+                      <AvatarImage src={comment.authorAvatarUrl || undefined} />
+                      <AvatarFallback>{comment.authorName?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-xs">{comment.authorName}</span>
+                        <span className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}</span>
+                      </div>
+                      <p className="text-xs text-foreground break-words">{comment.content}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </CollapsibleContent>
         </Collapsible>
       </CardFooter>

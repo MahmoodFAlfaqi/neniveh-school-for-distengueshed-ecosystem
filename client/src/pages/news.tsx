@@ -8,11 +8,13 @@ import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Heart, MessageSquare, Send, TrendingUp, Star } from "lucide-react";
+import { Heart, MessageSquare, Send, TrendingUp, Star, ChevronDown, ChevronUp } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ScopeSelector } from "@/components/ScopeSelector";
 import { useHasAccessToScope } from "@/hooks/use-digital-keys";
 import { UserProfileLink } from "@/components/UserProfileLink";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
 
 type Post = {
   id: string;
@@ -41,6 +43,8 @@ export default function NewsPage() {
   const { toast } = useToast();
   const [newPost, setNewPost] = useState("");
   const [selectedScope, setSelectedScope] = useState<string | null>(null);
+  const [showCommentsForPostId, setShowCommentsForPostId] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState<{ [postId: string]: string }>({});
 
   // Check if user has access to selected scope
   const hasAccess = useHasAccessToScope(selectedScope);
@@ -262,32 +266,119 @@ export default function NewsPage() {
                   )}
                 </CardContent>
                 <Separator />
-                <CardFooter className="py-3 gap-4">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() => handleToggleLike(post.id)}
-                    data-testid={`button-like-${post.id}`}
-                  >
-                    <Heart
-                      className={`w-4 h-4 ${
-                        post.isLikedByCurrentUser
-                          ? "fill-red-500 text-red-500"
-                          : ""
-                      }`}
-                    />
-                    <span>{post.likesCount}</span>
-                  </Button>
-                  <Button variant="ghost" size="sm" className="gap-2" data-testid={`button-comment-${post.id}`}>
-                    <MessageSquare className="w-4 h-4" />
-                    <span>{post.commentsCount}</span>
-                  </Button>
+                <CardFooter className="py-3 flex-col items-start gap-3 w-full">
+                  <div className="flex gap-4 w-full">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => handleToggleLike(post.id)}
+                      data-testid={`button-like-${post.id}`}
+                    >
+                      <Heart
+                        className={`w-4 h-4 ${
+                          post.isLikedByCurrentUser
+                            ? "fill-red-500 text-red-500"
+                            : ""
+                        }`}
+                      />
+                      <span>{post.likesCount}</span>
+                    </Button>
+                    <Collapsible open={showCommentsForPostId === post.id} onOpenChange={(open) => setShowCommentsForPostId(open ? post.id : null)} className="flex items-center gap-2">
+                      <CollapsibleTrigger className="flex items-center gap-2 text-sm hover-elevate px-2 py-1 rounded-md" data-testid={`button-comment-${post.id}`}>
+                        <MessageSquare className="w-4 h-4" />
+                        <span>{post.commentsCount}</span>
+                        {showCommentsForPostId === post.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </CollapsibleTrigger>
+                    </Collapsible>
+                  </div>
+
+                  <Collapsible open={showCommentsForPostId === post.id} className="w-full">
+                    <CollapsibleContent className="space-y-3 pt-2 w-full">
+                      <PostCommentSection postId={post.id} />
+                    </CollapsibleContent>
+                  </Collapsible>
                 </CardFooter>
               </Card>
             ))
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function PostCommentSection({ postId }: { postId: string }) {
+  const { toast } = useToast();
+  const [commentText, setCommentText] = useState("");
+  const { data: comments = [], isLoading } = useQuery<any[]>({
+    queryKey: [`/api/posts/${postId}/comments`],
+    queryFn: async () => {
+      const response = await fetch(`/api/posts/${postId}/comments`);
+      if (!response.ok) throw new Error("Failed to fetch comments");
+      return response.json();
+    },
+  });
+
+  const createCommentMutation = useMutation({
+    mutationFn: async (content: string) => {
+      return await apiRequest("POST", `/api/posts/${postId}/comments`, { content });
+    },
+    onSuccess: () => {
+      setCommentText("");
+      queryClient.invalidateQueries({ queryKey: [`/api/posts/${postId}/comments`] });
+      toast({ title: "Comment added", description: "Your comment has been posted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to add comment", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSubmitComment = () => {
+    if (commentText.trim()) {
+      createCommentMutation.mutate(commentText);
+    }
+  };
+
+  return (
+    <div className="space-y-3 border-t pt-3">
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <Input
+            placeholder="Add a comment..."
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            className="text-sm"
+            data-testid="input-post-comment"
+          />
+          <Button size="sm" onClick={handleSubmitComment} disabled={!commentText.trim() || createCommentMutation.isPending} data-testid="button-submit-comment">
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading comments...</p>
+        ) : comments.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No comments yet</p>
+        ) : (
+          comments.map((comment) => (
+            <div key={comment.id} className="flex gap-2 p-2 bg-muted/50 rounded-md text-sm" data-testid={`comment-${comment.id}`}>
+              <Avatar className="h-6 w-6">
+                <AvatarImage src={comment.authorAvatarUrl || undefined} />
+                <AvatarFallback>{comment.authorName?.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-xs">{comment.authorName}</span>
+                  <span className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}</span>
+                </div>
+                <p className="text-xs text-foreground break-words">{comment.content}</p>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
