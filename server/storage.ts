@@ -859,55 +859,64 @@ export class DatabaseStorage implements IStorage {
   }
 
   async ratePostAccuracy(postId: string, userId: string, rating: number): Promise<PostAccuracyRating> {
-    // Check if rating already exists
-    const existing = await db
-      .select()
-      .from(postAccuracyRatings)
-      .where(and(
-        eq(postAccuracyRatings.postId, postId),
-        eq(postAccuracyRatings.userId, userId)
-      ));
-
-    let result;
-    if (existing.length > 0) {
-      // Update existing rating
-      const [updated] = await db
-        .update(postAccuracyRatings)
-        .set({ 
-          rating,
-          updatedAt: new Date(),
-        })
+    try {
+      // Check if rating already exists
+      const existing = await db
+        .select()
+        .from(postAccuracyRatings)
         .where(and(
           eq(postAccuracyRatings.postId, postId),
           eq(postAccuracyRatings.userId, userId)
-        ))
-        .returning();
-      result = updated;
-    } else {
-      // Create new rating
-      const [created] = await db
-        .insert(postAccuracyRatings)
-        .values({ postId, userId, rating })
-        .returning();
-      result = created;
-    }
+        ));
 
-    // Recalculate post author's credibility based on average post accuracy ratings
-    const post = await this.getPost(postId);
-    if (post) {
-      const allRatings = await db
-        .select()
-        .from(postAccuracyRatings)
-        .where(eq(postAccuracyRatings.postId, postId));
-      
-      const avgAccuracy = allRatings.length > 0
-        ? (allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length) * 20
-        : 50;
-      
-      await this.updatePostCredibility(postId, avgAccuracy);
-    }
+      let result;
+      if (existing.length > 0) {
+        // Update existing rating
+        const [updated] = await db
+          .update(postAccuracyRatings)
+          .set({ 
+            rating,
+            updatedAt: new Date(),
+          })
+          .where(and(
+            eq(postAccuracyRatings.postId, postId),
+            eq(postAccuracyRatings.userId, userId)
+          ))
+          .returning();
+        result = updated;
+      } else {
+        // Create new rating
+        const [created] = await db
+          .insert(postAccuracyRatings)
+          .values({ postId, userId, rating })
+          .returning();
+        result = created;
+      }
 
-    return result;
+      // Recalculate post author's credibility based on average post accuracy ratings
+      const post = await this.getPost(postId);
+      if (post) {
+        try {
+          const allRatings = await db
+            .select()
+            .from(postAccuracyRatings)
+            .where(eq(postAccuracyRatings.postId, postId));
+          
+          const avgAccuracy = allRatings.length > 0
+            ? (allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length) * 20
+            : 50;
+          
+          await this.updatePostCredibility(postId, avgAccuracy);
+        } catch (e) {
+          // Ignore errors in recalculating credibility
+        }
+      }
+
+      return result;
+    } catch (error) {
+      // If table doesn't exist or other error, throw it so the API can handle it
+      throw error;
+    }
   }
 
   async getUserPostAccuracyRating(postId: string, userId: string): Promise<PostAccuracyRating | undefined> {
