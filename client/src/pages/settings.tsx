@@ -2,7 +2,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/theme";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, Key } from "lucide-react";
+import { Link } from "wouter";
 
 export default function SettingsPage() {
   const { theme, toggleTheme } = useTheme();
@@ -59,6 +60,26 @@ export default function SettingsPage() {
                 )}
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Digital Keys */}
+        <Card className="hover-elevate" data-testid="card-digital-keys">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5" />
+              Digital Keys
+            </CardTitle>
+            <CardDescription>
+              Manage your access keys and permissions
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/keys">
+              <Button variant="default" data-testid="button-manage-keys">
+                Manage Keys
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 
