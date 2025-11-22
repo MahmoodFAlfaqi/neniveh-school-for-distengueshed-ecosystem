@@ -20,7 +20,7 @@ The backend is developed with Node.js and Express, featuring a RESTful API desig
 
 ### Database Architecture
 
-Drizzle ORM with a PostgreSQL dialect is used for database interactions. The schema includes tables for `Users` (with roles, gamification scores, and account status), `Scopes` (defining access boundaries for global, stage, and section levels), `DigitalKeys` (persisting unlocked scopes per user), `Posts`, `Events`, `Schedules`, and `Teachers` (with a review system). Relationships between entities support the platform's features, such as user-generated content, event participation, and teacher evaluations.
+Drizzle ORM with a PostgreSQL dialect is used for database interactions. The schema includes tables for `Users` (with roles, gamification scores, account status, and 15 peer-ratable performance metrics), `Scopes` (defining access boundaries for global, stage, and section levels), `DigitalKeys` (persisting unlocked scopes per user), `Posts`, `Events`, `Schedules`, `Teachers` (with a review system), `PeerRatings` (storing student-to-student performance evaluations), `ProfileComments` (enabling peer feedback on profiles), and `PostReactions` (tracking post likes). Relationships between entities support the platform's features, such as user-generated content, event participation, teacher evaluations, peer assessments, and social interactions.
 
 ### Key Architectural Decisions
 
@@ -29,6 +29,9 @@ Drizzle ORM with a PostgreSQL dialect is used for database interactions. The sch
 -   **Admin Succession Protocol**: A one-click handover mechanism for admin privileges ensures continuity and prevents accumulation of high-level access.
 -   **Session-Based Authentication**: Chosen for its simplicity and security benefits, utilizing HttpOnly cookies and a 7-day expiration.
 -   **Monorepo Structure**: The project is organized as a monorepo (`/client`, `/server`, `/shared`) to enable type safety across the full stack and maintain a single source of truth for shared code.
+-   **Peer Rating System**: Students can rate each other on 15 performance metrics (1-5 stars), with ratings aggregated and displayed on user profiles. Self-rating is prevented at both UI and API levels.
+-   **Profile Social Features**: Profile comments allow peer feedback, and user avatars/names are clickable links throughout the app for easy profile navigation.
+-   **Server-Authoritative Social Interactions**: Post likes are tracked server-side with `isLikedByCurrentUser` included in posts queries, ensuring the backend is the single source of truth. The frontend reflects this state without local drift. Counter updates use safeguards (`GREATEST`) to prevent negative values.
 
 ## External Dependencies
 
