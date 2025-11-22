@@ -832,6 +832,21 @@ export class DatabaseStorage implements IStorage {
         createdByName: users.name,
         createdByRole: users.role,
         createdByAvatarUrl: users.avatarUrl,
+        createdByInitiativeScore: users.initiativeScore,
+        createdByCommunicationScore: users.communicationScore,
+        createdByCooperationScore: users.cooperationScore,
+        createdByKindnessScore: users.kindnessScore,
+        createdByPerseveranceScore: users.perseveranceScore,
+        createdByFitnessScore: users.fitnessScore,
+        createdByPlayingSkillsScore: users.playingSkillsScore,
+        createdByInClassMisconductScore: users.inClassMisconductScore,
+        createdByOutClassMisconductScore: users.outClassMisconductScore,
+        createdByLiteraryScienceScore: users.literaryScienceScore,
+        createdByNaturalScienceScore: users.naturalScienceScore,
+        createdByElectronicScienceScore: users.electronicScienceScore,
+        createdByConfidenceScore: users.confidenceScore,
+        createdByTemperScore: users.temperScore,
+        createdByCheerfulnessScore: users.cheerfulnessScore,
       })
       .from(events)
       .leftJoin(users, eq(events.createdById, users.id));
@@ -846,7 +861,36 @@ export class DatabaseStorage implements IStorage {
         results.map(async (event) => {
           const rsvps = await this.getEventRsvps(event.id);
           const userHasRsvpd = userId ? rsvps.some(r => r.userId === userId) : false;
-          return { ...event, rsvpCount: rsvps.length, userHasRsvpd };
+          
+          const creatorData = {
+            initiativeScore: event.createdByInitiativeScore,
+            communicationScore: event.createdByCommunicationScore,
+            cooperationScore: event.createdByCooperationScore,
+            kindnessScore: event.createdByKindnessScore,
+            perseveranceScore: event.createdByPerseveranceScore,
+            fitnessScore: event.createdByFitnessScore,
+            playingSkillsScore: event.createdByPlayingSkillsScore,
+            inClassMisconductScore: event.createdByInClassMisconductScore,
+            outClassMisconductScore: event.createdByOutClassMisconductScore,
+            literaryScienceScore: event.createdByLiteraryScienceScore,
+            naturalScienceScore: event.createdByNaturalScienceScore,
+            electronicScienceScore: event.createdByElectronicScienceScore,
+            confidenceScore: event.createdByConfidenceScore,
+            temperScore: event.createdByTemperScore,
+            cheerfulnessScore: event.createdByCheerfulnessScore,
+          };
+          
+          return { 
+            ...event, 
+            rsvpCount: rsvps.length, 
+            userHasRsvpd,
+            createdBy: {
+              name: event.createdByName || "Unknown User",
+              role: event.createdByRole || "student",
+              avatarUrl: event.createdByAvatarUrl,
+              averageRating: event.createdByRole === "student" ? calculateAverageRating(creatorData) : null,
+            }
+          };
         })
       );
       return eventsWithRsvps;
@@ -859,7 +903,36 @@ export class DatabaseStorage implements IStorage {
       results.map(async (event) => {
         const rsvps = await this.getEventRsvps(event.id);
         const userHasRsvpd = userId ? rsvps.some(r => r.userId === userId) : false;
-        return { ...event, rsvpCount: rsvps.length, userHasRsvpd };
+        
+        const creatorData = {
+          initiativeScore: event.createdByInitiativeScore,
+          communicationScore: event.createdByCommunicationScore,
+          cooperationScore: event.createdByCooperationScore,
+          kindnessScore: event.createdByKindnessScore,
+          perseveranceScore: event.createdByPerseveranceScore,
+          fitnessScore: event.createdByFitnessScore,
+          playingSkillsScore: event.createdByPlayingSkillsScore,
+          inClassMisconductScore: event.createdByInClassMisconductScore,
+          outClassMisconductScore: event.createdByOutClassMisconductScore,
+          literaryScienceScore: event.createdByLiteraryScienceScore,
+          naturalScienceScore: event.createdByNaturalScienceScore,
+          electronicScienceScore: event.createdByElectronicScienceScore,
+          confidenceScore: event.createdByConfidenceScore,
+          temperScore: event.createdByTemperScore,
+          cheerfulnessScore: event.createdByCheerfulnessScore,
+        };
+        
+        return { 
+          ...event, 
+          rsvpCount: rsvps.length, 
+          userHasRsvpd,
+          createdBy: {
+            name: event.createdByName || "Unknown User",
+            role: event.createdByRole || "student",
+            avatarUrl: event.createdByAvatarUrl,
+            averageRating: event.createdByRole === "student" ? calculateAverageRating(creatorData) : null,
+          }
+        };
       })
     );
     return eventsWithRsvps;

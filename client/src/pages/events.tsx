@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, MapPin, Clock, Users, Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar, MapPin, Clock, Users, Plus, ChevronDown, ChevronUp, Star } from "lucide-react";
 import { format } from "date-fns";
 import {
   Collapsible,
@@ -40,6 +40,12 @@ type Event = {
   createdByAvatarUrl: string | null;
   rsvpCount: number;
   userHasRsvpd: boolean;
+  createdBy: {
+    name: string;
+    role: string;
+    avatarUrl: string | null;
+    averageRating: number | null;
+  };
 };
 
 type Rsvp = {
@@ -125,6 +131,15 @@ function EventCard({ event, globalScopeId }: { event: Event; globalScopeId: stri
               <Badge variant="outline" className="text-xs">
                 {event.createdByRole}
               </Badge>
+              {event.createdBy.averageRating !== null && event.createdBy.averageRating > 0 && (
+                <>
+                  <span>•</span>
+                  <div className="flex items-center gap-1">
+                    <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                    <span className="text-xs font-medium">{event.createdBy.averageRating.toFixed(1)}</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
