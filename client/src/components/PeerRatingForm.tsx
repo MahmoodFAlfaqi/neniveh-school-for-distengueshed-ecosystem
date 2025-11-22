@@ -133,7 +133,7 @@ export function PeerRatingForm({ ratedUserId, ratedUserName, currentUserId }: Pe
           Rate your peer on these 15 performance metrics. Your rating will be anonymous and combined with others.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-3 pt-0">
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-2">
             {METRICS.map((metric) => (
