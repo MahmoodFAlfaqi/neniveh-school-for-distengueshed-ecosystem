@@ -57,10 +57,16 @@ export default function Home() {
       .slice(0, 2);
   };
 
+  // Get today's date at midnight
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
   // Generate 15-day window: 1 day before to 14 days ahead
   const calendarDays = useMemo(() => {
     const days = [];
-    const today = new Date();
     
     // Start from yesterday
     const startDate = new Date(today);
@@ -74,27 +80,32 @@ export default function Home() {
     }
     
     return days;
-  }, []);
+  }, [today]);
 
-  // Map events by date
+  // Helper function to get date string (YYYY-MM-DD)
+  const getDateString = (date: Date) => {
+    return date.toISOString().split('T')[0];
+  };
+
+  // Map events by date string
   const eventsByDate = useMemo(() => {
     const map: Record<string, Event[]> = {};
     
     events.forEach(event => {
-      const eventDate = new Date(event.date);
-      const dateKey = eventDate.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+      // Parse the event date - handle both ISO strings and other formats
+      let eventDate = new Date(event.date);
+      // Set to midnight to compare properly
+      eventDate.setHours(0, 0, 0, 0);
+      const dateStr = getDateString(eventDate);
       
-      if (!map[dateKey]) {
-        map[dateKey] = [];
+      if (!map[dateStr]) {
+        map[dateStr] = [];
       }
-      map[dateKey].push(event);
+      map[dateStr].push(event);
     });
     
     return map;
   }, [events]);
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
 
   return (
     <div className="h-full overflow-y-auto bg-gradient-to-br from-background via-background to-muted/20">
@@ -163,8 +174,8 @@ export default function Home() {
                   {/* 15-Day Calendar Grid */}
                   <div className="grid grid-cols-7 gap-1">
                     {calendarDays.map((date, idx) => {
-                      const dateKey = date.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
-                      const dayEvents = eventsByDate[dateKey] || [];
+                      const dateStr = getDateString(date);
+                      const dayEvents = eventsByDate[dateStr] || [];
                       const isToday = date.getTime() === today.getTime();
                       const isPast = date.getTime() < today.getTime();
 
@@ -186,6 +197,7 @@ export default function Home() {
                                 key={eventIdx}
                                 className="truncate bg-rose-600/30 dark:bg-rose-400/30 text-rose-700 dark:text-rose-300 px-0.5 rounded-sm line-clamp-1"
                                 title={event.title}
+                                data-testid={`event-${event.id}`}
                               >
                                 {event.title}
                               </div>
