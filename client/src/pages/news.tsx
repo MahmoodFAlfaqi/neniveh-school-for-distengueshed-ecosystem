@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Heart, MessageSquare, Send, TrendingUp, Star, ChevronDown, ChevronUp, Edit2, X } from "lucide-react";
+import { Heart, MessageSquare, Send, TrendingUp, Star, ChevronDown, ChevronUp, Edit2, X, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ScopeSelector } from "@/components/ScopeSelector";
 import { useHasAccessToScope } from "@/hooks/use-digital-keys";
@@ -174,8 +174,38 @@ export default function NewsPage() {
     rateAccuracyMutation.mutate({ postId, rating });
   }
 
+  const deletePostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      return await apiRequest("DELETE", `/api/posts/${postId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Post deleted",
+        description: "The post has been removed successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/posts", selectedScope] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete post",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeletePost = (postId: string) => {
+    if (window.confirm("Are you sure you want to delete this post?")) {
+      deletePostMutation.mutate(postId);
+    }
+  };
+
   const isPostAuthor = (authorId: string): boolean => {
     return user?.id === authorId;
+  };
+
+  const isAdmin = (): boolean => {
+    return user?.role === "admin";
   };
 
   const handleSubmitPost = (e: React.FormEvent) => {
@@ -316,6 +346,16 @@ export default function NewsPage() {
                           data-testid={`button-edit-post-${post.id}`}
                         >
                           <Edit2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {isAdmin() && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDeletePost(post.id)}
+                          data-testid={`button-delete-post-${post.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       )}
                     </div>

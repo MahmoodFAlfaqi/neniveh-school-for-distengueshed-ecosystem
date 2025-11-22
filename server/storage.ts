@@ -86,6 +86,7 @@ export interface IStorage {
   updateUserProfile(userId: string, updates: { bio?: string; avatarUrl?: string }): Promise<User | undefined>;
   updateUserCredibility(userId: string, newScore: number): Promise<User | undefined>;
   updateUserReputation(userId: string, newScore: number): Promise<User | undefined>;
+  deleteUser(userId: string): Promise<boolean>;
   
   // Student ID Management (Admin only)
   createStudentId(username: string, grade: number, className: string, adminId: string): Promise<AdminStudentId>;
@@ -117,6 +118,7 @@ export interface IStorage {
   getPost(id: string): Promise<Post | undefined>;
   updatePost(postId: string, content: string): Promise<Post | undefined>;
   updatePostCredibility(postId: string, rating: number): Promise<Post | undefined>;
+  deletePost(postId: string): Promise<boolean>;
   ratePostAccuracy(postId: string, userId: string, rating: number): Promise<PostAccuracyRating>;
   getUserPostAccuracyRating(postId: string, userId: string): Promise<PostAccuracyRating | undefined>;
   
@@ -313,6 +315,16 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return user || undefined;
+  }
+
+  async deleteUser(userId: string): Promise<boolean> {
+    try {
+      const result = await db.delete(users).where(eq(users.id, userId));
+      return result.rowCount ? result.rowCount > 0 : false;
+    } catch (error) {
+      console.error("Failed to delete user:", error);
+      return false;
+    }
   }
 
   // ==================== STUDENT ID MANAGEMENT ====================
@@ -885,6 +897,16 @@ export class DatabaseStorage implements IStorage {
     }
     
     return post || undefined;
+  }
+
+  async deletePost(postId: string): Promise<boolean> {
+    try {
+      const result = await db.delete(posts).where(eq(posts.id, postId));
+      return result.rowCount ? result.rowCount > 0 : false;
+    } catch (error) {
+      console.error("Failed to delete post:", error);
+      return false;
+    }
   }
 
   async ratePostAccuracy(postId: string, userId: string, rating: number): Promise<PostAccuracyRating> {

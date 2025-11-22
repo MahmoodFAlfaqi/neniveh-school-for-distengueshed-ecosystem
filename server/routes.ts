@@ -432,6 +432,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update credibility" });
     }
   });
+
+  // Delete user account (admin only)
+  app.delete("/api/users/:userId", requireAdmin, async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const currentAdmin = await storage.getUser(req.session.userId!);
+      
+      // Prevent admins from deleting themselves
+      if (currentAdmin?.id === userId) {
+        return res.status(400).json({ message: "You cannot delete your own account" });
+      }
+      
+      const success = await storage.deleteUser(userId);
+      
+      if (!success) {
+        return res.status(404).json({ message: "User not found or already deleted" });
+      }
+      
+      res.json({ message: "User account deleted successfully" });
+    } catch (error) {
+      console.error("Failed to delete user:", error);
+      res.status(500).json({ message: "Failed to delete user account" });
+    }
+  });
   
   // Get user stats (public - for profile cards)
   app.get("/api/users/:userId/stats", async (req, res) => {
@@ -656,6 +680,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(post);
     } catch (error) {
       res.status(500).json({ message: "Failed to update post credibility" });
+    }
+  });
+
+  // Delete post (admin only)
+  app.delete("/api/posts/:id", requireAdmin, async (req, res) => {
+    try {
+      const postId = req.params.id;
+      
+      const post = await storage.getPost(postId);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+      
+      const success = await storage.deletePost(postId);
+      
+      if (!success) {
+        return res.status(500).json({ message: "Failed to delete post" });
+      }
+      
+      res.json({ message: "Post deleted successfully" });
+    } catch (error) {
+      console.error("Failed to delete post:", error);
+      res.status(500).json({ message: "Failed to delete post" });
     }
   });
 

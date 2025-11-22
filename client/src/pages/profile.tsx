@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { Star, Award, TrendingUp, User as UserIcon, Calendar, MessageSquare, Edit2 } from "lucide-react";
+import { Star, Award, TrendingUp, User as UserIcon, Calendar, MessageSquare, Edit2, Trash2 } from "lucide-react";
 import { PeerRatingForm } from "@/components/PeerRatingForm";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ import { useState } from "react";
 import { UserProfileLink } from "@/components/UserProfileLink";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useLocation } from "wouter";
 
 type User = {
   id: string;
@@ -151,6 +152,35 @@ export default function ProfilePage() {
     }
   };
 
+  const [, setLocation] = useLocation();
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest("DELETE", `/api/users/${userId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Account deleted",
+        description: "The user account has been removed successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete account",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteAccount = (userId: string) => {
+    if (window.confirm("Are you sure you want to delete this account? This action cannot be undone.")) {
+      deleteAccountMutation.mutate(userId);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="h-full overflow-y-auto">
@@ -218,6 +248,18 @@ export default function ProfilePage() {
                     >
                       <Edit2 className="w-4 h-4 mr-2" />
                       Edit
+                    </Button>
+                  )}
+                  {currentUser?.role === "admin" && !isOwnProfile && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDeleteAccount(user.id)}
+                      disabled={deleteAccountMutation.isPending}
+                      data-testid="button-delete-account"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      {deleteAccountMutation.isPending ? "Deleting..." : "Delete Account"}
                     </Button>
                   )}
                 </div>
