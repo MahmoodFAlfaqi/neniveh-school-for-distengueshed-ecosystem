@@ -256,10 +256,10 @@ export default function ProfilePage() {
                       }
                       return score;
                     });
-                    const validScores = scores.filter((s) => s !== null) as number[];
+                    const validScores = scores.filter((s) => s !== null && s !== undefined && s !== 0) as number[];
                     const avgScore = validScores.length > 0 
                       ? validScores.reduce((sum, s) => sum + s, 0) / validScores.length 
-                      : 0;
+                      : 3;
                     
                     return (
                       <Star
@@ -283,10 +283,10 @@ export default function ProfilePage() {
                       }
                       return score;
                     });
-                    const validScores = scores.filter((s) => s !== null) as number[];
+                    const validScores = scores.filter((s) => s !== null && s !== undefined && s !== 0) as number[];
                     const avgScore = validScores.length > 0 
                       ? validScores.reduce((sum, s) => sum + s, 0) / validScores.length 
-                      : 0;
+                      : 3;
                     return avgScore.toFixed(1);
                   })()}
                 </div>
@@ -306,10 +306,10 @@ export default function ProfilePage() {
                   {STAT_METRICS.map((metric) => {
                     let score = user[metric.key] as number | null;
                     // Inverse misconduct and temper scores for display
-                    if (metric.isInverse && score !== null) {
+                    if (metric.isInverse && score !== null && score !== undefined && score !== 0) {
                       score = 6 - score;
                     }
-                    const displayScore = score ?? 3;
+                    const displayScore = score || 3;
                     
                     return (
                       <div
