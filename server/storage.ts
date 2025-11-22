@@ -16,6 +16,7 @@ import {
   teacherReviews,
   profileComments,
   peerRatings,
+  settings,
   type User,
   type InsertUser,
   type Scope,
@@ -50,6 +51,8 @@ import {
   type InsertProfileComment,
   type PeerRating,
   type InsertPeerRating,
+  type Setting,
+  type InsertSetting,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
@@ -165,6 +168,10 @@ export interface IStorage {
   // Profile Comments
   createProfileComment(comment: InsertProfileComment): Promise<ProfileComment>;
   getProfileComments(profileUserId: string): Promise<ProfileComment[]>;
+  
+  // Settings
+  getSetting(key: string): Promise<Setting | undefined>;
+  setSetting(key: string, value: string): Promise<Setting>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1667,6 +1674,42 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));
+  }
+
+  // ==================== SETTINGS ====================
+  async getSetting(key: string): Promise<Setting | undefined> {
+    const [setting] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, key));
+    return setting || undefined;
+  }
+
+  async setSetting(key: string, value: string): Promise<Setting> {
+    const existingSetting = await this.getSetting(key);
+
+    if (existingSetting) {
+      // Update existing setting
+      const [updated] = await db
+        .update(settings)
+        .set({
+          value,
+          updatedAt: new Date(),
+        })
+        .where(eq(settings.key, key))
+        .returning();
+      return updated;
+    } else {
+      // Insert new setting
+      const [inserted] = await db
+        .insert(settings)
+        .values({
+          key,
+          value,
+        })
+        .returning();
+      return inserted;
+    }
   }
 }
 

@@ -390,6 +390,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== SETTINGS / SUPPORT ====================
+  
+  // Get donation URL (public - anyone can check if donation URL is configured)
+  app.get("/api/settings/donation-url", async (req, res) => {
+    try {
+      const setting = await storage.getSetting("donationUrl");
+      res.json({ 
+        url: setting?.value || null 
+      });
+    } catch (error) {
+      console.error("Failed to get donation URL:", error);
+      res.status(500).json({ message: "Failed to get donation URL" });
+    }
+  });
+  
+  // Set donation URL (admin only)
+  app.put("/api/admin/settings/donation-url", requireAdmin, async (req, res) => {
+    try {
+      const { url } = req.body;
+      
+      if (!url || typeof url !== "string") {
+        return res.status(400).json({ message: "Invalid donation URL" });
+      }
+      
+      // Basic URL validation
+      try {
+        new URL(url);
+      } catch {
+        return res.status(400).json({ message: "Invalid URL format" });
+      }
+      
+      await storage.setSetting("donationUrl", url);
+      res.json({ 
+        message: "Donation URL updated successfully",
+        url 
+      });
+    } catch (error) {
+      console.error("Failed to set donation URL:", error);
+      res.status(500).json({ message: "Failed to set donation URL" });
+    }
+  });
+
   // ==================== ACCESS CODE / DIGITAL KEY SYSTEM ====================
   
   // Verify and unlock scope (uses authenticated user from session)

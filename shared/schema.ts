@@ -196,6 +196,14 @@ export const teachers = pgTable("teachers", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Settings - for application-wide configuration
+export const settings = pgTable("settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(), // e.g., "donationUrl"
+  value: text("value"), // The actual value (e.g., URL to donation page)
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Teacher Reviews
 export const teacherReviews = pgTable("teacher_reviews", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -623,3 +631,11 @@ export type ProfileComment = typeof profileComments.$inferSelect;
 
 export type InsertPeerRating = z.infer<typeof insertPeerRatingSchema>;
 export type PeerRating = typeof peerRatings.$inferSelect;
+
+export const insertSettingSchema = createInsertSchema(settings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertSetting = z.infer<typeof insertSettingSchema>;
+export type Setting = typeof settings.$inferSelect;
