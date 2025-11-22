@@ -683,18 +683,26 @@ export class DatabaseStorage implements IStorage {
         .where(sql`${posts.scopeId} IS NULL`)
         .orderBy(desc(posts.createdAt));
       
-      // Get user's liked posts and accuracy ratings if userId provided
+      // Get user's liked posts if userId provided
       const likedPostIds = userId ? (await db
         .select({ postId: postReactions.postId })
         .from(postReactions)
         .where(eq(postReactions.userId, userId)))
         .map(r => r.postId) : [];
       
-      const accuracyRatings = userId ? (await db
-        .select({ postId: postAccuracyRatings.postId, rating: postAccuracyRatings.rating })
-        .from(postAccuracyRatings)
-        .where(eq(postAccuracyRatings.userId, userId)))
-        .reduce((map, r) => ({ ...map, [r.postId]: r.rating }), {} as Record<string, number>) : {};
+      // Get user's accuracy ratings if userId provided (gracefully handle if table doesn't exist yet)
+      let accuracyRatings: Record<string, number> = {};
+      try {
+        if (userId) {
+          const ratings = await db
+            .select({ postId: postAccuracyRatings.postId, rating: postAccuracyRatings.rating })
+            .from(postAccuracyRatings)
+            .where(eq(postAccuracyRatings.userId, userId));
+          accuracyRatings = ratings.reduce((map, r) => ({ ...map, [r.postId]: r.rating }), {});
+        }
+      } catch (error) {
+        // Table might not exist yet, continue without accuracy ratings
+      }
       
       // Transform to ensure author always exists and include liked status and average rating
       return results.map(post => {
@@ -766,18 +774,26 @@ export class DatabaseStorage implements IStorage {
       .where(eq(posts.scopeId, scopeId))
       .orderBy(desc(posts.createdAt));
     
-    // Get user's liked posts and accuracy ratings if userId provided
+    // Get user's liked posts if userId provided
     const likedPostIds = userId ? (await db
       .select({ postId: postReactions.postId })
       .from(postReactions)
       .where(eq(postReactions.userId, userId)))
       .map(r => r.postId) : [];
     
-    const accuracyRatings = userId ? (await db
-      .select({ postId: postAccuracyRatings.postId, rating: postAccuracyRatings.rating })
-      .from(postAccuracyRatings)
-      .where(eq(postAccuracyRatings.userId, userId)))
-      .reduce((map, r) => ({ ...map, [r.postId]: r.rating }), {} as Record<string, number>) : {};
+    // Get user's accuracy ratings if userId provided (gracefully handle if table doesn't exist yet)
+    let accuracyRatings2: Record<string, number> = {};
+    try {
+      if (userId) {
+        const ratings = await db
+          .select({ postId: postAccuracyRatings.postId, rating: postAccuracyRatings.rating })
+          .from(postAccuracyRatings)
+          .where(eq(postAccuracyRatings.userId, userId));
+        accuracyRatings2 = ratings.reduce((map, r) => ({ ...map, [r.postId]: r.rating }), {});
+      }
+    } catch (error) {
+      // Table might not exist yet, continue without accuracy ratings
+    }
     
     // Transform to ensure author always exists and include liked status and average rating
     return results.map(post => {
@@ -802,7 +818,7 @@ export class DatabaseStorage implements IStorage {
       return {
         ...post,
         isLikedByCurrentUser: likedPostIds.includes(post.id),
-        currentUserAccuracyRating: accuracyRatings[post.id] || null,
+        currentUserAccuracyRating: accuracyRatings2[post.id] || null,
         author: {
           name: post.authorName || "Unknown User",
           role: post.authorRole || "student",
