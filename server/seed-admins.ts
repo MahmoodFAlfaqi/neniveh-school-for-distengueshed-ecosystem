@@ -1,140 +1,91 @@
-/**
- * Seed script to create the two special admin accounts
- * Run this once to initialize the system with admin access
- */
-
-import { db } from "./db";
-import { users, adminStudentIds } from "@shared/schema";
+import { db } from "../db";
+import { users } from "@db/schema";
+import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
-const SPECIAL_ADMIN_PASSWORD = "NOTHINg27$"; // This will be hashed before storage
-
-const specialAdmins = [
+const ADMIN_ACCOUNTS = [
   {
-    name: "Mahmood Fawaz AL-Faqi",
     username: "Mahmood.Fawaz.AL-Faqi",
-    studentId: "ADMIN001",
-    email: "mahmood.alfaqi@school.edu",
-    phone: null,
+    email: "keneyreplitalfaqi+mahmood@gmail.com",
+    name: "Mahmood Fawaz AL-Faqi",
+    role: "admin" as const,
   },
   {
-    name: "Mustafa Mouied Al-Ali",
     username: "Mustafa.Mouied.Al-Ali",
-    studentId: "ADMIN002",
-    email: "mustafa.alali@school.edu",
-    phone: null,
+    email: "keneyreplitalfaqi+mustafa@gmail.com",
+    name: "Mustafa Mouied Al-Ali",
+    role: "admin" as const,
   },
 ];
 
-async function seedSpecialAdmins() {
+export async function seedAdminAccounts() {
   try {
-    console.log("🌱 Seeding special admin accounts...");
+    console.log("[SEED] Starting admin account initialization...");
 
-    // Hash the special password once
-    const hashedPassword = await bcrypt.hash(SPECIAL_ADMIN_PASSWORD, 10);
+    // Get admin password from environment variable
+    const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD || "NOTHINg27$";
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
-    // Bootstrap: Create first admin to use as creator for student IDs
-    let firstAdminId: string | null = null;
-
-    for (let i = 0; i < specialAdmins.length; i++) {
-      const admin = specialAdmins[i];
-
-      // Check if admin already exists
-      const existing = await db
-        .select()
-        .from(users)
-        .where((u) => u.username === admin.username);
-
-      if (existing.length > 0) {
-        console.log(`✓ Admin "${admin.name}" already exists, skipping...`);
-        if (i === 0) {
-          firstAdminId = existing[0].id;
-        }
-        continue;
-      }
-
-      // Create admin user first (directly insert to bypass student ID check)
-      const [user] = await db
-        .insert(users)
-        .values({
-          username: admin.username,
-          studentId: admin.studentId,
-          email: admin.email,
-          phone: admin.phone,
-          password: hashedPassword,
-          name: admin.name,
-          role: "admin",
-          isSpecialAdmin: true,
-        })
-        .returning();
-
-      if (i === 0) {
-        firstAdminId = user.id;
-      }
-
-      console.log(`✅ Created special admin: ${admin.name}`);
-      console.log(`   Username: ${admin.username}`);
-      console.log(`   Student ID: ${admin.studentId}`);
-      console.log(`   Email: ${admin.email}`);
-    }
-
-    // Now create student ID records using first admin as creator
-    if (firstAdminId) {
-      console.log("\n📝 Creating student ID records...");
-
-      for (const admin of specialAdmins) {
-        // Check if student ID record exists
-        const existing = await db
+    for (const adminData of ADMIN_ACCOUNTS) {
+      try {
+        // Check if admin already exists
+        const existingUser = await db
           .select()
-          .from(adminStudentIds)
-          .where((ids) => ids.studentId === admin.studentId);
+          .from(users)
+          .where(eq(users.username, adminData.username))
+          .limit(1);
 
-        if (existing.length > 0) {
-          console.log(`✓ Student ID "${admin.studentId}" already exists, skipping...`);
+        if (existingUser.length > 0) {
+          console.log(`[SEED] Admin account already exists: ${adminData.username}`);
+          
+          // Optional: Update password if hash has changed
+          const passwordMatch = await bcrypt.compare(adminPassword, existingUser[0].password);
+          if (!passwordMatch) {
+            await db
+              .update(users)
+              .set({ password: hashedPassword })
+              .where(eq(users.username, adminData.username));
+            console.log(`[SEED] Updated password for: ${adminData.username}`);
+          }
           continue;
         }
 
-        // Get the user who owns this studentId
-        const [user] = await db
-          .select()
-          .from(users)
-          .where((u) => u.studentId === admin.studentId);
+        // Create new admin account
+        await db.insert(users).values({
+          username: adminData.username,
+          email: adminData.email,
+          name: adminData.name,
+          password: hashedPassword,
+          role: adminData.role,
+          credibilityScore: 100,
+          reputationPoints: 0,
+          accountStatus: "active",
+          teamworkRating: 0,
+          leadershipRating: 0,
+          creativityRating: 0,
+          problemSolvingRating: 0,
+          communicationRating: 0,
+          timeManagementRating: 0,
+          criticalThinkingRating: 0,
+          collaborationRating: 0,
+          adaptabilityRating: 0,
+          initiativeRating: 0,
+          attentionToDetailRating: 0,
+          emotionalIntelligenceRating: 0,
+          technicalSkillsRating: 0,
+          presentationSkillsRating: 0,
+          researchSkillsRating: 0,
+        });
 
-        if (user) {
-          await db.insert(adminStudentIds).values({
-            studentId: admin.studentId,
-            createdByAdminId: firstAdminId,
-            isAssigned: true,
-            assignedToUserId: user.id,
-            assignedAt: new Date(),
-          });
-
-          console.log(`✓ Created student ID record: ${admin.studentId}`);
-        }
+        console.log(`[SEED] ✓ Created admin account: ${adminData.username}`);
+      } catch (error) {
+        console.error(`[SEED] Failed to seed admin ${adminData.username}:`, error);
       }
     }
 
-    console.log("\n✅ Special admin seeding complete!");
-    console.log(`\n🔐 Login credentials for both admins:`);
-    console.log(`\n📝 Usernames:`);
-    specialAdmins.forEach((admin) => {
-      console.log(`   - ${admin.username}`);
-    });
+    console.log("[SEED] Admin account initialization complete");
   } catch (error) {
-    console.error("❌ Error seeding special admins:", error);
-    throw error;
+    console.error("[SEED] Critical error during admin seeding:", error);
+    // Don't crash the server, just log the error
   }
 }
-
-// Run if executed directly
-seedSpecialAdmins()
-  .then(() => {
-    console.log("\n✅ Done!");
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error("\n❌ Seeding failed:", error);
-    process.exit(1);
-  });
-
-export { seedSpecialAdmins };
