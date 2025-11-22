@@ -267,30 +267,50 @@ export default function NewsPage() {
                 </CardContent>
                 <Separator />
                 <CardFooter className="py-3 flex-col items-start gap-3 w-full">
-                  <div className="flex gap-4 w-full">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="gap-2"
-                      onClick={() => handleToggleLike(post.id)}
-                      data-testid={`button-like-${post.id}`}
-                    >
-                      <Heart
-                        className={`w-4 h-4 ${
-                          post.isLikedByCurrentUser
-                            ? "fill-red-500 text-red-500"
-                            : ""
-                        }`}
-                      />
-                      <span>{post.likesCount}</span>
-                    </Button>
-                    <Collapsible open={showCommentsForPostId === post.id} onOpenChange={(open) => setShowCommentsForPostId(open ? post.id : null)} className="flex items-center gap-2">
-                      <CollapsibleTrigger className="flex items-center gap-2 text-sm hover-elevate px-2 py-1 rounded-md" data-testid={`button-comment-${post.id}`}>
-                        <MessageSquare className="w-4 h-4" />
-                        <span>{post.commentsCount}</span>
-                        {showCommentsForPostId === post.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </CollapsibleTrigger>
-                    </Collapsible>
+                  <div className="flex gap-4 w-full items-center justify-between">
+                    <div className="flex gap-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => handleToggleLike(post.id)}
+                        data-testid={`button-like-${post.id}`}
+                      >
+                        <Heart
+                          className={`w-4 h-4 ${
+                            post.isLikedByCurrentUser
+                              ? "fill-red-500 text-red-500"
+                              : ""
+                          }`}
+                        />
+                        <span>{post.likesCount}</span>
+                      </Button>
+                      <Collapsible open={showCommentsForPostId === post.id} onOpenChange={(open) => setShowCommentsForPostId(open ? post.id : null)} className="flex items-center gap-2">
+                        <CollapsibleTrigger className="flex items-center gap-2 text-sm hover-elevate px-2 py-1 rounded-md" data-testid={`button-comment-${post.id}`}>
+                          <MessageSquare className="w-4 h-4" />
+                          <span>{post.commentsCount}</span>
+                          {showCommentsForPostId === post.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </CollapsibleTrigger>
+                      </Collapsible>
+                    </div>
+                    
+                    {/* Post Accuracy Stars */}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid={`post-accuracy-${post.id}`}>
+                      <span className="font-medium">Post Accuracy</span>
+                      <div className="flex gap-0.5">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-3.5 h-3.5 ${
+                              i < Math.round(post.credibilityRating / 20)
+                                ? "fill-amber-400 text-amber-400"
+                                : "text-muted-foreground"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs ml-0.5 font-semibold">{(post.credibilityRating / 20).toFixed(1)}</span>
+                    </div>
                   </div>
 
                   <Collapsible open={showCommentsForPostId === post.id} className="w-full">
