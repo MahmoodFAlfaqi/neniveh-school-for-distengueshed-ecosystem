@@ -91,14 +91,14 @@ export default function Home() {
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-1 mb-1">
                       <Trophy className="w-4 h-4 text-amber-500" />
-                      <p className="text-2xl font-bold" data-testid="text-credibility">{user.credibilityScore}</p>
+                      <p className="text-2xl font-bold" data-testid="text-credibility">{user.credibilityScore.toFixed(1)}</p>
                     </div>
                     <p className="text-sm text-muted-foreground">Credibility</p>
                   </div>
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-1 mb-1">
                       <TrendingUp className="w-4 h-4 text-blue-500" />
-                      <p className="text-2xl font-bold" data-testid="text-reputation">{user.reputationScore}</p>
+                      <p className="text-2xl font-bold" data-testid="text-reputation">{user.reputationScore.toFixed(0)}</p>
                     </div>
                     <p className="text-sm text-muted-foreground">Reputation</p>
                   </div>
