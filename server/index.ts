@@ -24,6 +24,12 @@ app.use(
 declare module "express-session" {
   interface SessionData {
     userId?: string;
+    isVisitor?: boolean;
+    visitorData?: {
+      username: string;
+      name: string;
+      role: string;
+    };
   }
 }
 

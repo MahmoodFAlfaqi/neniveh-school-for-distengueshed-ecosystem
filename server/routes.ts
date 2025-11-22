@@ -4,7 +4,9 @@ import { createServer, type Server } from "http";
 import { promises as fs } from "fs";
 import path from "path";
 import { storage } from "./storage";
+import { db } from "./db";
 import { 
+  users,
   insertUserSchema,
   insertPostSchema,
   insertEventSchema,
@@ -170,76 +172,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin verification via security question
-  app.post("/api/auth/admin-verify", async (req, res) => {
+  // Admin Register (requires scientific question answer)
+  app.post("/api/auth/admin/register", async (req, res) => {
     try {
-      const { answer } = req.body;
+      const { scientificAnswer, username, password, name, email } = req.body;
       
-      if (!answer) {
-        return res.status(400).json({ message: "Answer is required" });
+      if (!scientificAnswer || !username || !password || !name || !email) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      // Verify scientific question answer (one-time invitation code)
+      const correctAnswer = process.env.ADMIN_DEFAULT_PASSWORD;
+      
+      if (!correctAnswer) {
+        return res.status(500).json({ message: "Admin registration not configured" });
       }
       
-      // Check if answer matches the admin password
-      const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD;
-      
-      if (!adminPassword) {
-        return res.status(500).json({ message: "Admin authentication not configured" });
+      if (scientificAnswer !== correctAnswer) {
+        return res.status(401).json({ message: "Incorrect answer to scientific question" });
       }
       
-      if (answer !== adminPassword) {
-        return res.status(401).json({ message: "Incorrect answer" });
+      // Check if username already exists
+      const existingByUsername = await storage.getUserByUsername(username);
+      if (existingByUsername) {
+        return res.status(400).json({ message: "Username already taken" });
       }
       
-      // Find first admin account (from seeded admins)
-      const adminUser = await storage.getAdminUser();
-      
-      if (!adminUser) {
-        return res.status(500).json({ message: "No admin accounts found" });
+      // Check if email already exists
+      const existingByEmail = await storage.getUserByEmail(email);
+      if (existingByEmail) {
+        return res.status(400).json({ message: "Email already registered" });
       }
+
+      // Create admin account
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const [admin] = await db.insert(users).values({
+        username,
+        password: hashedPassword,
+        name,
+        email,
+        studentId: `ADMIN_${Date.now()}`, // Unique admin student ID
+        role: "admin",
+      }).returning();
       
       // Set session
-      req.session.userId = adminUser.id;
+      req.session.userId = admin.id;
       
-      // Don't send password back
-      const { password: _, ...userWithoutPassword } = adminUser;
+      const { password: _, ...adminWithoutPassword } = admin;
       
       res.json({ 
-        message: "Admin verification successful",
-        user: userWithoutPassword 
+        message: "Admin account created successfully",
+        user: adminWithoutPassword 
       });
     } catch (error) {
-      console.error("Admin verification error:", error);
-      res.status(500).json({ message: "Admin verification failed" });
+      console.error("Admin registration error:", error);
+      res.status(500).json({ message: "Admin registration failed" });
     }
   });
 
-  // Visitor guest access (no authentication required)
-  app.post("/api/auth/visitor", async (req, res) => {
+  // Admin Login (username + password + optional remember-me)
+  app.post("/api/auth/admin/login", async (req, res) => {
     try {
-      // Create or get a generic visitor user
-      let visitorUser = await storage.getVisitorUser();
+      const { username, password, rememberMe } = req.body;
       
-      if (!visitorUser) {
-        // Create a visitor user if it doesn't exist
-        const hashedPassword = await bcrypt.hash("visitor_no_password", 10);
-        visitorUser = await storage.createVisitorUser({
-          username: "Visitor",
-          email: "visitor@system.local",
-          password: hashedPassword,
-          name: "Guest Visitor",
-          studentId: "VISITOR_GUEST"
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password required" });
+      }
+
+      // Check if account is locked
+      const isLocked = await storage.isAccountLocked(username);
+      if (isLocked) {
+        return res.status(429).json({ 
+          message: "Account locked due to too many failed attempts. Please try again in 15 minutes." 
         });
       }
       
-      // Set session
-      req.session.userId = visitorUser.id;
+      const user = await storage.getUserByUsername(username);
+      if (!user || user.role !== "admin") {
+        await storage.recordFailedLogin(username);
+        return res.status(401).json({ message: "Invalid admin credentials" });
+      }
       
-      // Don't send password back
-      const { password: _, ...userWithoutPassword } = visitorUser;
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      
+      if (!passwordMatch) {
+        await storage.recordFailedLogin(username);
+        const attempts = await storage.getFailedLoginAttempts(username);
+        const remaining = attempts ? Math.max(0, 3 - attempts.attemptCount) : 3;
+        return res.status(401).json({ 
+          message: `Invalid credentials. ${remaining} attempt(s) remaining.` 
+        });
+      }
+      
+      // Successful login - clear failed attempts
+      await storage.clearFailedLoginAttempts(username);
+      
+      // Set session
+      req.session.userId = user.id;
+
+      // Handle remember-me functionality
+      if (rememberMe) {
+        const crypto = require('crypto');
+        const token = crypto.randomBytes(32).toString('hex');
+        await storage.createRememberMeToken(user.id, token);
+        
+        // Set remember-me cookie (7 days)
+        res.cookie('remember_token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        });
+      }
+      
+      const { password: _, ...userWithoutPassword } = user;
+      
+      res.json({ 
+        message: "Login successful",
+        user: userWithoutPassword 
+      });
+    } catch (error) {
+      console.error("Admin login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Visitor guest access (session-only, no database user)
+  app.post("/api/auth/visitor", async (req, res) => {
+    try {
+      // Create temporary visitor session data (no database user)
+      req.session.isVisitor = true;
+      req.session.visitorData = {
+        username: "Guest Visitor",
+        name: "Guest Visitor",
+        role: "visitor",
+      };
       
       res.json({ 
         message: "Visitor access granted",
-        user: userWithoutPassword 
+        user: {
+          username: "Guest Visitor",
+          name: "Guest Visitor",
+          role: "visitor",
+        }
       });
     } catch (error) {
       console.error("Visitor access error:", error);
@@ -247,32 +325,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get random security question for admin verification
-  app.get("/api/auth/admin-question", (req, res) => {
-    const questions = [
-      "What is the school's founding year?",
-      "What is the name of the school mascot?",
-      "What is the principal's favorite subject?",
-      "What is the school's motto?",
-      "What color is the school flag?",
-      "What is the name of the school library?",
-      "What is the school's anniversary month?",
-      "What is the main building's name?"
-    ];
-    
-    const randomQuestion = questions[Math.floor(Math.random() * questions.length)];
-    
-    res.json({ question: randomQuestion });
-  });
-
   // Logout
-  app.post("/api/auth/logout", (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        return res.status(500).json({ message: "Logout failed" });
+  app.post("/api/auth/logout", async (req, res) => {
+    try {
+      // Delete remember-me token if it exists
+      const rememberToken = req.cookies?.remember_token;
+      if (rememberToken) {
+        await storage.deleteRememberMeToken(rememberToken);
+        res.clearCookie('remember_token');
       }
-      res.json({ message: "Logged out successfully" });
-    });
+
+      req.session.destroy((err) => {
+        if (err) {
+          return res.status(500).json({ message: "Logout failed" });
+        }
+        res.json({ message: "Logged out successfully" });
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+      res.status(500).json({ message: "Logout failed" });
+    }
   });
 
   // Request password reset (by email or phone)
