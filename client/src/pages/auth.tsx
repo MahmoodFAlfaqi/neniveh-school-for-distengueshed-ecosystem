@@ -75,15 +75,15 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
-      <Card className="w-full max-w-md">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <Card className="w-full max-w-md shadow-lg">
         <CardHeader>
           <CardTitle className="text-3xl font-bold">School Community</CardTitle>
           <CardDescription>Join your school's digital ecosystem</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="login" data-testid="tab-login">Login</TabsTrigger>
               <TabsTrigger value="register" data-testid="tab-register">Register</TabsTrigger>
             </TabsList>
