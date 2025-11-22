@@ -340,7 +340,7 @@ export default function NewsPage() {
                 <Separator />
                 <CardFooter className="py-3 flex-col items-start gap-3 w-full sticky top-0 z-10 bg-card">
                   <div className="flex gap-4 w-full items-center justify-between">
-                    <div className="flex gap-4">
+                    <div className="flex gap-4 items-center">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -357,6 +357,30 @@ export default function NewsPage() {
                         />
                         <span>{post.likesCount}</span>
                       </Button>
+                      
+                      {/* Post Accuracy Rating */}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid={`post-accuracy-${post.id}`}>
+                        <div className="flex gap-0.5">
+                          {[...Array(5)].map((_, i) => (
+                            <button
+                              key={i}
+                              onClick={() => handleRatePostAccuracy(post.id, i + 1)}
+                              className="hover:opacity-80 transition-opacity"
+                              data-testid={`button-rate-accuracy-${post.id}-${i + 1}`}
+                            >
+                              <Star
+                                className={`w-3.5 h-3.5 cursor-pointer ${
+                                  i < (post.currentUserAccuracyRating || 0)
+                                    ? "fill-amber-400 text-amber-400"
+                                    : "text-muted-foreground hover:text-amber-300"
+                                }`}
+                              />
+                            </button>
+                          ))}
+                        </div>
+                        <span className="text-xs font-semibold">{(post.currentUserAccuracyRating || 0).toFixed(1)}</span>
+                      </div>
+
                       <Collapsible open={showCommentsForPostId === post.id} onOpenChange={(open) => setShowCommentsForPostId(open ? post.id : null)} className="w-full">
                         <CollapsibleTrigger asChild>
                           <Button variant="ghost" size="sm" className="gap-2" data-testid={`button-comment-${post.id}`}>
@@ -369,30 +393,6 @@ export default function NewsPage() {
                           <PostCommentSection postId={post.id} />
                         </CollapsibleContent>
                       </Collapsible>
-                    </div>
-                    
-                    {/* Post Accuracy Rating */}
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid={`post-accuracy-${post.id}`}>
-                      <span className="font-medium">Post Accuracy</span>
-                      <div className="flex gap-0.5">
-                        {[...Array(5)].map((_, i) => (
-                          <button
-                            key={i}
-                            onClick={() => handleRatePostAccuracy(post.id, i + 1)}
-                            className="hover:opacity-80 transition-opacity"
-                            data-testid={`button-rate-accuracy-${post.id}-${i + 1}`}
-                          >
-                            <Star
-                              className={`w-3.5 h-3.5 cursor-pointer ${
-                                i < (post.currentUserAccuracyRating || 0)
-                                  ? "fill-amber-400 text-amber-400"
-                                  : "text-muted-foreground hover:text-amber-300"
-                              }`}
-                            />
-                          </button>
-                        ))}
-                      </div>
-                      <span className="text-xs ml-0.5 font-semibold">{(post.currentUserAccuracyRating || 0).toFixed(1)}</span>
                     </div>
                   </div>
                 </CardFooter>
