@@ -87,6 +87,9 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getAdminUser(): Promise<User | undefined>;
+  getVisitorUser(): Promise<User | undefined>;
+  createVisitorUser(userData: InsertUser): Promise<User>;
   getStudentsByClass(grade: number, className: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUserProfile(userId: string, updates: { bio?: string; avatarUrl?: string }): Promise<User | undefined>;
@@ -201,6 +204,31 @@ export class DatabaseStorage implements IStorage {
     // Case-insensitive lookup using SQL lower() function
     const [user] = await db.select().from(users).where(sql`LOWER(${users.username}) = LOWER(${username})`);
     return user || undefined;
+  }
+
+  async getAdminUser(): Promise<User | undefined> {
+    const [admin] = await db.select().from(users).where(eq(users.role, "admin"));
+    return admin || undefined;
+  }
+
+  async getVisitorUser(): Promise<User | undefined> {
+    const [visitor] = await db.select().from(users).where(eq(users.role, "visitor"));
+    return visitor || undefined;
+  }
+
+  async createVisitorUser(insertUser: InsertUser): Promise<User> {
+    const hashedPassword = await bcrypt.hash(insertUser.password, 10);
+    
+    const [user] = await db
+      .insert(users)
+      .values({
+        ...insertUser,
+        password: hashedPassword,
+        role: "visitor",
+      })
+      .returning();
+    
+    return user;
   }
 
   async getStudentsByClass(grade: number, className: string): Promise<User[]> {

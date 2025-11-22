@@ -152,6 +152,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin verification via security question
+  app.post("/api/auth/admin-verify", async (req, res) => {
+    try {
+      const { answer } = req.body;
+      
+      if (!answer) {
+        return res.status(400).json({ message: "Answer is required" });
+      }
+      
+      // Check if answer matches the admin password
+      const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD;
+      
+      if (!adminPassword) {
+        return res.status(500).json({ message: "Admin authentication not configured" });
+      }
+      
+      if (answer !== adminPassword) {
+        return res.status(401).json({ message: "Incorrect answer" });
+      }
+      
+      // Find first admin account (from seeded admins)
+      const adminUser = await storage.getAdminUser();
+      
+      if (!adminUser) {
+        return res.status(500).json({ message: "No admin accounts found" });
+      }
+      
+      // Set session
+      req.session.userId = adminUser.id;
+      
+      // Don't send password back
+      const { password: _, ...userWithoutPassword } = adminUser;
+      
+      res.json({ 
+        message: "Admin verification successful",
+        user: userWithoutPassword 
+      });
+    } catch (error) {
+      console.error("Admin verification error:", error);
+      res.status(500).json({ message: "Admin verification failed" });
+    }
+  });
+
+  // Visitor guest access (no authentication required)
+  app.post("/api/auth/visitor", async (req, res) => {
+    try {
+      // Create or get a generic visitor user
+      let visitorUser = await storage.getVisitorUser();
+      
+      if (!visitorUser) {
+        // Create a visitor user if it doesn't exist
+        const hashedPassword = await bcrypt.hash("visitor_no_password", 10);
+        visitorUser = await storage.createVisitorUser({
+          username: "Visitor",
+          email: "visitor@system.local",
+          password: hashedPassword,
+          name: "Guest Visitor",
+          studentId: "VISITOR_GUEST"
+        });
+      }
+      
+      // Set session
+      req.session.userId = visitorUser.id;
+      
+      // Don't send password back
+      const { password: _, ...userWithoutPassword } = visitorUser;
+      
+      res.json({ 
+        message: "Visitor access granted",
+        user: userWithoutPassword 
+      });
+    } catch (error) {
+      console.error("Visitor access error:", error);
+      res.status(500).json({ message: "Visitor access failed" });
+    }
+  });
+
+  // Get random security question for admin verification
+  app.get("/api/auth/admin-question", (req, res) => {
+    const questions = [
+      "What is the school's founding year?",
+      "What is the name of the school mascot?",
+      "What is the principal's favorite subject?",
+      "What is the school's motto?",
+      "What color is the school flag?",
+      "What is the name of the school library?",
+      "What is the school's anniversary month?",
+      "What is the main building's name?"
+    ];
+    
+    const randomQuestion = questions[Math.floor(Math.random() * questions.length)];
+    
+    res.json({ question: randomQuestion });
+  });
+
   // Logout
   app.post("/api/auth/logout", (req, res) => {
     req.session.destroy((err) => {

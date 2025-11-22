@@ -5,7 +5,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userRoleEnum = pgEnum("user_role", ["student", "admin"]);
+export const userRoleEnum = pgEnum("user_role", ["student", "admin", "visitor"]);
 export const accountStatusEnum = pgEnum("account_status", ["active", "threatened", "suspended"]);
 export const scopeTypeEnum = pgEnum("scope_type", ["global", "stage", "section"]);
 export const eventTypeEnum = pgEnum("event_type", ["curricular", "extracurricular"]);
