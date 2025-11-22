@@ -224,6 +224,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update user profile (own profile only)
+  app.patch("/api/users/:userId/profile", requireAuth, async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const currentUserId = req.session.userId!;
+      
+      if (userId !== currentUserId) {
+        return res.status(403).json({ message: "You can only edit your own profile" });
+      }
+      
+      const { bio, avatarUrl } = req.body;
+      
+      // Moderate bio before updating
+      if (bio && typeof bio === "string" && bio.trim()) {
+        await requireModeration(bio);
+      }
+      
+      const updated = await storage.updateUserProfile(userId, { bio, avatarUrl });
+      
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { password, ...userWithoutPassword } = updated;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("community guidelines")) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
   // ==================== ADMIN STUDENT ID MANAGEMENT ====================
   
   // Generate new student ID (admin only)
@@ -566,6 +599,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(posts);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch posts" });
+    }
+  });
+  
+  // Edit post (author only)
+  app.patch("/api/posts/:id", requireAuth, async (req, res) => {
+    try {
+      const postId = req.params.id;
+      const userId = req.session.userId!;
+      const { content } = req.body;
+      
+      if (!content || typeof content !== "string") {
+        return res.status(400).json({ message: "Content is required" });
+      }
+      
+      // Verify user is the post author
+      const post = await storage.getPost(postId);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+      
+      if (post.authorId !== userId) {
+        return res.status(403).json({ message: "You can only edit your own posts" });
+      }
+      
+      // Moderate content before updating
+      if (content.trim()) {
+        await requireModeration(content);
+      }
+      
+      const updated = await storage.updatePost(postId, content);
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("community guidelines")) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to update post" });
     }
   });
   

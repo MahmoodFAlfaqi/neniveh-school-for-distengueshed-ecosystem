@@ -83,6 +83,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getStudentsByClass(grade: number, className: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserProfile(userId: string, updates: { bio?: string; avatarUrl?: string }): Promise<User | undefined>;
   updateUserCredibility(userId: string, newScore: number): Promise<User | undefined>;
   updateUserReputation(userId: string, newScore: number): Promise<User | undefined>;
   
@@ -114,6 +115,7 @@ export interface IStorage {
   createPost(post: InsertPost): Promise<Post>;
   getPosts(scopeId?: string | null, userId?: string): Promise<any[]>;
   getPost(id: string): Promise<Post | undefined>;
+  updatePost(postId: string, content: string): Promise<Post | undefined>;
   updatePostCredibility(postId: string, rating: number): Promise<Post | undefined>;
   ratePostAccuracy(postId: string, userId: string, rating: number): Promise<PostAccuracyRating>;
   getUserPostAccuracyRating(postId: string, userId: string): Promise<PostAccuracyRating | undefined>;
@@ -268,6 +270,19 @@ export class DatabaseStorage implements IStorage {
       
       return user;
     });
+  }
+
+  async updateUserProfile(userId: string, updates: { bio?: string; avatarUrl?: string }): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ 
+        bio: updates.bio,
+        avatarUrl: updates.avatarUrl,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
   }
 
   async updateUserCredibility(userId: string, newScore: number): Promise<User | undefined> {
@@ -833,6 +848,18 @@ export class DatabaseStorage implements IStorage {
 
   async getPost(id: string): Promise<Post | undefined> {
     const [post] = await db.select().from(posts).where(eq(posts.id, id));
+    return post || undefined;
+  }
+
+  async updatePost(postId: string, content: string): Promise<Post | undefined> {
+    const [post] = await db
+      .update(posts)
+      .set({ 
+        content,
+        updatedAt: new Date(),
+      })
+      .where(eq(posts.id, postId))
+      .returning();
     return post || undefined;
   }
 

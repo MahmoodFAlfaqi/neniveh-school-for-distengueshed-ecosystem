@@ -8,13 +8,14 @@ import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Heart, MessageSquare, Send, TrendingUp, Star, ChevronDown, ChevronUp } from "lucide-react";
+import { Heart, MessageSquare, Send, TrendingUp, Star, ChevronDown, ChevronUp, Edit2, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ScopeSelector } from "@/components/ScopeSelector";
 import { useHasAccessToScope } from "@/hooks/use-digital-keys";
 import { UserProfileLink } from "@/components/UserProfileLink";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 type Post = {
   id: string;
@@ -47,6 +48,8 @@ export default function NewsPage() {
   const [selectedScope, setSelectedScope] = useState<string | null>(null);
   const [showCommentsForPostId, setShowCommentsForPostId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState<{ [postId: string]: string }>({});
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
 
   // Check if user has access to selected scope
   const hasAccess = useHasAccessToScope(selectedScope);
@@ -130,12 +133,49 @@ export default function NewsPage() {
     },
   });
 
+  const updatePostMutation = useMutation({
+    mutationFn: async (data: { postId: string; content: string }) => {
+      return await apiRequest("PATCH", `/api/posts/${data.postId}`, { content: data.content });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Post updated",
+        description: "Your post has been edited successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/posts", selectedScope] });
+      setEditingPostId(null);
+      setEditContent("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update post",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleToggleLike = (postId: string) => {
     toggleLikeMutation.mutate(postId);
   };
 
+  const handleEditPost = (post: Post) => {
+    setEditingPostId(post.id);
+    setEditContent(post.content);
+  };
+
+  const handleSaveEdit = () => {
+    if (editContent.trim() && editingPostId) {
+      updatePostMutation.mutate({ postId: editingPostId, content: editContent });
+    }
+  };
+
   const handleRatePostAccuracy = (postId: string, rating: number) => {
     rateAccuracyMutation.mutate({ postId, rating });
+  }
+
+  const isPostAuthor = (authorId: string): boolean => {
+    return user?.id === authorId;
   };
 
   const handleSubmitPost = (e: React.FormEvent) => {
@@ -264,10 +304,20 @@ export default function NewsPage() {
                         <span>{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <Badge variant="outline" className={getCredibilityColor(post.authorCredibilityScore)}>
                         {post.authorCredibilityScore.toFixed(0)}% credibility
                       </Badge>
+                      {isPostAuthor(post.authorId) && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleEditPost(post)}
+                          data-testid={`button-edit-post-${post.id}`}
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -351,6 +401,45 @@ export default function NewsPage() {
             ))
           )}
         </div>
+
+        <Dialog open={!!editingPostId} onOpenChange={(open) => { if (!open) setEditingPostId(null); }}>
+          <DialogContent data-testid="dialog-edit-post">
+            <DialogHeader>
+              <DialogTitle>Edit Post</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                placeholder="What's happening in our school community?"
+                className="min-h-24 resize-none"
+                data-testid="textarea-edit-post"
+                maxLength={4000}
+              />
+              <div className="flex justify-end">
+                <span className={`text-xs ${editContent.length > 4000 ? "text-destructive" : "text-muted-foreground"}`}>
+                  {editContent.length}/4000
+                </span>
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setEditingPostId(null)}
+                data-testid="button-cancel-edit"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveEdit}
+                disabled={!editContent.trim() || editContent.length > 4000 || updatePostMutation.isPending}
+                data-testid="button-save-edit"
+              >
+                {updatePostMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

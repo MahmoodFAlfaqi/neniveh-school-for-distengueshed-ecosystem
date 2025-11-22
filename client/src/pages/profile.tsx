@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { Star, Award, TrendingUp, User as UserIcon, Calendar, MessageSquare } from "lucide-react";
+import { Star, Award, TrendingUp, User as UserIcon, Calendar, MessageSquare, Edit2 } from "lucide-react";
 import { PeerRatingForm } from "@/components/PeerRatingForm";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { UserProfileLink } from "@/components/UserProfileLink";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 type User = {
   id: string;
@@ -102,6 +104,9 @@ function StarRating({ score, max = 5 }: { score: number; max?: number }) {
 export default function ProfilePage() {
   const [, params] = useRoute("/profile/:userId");
   const userId = params?.userId;
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editBio, setEditBio] = useState("");
+  const { toast } = useToast();
 
   const { data: user, isLoading } = useQuery<User>({
     queryKey: userId ? [`/api/users/${userId}`] : ["/api/auth/me"],
@@ -110,6 +115,41 @@ export default function ProfilePage() {
   const { data: currentUser } = useQuery<User>({
     queryKey: ["/api/auth/me"],
   });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: { bio: string }) => {
+      return await apiRequest("PATCH", `/api/users/${currentUser?.id}/profile`, { bio: data.bio });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Profile updated",
+        description: "Your profile has been updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${currentUser?.id}`] });
+      setEditingProfile(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update profile",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditProfile = () => {
+    if (user) {
+      setEditBio(user.bio || "");
+      setEditingProfile(true);
+    }
+  };
+
+  const handleSaveProfile = () => {
+    if (currentUser?.id === user?.id) {
+      updateProfileMutation.mutate({ bio: editBio });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -168,6 +208,17 @@ export default function ProfilePage() {
                   </Badge>
                   {user.accountStatus !== "active" && (
                     <Badge variant="destructive">{user.accountStatus}</Badge>
+                  )}
+                  {isOwnProfile && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleEditProfile}
+                      data-testid="button-edit-profile"
+                    >
+                      <Edit2 className="w-4 h-4 mr-2" />
+                      Edit
+                    </Button>
                   )}
                 </div>
                 
@@ -360,6 +411,49 @@ export default function ProfilePage() {
 
         <ProfileCommentsSection userId={user.id} currentUserId={currentUser?.id} />
       </div>
+
+      <Dialog open={editingProfile} onOpenChange={setEditingProfile}>
+        <DialogContent data-testid="dialog-edit-profile">
+          <DialogHeader>
+            <DialogTitle>Edit Profile</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="bio" className="text-sm font-medium">Bio</label>
+              <Textarea
+                id="bio"
+                value={editBio}
+                onChange={(e) => setEditBio(e.target.value)}
+                placeholder="Tell us about yourself..."
+                className="min-h-24 resize-none"
+                data-testid="textarea-edit-bio"
+                maxLength={500}
+              />
+              <div className="flex justify-end">
+                <span className={`text-xs ${editBio.length > 500 ? "text-destructive" : "text-muted-foreground"}`}>
+                  {editBio.length}/500
+                </span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setEditingProfile(false)}
+              data-testid="button-cancel-profile-edit"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveProfile}
+              disabled={editBio.length > 500 || updateProfileMutation.isPending}
+              data-testid="button-save-profile-edit"
+            >
+              {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
