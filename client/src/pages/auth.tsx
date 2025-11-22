@@ -22,6 +22,7 @@ export default function AuthPage() {
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showAdminRegisterPassword, setShowAdminRegisterPassword] = useState(false);
   const [showAdminLoginPassword, setShowAdminLoginPassword] = useState(false);
+  const [showAdminCode, setShowAdminCode] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   
   const [registerData, setRegisterData] = useState({
@@ -301,22 +302,41 @@ export default function AuthPage() {
                     <Alert>
                       <ShieldCheck className="h-4 w-4" />
                       <AlertDescription className="text-sm">
-                        You need to answer a scientific question to register as an admin. Contact the system administrator for the answer.
+                        Contact the system administrator to obtain the administration code required for registration.
                       </AlertDescription>
                     </Alert>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="admin-scientific-answer">Scientific Question Answer</Label>
-                      <Input
-                        id="admin-scientific-answer"
-                        type="password"
-                        placeholder="Enter the answer provided by admin"
-                        value={adminRegisterData.scientificAnswer}
-                        onChange={(e) => setAdminRegisterData({ ...adminRegisterData, scientificAnswer: e.target.value })}
-                        required
-                        data-testid="input-admin-scientific-answer"
-                      />
-                      <p className="text-xs text-muted-foreground">You will need the admin invitation code provided by the system administrator</p>
+                      <Label htmlFor="admin-code">Administration Code</Label>
+                      <div className="relative">
+                        <Input
+                          id="admin-code"
+                          type={showAdminCode ? "text" : "password"}
+                          placeholder="Enter administration code"
+                          value={adminRegisterData.scientificAnswer}
+                          onChange={(e) => setAdminRegisterData({ ...adminRegisterData, scientificAnswer: e.target.value })}
+                          required
+                          data-testid="input-admin-code"
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                          onClick={() => setShowAdminCode(!showAdminCode)}
+                          data-testid="button-toggle-admin-code"
+                        >
+                          {showAdminCode ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Ask your system administrator for the administration code
+                      </p>
                     </div>
                     
                     <div className="space-y-2">
