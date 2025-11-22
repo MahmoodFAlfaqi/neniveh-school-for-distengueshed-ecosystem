@@ -502,6 +502,20 @@ export const insertTeacherReviewSchema = createInsertSchema(teacherReviews)
     comment: z.string().trim().optional(),
   });
 
+export const insertPostCommentSchema = createInsertSchema(postComments).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  content: z.string().trim().min(1, "Comment is required").max(1000, "Comment must not exceed 1000 characters"),
+});
+
+export const insertEventCommentSchema = createInsertSchema(eventComments).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  content: z.string().trim().min(1, "Comment is required").max(1000, "Comment must not exceed 1000 characters"),
+});
+
 export const insertProfileCommentSchema = createInsertSchema(profileComments).omit({
   id: true,
   createdAt: true,
@@ -573,6 +587,12 @@ export type Teacher = typeof teachers.$inferSelect;
 
 export type InsertTeacherReview = z.infer<typeof insertTeacherReviewSchema>;
 export type TeacherReview = typeof teacherReviews.$inferSelect;
+
+export type InsertPostComment = z.infer<typeof insertPostCommentSchema>;
+export type PostComment = typeof postComments.$inferSelect;
+
+export type InsertEventComment = z.infer<typeof insertEventCommentSchema>;
+export type EventComment = typeof eventComments.$inferSelect;
 
 export type InsertProfileComment = z.infer<typeof insertProfileCommentSchema>;
 export type ProfileComment = typeof profileComments.$inferSelect;
