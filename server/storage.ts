@@ -48,6 +48,25 @@ import bcrypt from "bcrypt";
 
 const CREDIBILITY_THRESHOLD_FOR_THREAT = 25.0; // Below this, account becomes "threatened"
 
+// Helper function to calculate average rating from user's 15 performance metrics
+function calculateAverageRating(user: any): number {
+  const metricKeys = [
+    'initiativeScore', 'communicationScore', 'cooperationScore', 'kindnessScore',
+    'perseveranceScore', 'fitnessScore', 'playingSkillsScore', 'inClassMisconductScore',
+    'outClassMisconductScore', 'literaryScienceScore', 'naturalScienceScore',
+    'electronicScienceScore', 'confidenceScore', 'temperScore', 'cheerfulnessScore'
+  ];
+  
+  const validScores = metricKeys
+    .map(key => user[key])
+    .filter((score): score is number => score !== null && score !== undefined);
+  
+  if (validScores.length === 0) return 0;
+  
+  const sum = validScores.reduce((acc, score) => acc + score, 0);
+  return sum / validScores.length;
+}
+
 export interface IStorage {
   // User management
   getUser(id: string): Promise<User | undefined>;
@@ -608,7 +627,7 @@ export class DatabaseStorage implements IStorage {
 
   async getPosts(scopeId?: string | null, userId?: string): Promise<any[]> {
     if (scopeId === null || scopeId === undefined) {
-      // Get public square posts (no scope) with author info
+      // Get public square posts (no scope) with author info including all rating metrics
       const results = await db
         .select({
           id: posts.id,
@@ -624,6 +643,21 @@ export class DatabaseStorage implements IStorage {
           authorName: users.name,
           authorRole: users.role,
           authorAvatarUrl: users.avatarUrl,
+          authorInitiativeScore: users.initiativeScore,
+          authorCommunicationScore: users.communicationScore,
+          authorCooperationScore: users.cooperationScore,
+          authorKindnessScore: users.kindnessScore,
+          authorPerseveranceScore: users.perseveranceScore,
+          authorFitnessScore: users.fitnessScore,
+          authorPlayingSkillsScore: users.playingSkillsScore,
+          authorInClassMisconductScore: users.inClassMisconductScore,
+          authorOutClassMisconductScore: users.outClassMisconductScore,
+          authorLiteraryScienceScore: users.literaryScienceScore,
+          authorNaturalScienceScore: users.naturalScienceScore,
+          authorElectronicScienceScore: users.electronicScienceScore,
+          authorConfidenceScore: users.confidenceScore,
+          authorTemperScore: users.temperScore,
+          authorCheerfulnessScore: users.cheerfulnessScore,
         })
         .from(posts)
         .leftJoin(users, eq(posts.authorId, users.id))
@@ -637,16 +671,37 @@ export class DatabaseStorage implements IStorage {
         .where(eq(postReactions.userId, userId)))
         .map(r => r.postId) : [];
       
-      // Transform to ensure author always exists and include liked status
-      return results.map(post => ({
-        ...post,
-        isLikedByCurrentUser: likedPostIds.includes(post.id),
-        author: {
-          name: post.authorName || "Unknown User",
-          role: post.authorRole || "student",
-          avatarUrl: post.authorAvatarUrl,
-        },
-      }));
+      // Transform to ensure author always exists and include liked status and average rating
+      return results.map(post => {
+        const authorData = {
+          initiativeScore: post.authorInitiativeScore,
+          communicationScore: post.authorCommunicationScore,
+          cooperationScore: post.authorCooperationScore,
+          kindnessScore: post.authorKindnessScore,
+          perseveranceScore: post.authorPerseveranceScore,
+          fitnessScore: post.authorFitnessScore,
+          playingSkillsScore: post.authorPlayingSkillsScore,
+          inClassMisconductScore: post.authorInClassMisconductScore,
+          outClassMisconductScore: post.authorOutClassMisconductScore,
+          literaryScienceScore: post.authorLiteraryScienceScore,
+          naturalScienceScore: post.authorNaturalScienceScore,
+          electronicScienceScore: post.authorElectronicScienceScore,
+          confidenceScore: post.authorConfidenceScore,
+          temperScore: post.authorTemperScore,
+          cheerfulnessScore: post.authorCheerfulnessScore,
+        };
+        
+        return {
+          ...post,
+          isLikedByCurrentUser: likedPostIds.includes(post.id),
+          author: {
+            name: post.authorName || "Unknown User",
+            role: post.authorRole || "student",
+            avatarUrl: post.authorAvatarUrl,
+            averageRating: post.authorRole === "student" ? calculateAverageRating(authorData) : null,
+          },
+        };
+      });
     }
     
     const results = await db
@@ -664,6 +719,21 @@ export class DatabaseStorage implements IStorage {
         authorName: users.name,
         authorRole: users.role,
         authorAvatarUrl: users.avatarUrl,
+        authorInitiativeScore: users.initiativeScore,
+        authorCommunicationScore: users.communicationScore,
+        authorCooperationScore: users.cooperationScore,
+        authorKindnessScore: users.kindnessScore,
+        authorPerseveranceScore: users.perseveranceScore,
+        authorFitnessScore: users.fitnessScore,
+        authorPlayingSkillsScore: users.playingSkillsScore,
+        authorInClassMisconductScore: users.inClassMisconductScore,
+        authorOutClassMisconductScore: users.outClassMisconductScore,
+        authorLiteraryScienceScore: users.literaryScienceScore,
+        authorNaturalScienceScore: users.naturalScienceScore,
+        authorElectronicScienceScore: users.electronicScienceScore,
+        authorConfidenceScore: users.confidenceScore,
+        authorTemperScore: users.temperScore,
+        authorCheerfulnessScore: users.cheerfulnessScore,
       })
       .from(posts)
       .leftJoin(users, eq(posts.authorId, users.id))
@@ -677,16 +747,37 @@ export class DatabaseStorage implements IStorage {
       .where(eq(postReactions.userId, userId)))
       .map(r => r.postId) : [];
     
-    // Transform to ensure author always exists and include liked status
-    return results.map(post => ({
-      ...post,
-      isLikedByCurrentUser: likedPostIds.includes(post.id),
-      author: {
-        name: post.authorName || "Unknown User",
-        role: post.authorRole || "student",
-        avatarUrl: post.authorAvatarUrl,
-      },
-    }));
+    // Transform to ensure author always exists and include liked status and average rating
+    return results.map(post => {
+      const authorData = {
+        initiativeScore: post.authorInitiativeScore,
+        communicationScore: post.authorCommunicationScore,
+        cooperationScore: post.authorCooperationScore,
+        kindnessScore: post.authorKindnessScore,
+        perseveranceScore: post.authorPerseveranceScore,
+        fitnessScore: post.authorFitnessScore,
+        playingSkillsScore: post.authorPlayingSkillsScore,
+        inClassMisconductScore: post.authorInClassMisconductScore,
+        outClassMisconductScore: post.authorOutClassMisconductScore,
+        literaryScienceScore: post.authorLiteraryScienceScore,
+        naturalScienceScore: post.authorNaturalScienceScore,
+        electronicScienceScore: post.authorElectronicScienceScore,
+        confidenceScore: post.authorConfidenceScore,
+        temperScore: post.authorTemperScore,
+        cheerfulnessScore: post.authorCheerfulnessScore,
+      };
+      
+      return {
+        ...post,
+        isLikedByCurrentUser: likedPostIds.includes(post.id),
+        author: {
+          name: post.authorName || "Unknown User",
+          role: post.authorRole || "student",
+          avatarUrl: post.authorAvatarUrl,
+          averageRating: post.authorRole === "student" ? calculateAverageRating(authorData) : null,
+        },
+      };
+    });
   }
 
   async getPost(id: string): Promise<Post | undefined> {

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Heart, MessageSquare, Send, TrendingUp } from "lucide-react";
+import { Heart, MessageSquare, Send, TrendingUp, Star } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ScopeSelector } from "@/components/ScopeSelector";
 import { useHasAccessToScope } from "@/hooks/use-digital-keys";
@@ -29,6 +29,12 @@ type Post = {
   authorRole: string;
   authorAvatarUrl: string | null;
   isLikedByCurrentUser: boolean;
+  author: {
+    name: string;
+    role: string;
+    avatarUrl: string | null;
+    averageRating: number | null;
+  };
 };
 
 export default function NewsPage() {
@@ -219,6 +225,15 @@ export default function NewsPage() {
                         <Badge variant="secondary" className="text-xs">
                           {post.authorRole}
                         </Badge>
+                        {post.author.averageRating !== null && post.author.averageRating > 0 && (
+                          <>
+                            <span>•</span>
+                            <div className="flex items-center gap-1">
+                              <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                              <span className="text-xs font-medium">{post.author.averageRating.toFixed(1)}</span>
+                            </div>
+                          </>
+                        )}
                         <span>•</span>
                         <span>{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
                       </div>
