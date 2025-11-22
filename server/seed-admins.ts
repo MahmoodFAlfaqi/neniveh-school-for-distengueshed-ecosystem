@@ -23,7 +23,14 @@ export async function seedAdminAccounts() {
     console.log("[SEED] Starting admin account initialization...");
 
     // Get admin password from environment variable
-    const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD || "NOTHINg27$";
+    const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD;
+    
+    if (!adminPassword) {
+      console.error("[SEED] ⚠️  ADMIN_DEFAULT_PASSWORD environment variable is not set!");
+      console.error("[SEED] ⚠️  Admin accounts will not be created. Please set this variable.");
+      return; // Skip seeding if no password is provided
+    }
+
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
     for (const adminData of ADMIN_ACCOUNTS) {

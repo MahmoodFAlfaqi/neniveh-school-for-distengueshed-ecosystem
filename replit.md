@@ -132,6 +132,28 @@ Drizzle ORM with a PostgreSQL dialect is used for database interactions. The sch
 -   **Fonts**: Google Fonts (Inter, Outfit) via CDN for modern typography.
 -   **Session Storage**: `express-session` with `connect-pg-simple` for PostgreSQL-backed persistent session storage.
 
+## Admin Account Seeding System
+
+The application includes an automatic admin account initialization system that runs on server startup. This ensures admin accounts are always available in both development and production environments.
+
+**How it works:**
+- On server startup, the system automatically creates 2 admin accounts if they don't exist
+- Admin accounts are defined in `server/seed-admins.ts`
+- Password is controlled via the `ADMIN_DEFAULT_PASSWORD` environment variable
+- The system is idempotent (won't create duplicates on multiple startups)
+- If the password changes in the environment variable, existing accounts will be updated
+
+**Admin Accounts:**
+1. **Mahmood.Fawaz.AL-Faqi** (keneyreplitalfaqi+mahmood@gmail.com)
+2. **Mustafa.Mouied.Al-Ali** (keneyreplitalfaqi+mustafa@gmail.com)
+
+**Environment Variable:**
+- `ADMIN_DEFAULT_PASSWORD` - Set in shared environment, used for all admin accounts
+- Current password: `NOTHINg27$`
+- Both emails route to: `keneyreplitalfaqi@gmail.com` (using Gmail alias feature)
+
+This solution eliminates the need to manually create admin accounts in the production database after publishing.
+
 ## Recent Changes (November 22, 2025)
 
 1. **Account Cleanup**: Deleted 6 accounts (Kena, FGSDG, test.admin, and 3 student accounts), keeping only Mahmood.Fawaz.AL-Faqi and Mustafa.Mouied.Al-Ali admin accounts
