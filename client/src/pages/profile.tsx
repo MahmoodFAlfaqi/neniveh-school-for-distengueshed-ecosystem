@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { Star, Award, TrendingUp, User as UserIcon, Calendar, MessageSquare, Edit2, Trash2 } from "lucide-react";
+import { Star, Award, TrendingUp, User as UserIcon, Calendar, MessageSquare, Edit2, Trash2, ChevronDown } from "lucide-react";
 import { PeerRatingForm } from "@/components/PeerRatingForm";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -110,6 +110,7 @@ export default function ProfilePage() {
   const [editBio, setEditBio] = useState("");
   const [editGrade, setEditGrade] = useState("");
   const [editClassName, setEditClassName] = useState("");
+  const [expandMetrics, setExpandMetrics] = useState(false);
   const { toast } = useToast();
 
   const { data: user, isLoading } = useQuery<User>({
@@ -397,57 +398,72 @@ export default function ProfilePage() {
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Individual Performance Metrics</CardTitle>
-                <CardDescription>
-                  Detailed peer-rated metrics (1-5 stars)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {STAT_METRICS.map((metric) => {
-                    let score = user[metric.key] as number | null;
-                    // Inverse misconduct and temper scores for display
-                    if (metric.isInverse && score !== null && score !== undefined && score !== 0) {
-                      score = 6 - score;
-                    }
-                    const displayScore = score || 3;
-                    
-                    return (
-                      <div
-                        key={metric.key}
-                        className="flex items-center justify-between p-2 rounded-lg border"
-                        data-testid={`stat-${metric.key}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{metric.label}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {metric.arabicLabel}
-                          </div>
-                          {metric.isInverse && (
-                            <div className="text-xs text-yellow-600 dark:text-yellow-500">
-                              Lower is better (inverted display)
+              <button
+                onClick={() => setExpandMetrics(!expandMetrics)}
+                className="w-full hover-elevate active-elevate-2"
+                data-testid="button-toggle-metrics"
+              >
+                <CardHeader className="cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 text-left">
+                      <CardTitle>Individual Performance Metrics</CardTitle>
+                      <CardDescription>
+                        Detailed peer-rated metrics (1-5 stars)
+                      </CardDescription>
+                    </div>
+                    <ChevronDown 
+                      className={`w-5 h-5 transition-transform duration-200 flex-shrink-0 ${expandMetrics ? "rotate-180" : ""}`}
+                    />
+                  </div>
+                </CardHeader>
+              </button>
+              {expandMetrics && (
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {STAT_METRICS.map((metric) => {
+                      let score = user[metric.key] as number | null;
+                      // Inverse misconduct and temper scores for display
+                      if (metric.isInverse && score !== null && score !== undefined && score !== 0) {
+                        score = 6 - score;
+                      }
+                      const displayScore = score || 3;
+                      
+                      return (
+                        <div
+                          key={metric.key}
+                          className="flex items-center justify-between p-2 rounded-lg border"
+                          data-testid={`stat-${metric.key}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{metric.label}</div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {metric.arabicLabel}
                             </div>
-                          )}
+                            {metric.isInverse && (
+                              <div className="text-xs text-yellow-600 dark:text-yellow-500">
+                                Lower is better (inverted display)
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-0.5 ml-2">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`w-3 h-3 ${
+                                  i < Math.round(displayScore)
+                                    ? "fill-yellow-400 text-yellow-400"
+                                    : "text-muted-foreground"
+                                }`}
+                              />
+                            ))}
+                            <span className="ml-1 text-xs font-medium">{displayScore.toFixed(1)}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-0.5 ml-2">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`w-3 h-3 ${
-                                i < Math.round(displayScore)
-                                  ? "fill-yellow-400 text-yellow-400"
-                                  : "text-muted-foreground"
-                              }`}
-                            />
-                          ))}
-                          <span className="ml-1 text-xs font-medium">{displayScore.toFixed(1)}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              )}
             </Card>
           </>
         )}
