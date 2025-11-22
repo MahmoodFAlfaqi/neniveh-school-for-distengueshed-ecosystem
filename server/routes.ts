@@ -114,7 +114,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Login (username + password)
   app.post("/api/auth/login", async (req, res) => {
     try {
-      console.log("[AUTH] Login attempt:", { username: req.body.username, hasPassword: !!req.body.password });
       const { username, password } = req.body;
       
       if (!username || !password) {

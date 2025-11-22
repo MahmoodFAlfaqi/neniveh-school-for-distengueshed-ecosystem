@@ -116,7 +116,6 @@ async function seedSpecialAdmins() {
 
     console.log("\n✅ Special admin seeding complete!");
     console.log(`\n🔐 Login credentials for both admins:`);
-    console.log(`   Password: ${SPECIAL_ADMIN_PASSWORD}`);
     console.log(`\n📝 Usernames:`);
     specialAdmins.forEach((admin) => {
       console.log(`   - ${admin.username}`);
