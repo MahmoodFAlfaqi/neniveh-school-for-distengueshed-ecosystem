@@ -6,8 +6,15 @@ import { Label } from "@/components/ui/label";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, Copy, Check, ChevronUp, ChevronDown } from "lucide-react";
+import { Trash2, Plus, Copy, Check, ChevronUp, ChevronDown, Crown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type StudentId = {
   id: string;
@@ -53,6 +60,9 @@ export default function AdminPage() {
   const [idSearchQuery, setIdSearchQuery] = useState("");
   const [idSortField, setIdSortField] = useState<SortField>("name");
   const [idSortDirection, setIdSortDirection] = useState<SortDirection>("asc");
+  
+  // Promote to admin state
+  const [selectedUserToPromote, setSelectedUserToPromote] = useState<string>("");
 
   const { data: studentIds, isLoading } = useQuery<StudentId[]>({
     queryKey: ["/api/admin/student-ids"],
@@ -129,6 +139,38 @@ export default function AdminPage() {
   const handleDeleteStudent = (userId: string, studentName: string) => {
     if (window.confirm(`Are you sure you want to delete ${studentName}'s account and all associated data? This action cannot be undone.`)) {
       deleteAccountMutation.mutate(userId);
+    }
+  };
+
+  const promoteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest("POST", "/api/admin/promote", { userId });
+    },
+    onSuccess: () => {
+      toast({
+        title: "User promoted to admin",
+        description: "The user has been successfully promoted to admin",
+      });
+      setSelectedUserToPromote("");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/students"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to promote user",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handlePromoteUser = () => {
+    if (!selectedUserToPromote) return;
+    
+    const user = students?.find(s => s.id === selectedUserToPromote);
+    if (!user) return;
+
+    if (window.confirm(`Are you sure you want to promote ${user.name} to admin? They will have full administrative privileges.`)) {
+      promoteMutation.mutate(selectedUserToPromote);
     }
   };
 
@@ -543,6 +585,66 @@ export default function AdminPage() {
                   ))}
                 </div>
               )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Crown className="w-5 h-5" />
+              Promote User to Admin
+            </CardTitle>
+            <CardDescription>
+              Grant admin privileges to a student without losing your own admin status. This is different from the handover feature.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="select-user-promote">Select Student to Promote</Label>
+                <Select
+                  value={selectedUserToPromote}
+                  onValueChange={setSelectedUserToPromote}
+                >
+                  <SelectTrigger id="select-user-promote" data-testid="select-user-promote">
+                    <SelectValue placeholder="Choose a student..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {students && students.length > 0 ? (
+                      students.map((student) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          {student.name} (@{student.username}) - Grade {student.grade}-{student.className}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>
+                        No students available
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <Button
+                onClick={handlePromoteUser}
+                disabled={!selectedUserToPromote || promoteMutation.isPending}
+                data-testid="button-promote-to-admin"
+                className="w-full"
+              >
+                <Crown className="w-4 h-4 mr-2" />
+                {promoteMutation.isPending ? "Promoting..." : "Promote to Admin"}
+              </Button>
+
+              <div className="rounded-lg bg-muted p-4 space-y-2">
+                <h4 className="font-semibold text-sm">Important Notes:</h4>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>This action promotes a student to admin status</li>
+                  <li>You will keep your admin privileges (inheritance model)</li>
+                  <li>The promoted user will have full administrative access</li>
+                  <li>This is different from "handover" which transfers privileges</li>
+                </ul>
+              </div>
             </div>
           </CardContent>
         </Card>

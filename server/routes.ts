@@ -510,6 +510,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Promote user to admin (requires current user to be admin)
+  app.post("/api/admin/promote", requireAdmin, async (req, res) => {
+    try {
+      const { userId } = req.body;
+      const currentAdminId = req.session.userId!;
+      
+      if (!userId) {
+        return res.status(400).json({ message: "User ID required" });
+      }
+      
+      const result = await storage.promoteUserToAdmin(currentAdminId, userId);
+      
+      if (!result.success) {
+        return res.status(400).json({ message: result.message });
+      }
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to promote user to admin:", error);
+      res.status(500).json({ message: "Failed to promote user to admin" });
+    }
+  });
+
   // ==================== CREDIBILITY & REPUTATION ENGINE ====================
   
   // Calculate authenticated user's reputation

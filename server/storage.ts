@@ -108,6 +108,9 @@ export interface IStorage {
   transferAdminPrivileges(currentAdminId: string, successorId: string, notes?: string): Promise<{ success: boolean; message: string; succession?: AdminSuccession }>;
   getAdminSuccessionHistory(): Promise<AdminSuccession[]>;
   
+  // Admin Promotion (without demotion)
+  promoteUserToAdmin(currentAdminId: string, userId: string): Promise<{ success: boolean; message: string }>;
+  
   // Credibility & Reputation Engine
   calculateUserReputation(userId: string): Promise<number>;
   checkAndUpdateAccountStatus(userId: string): Promise<void>;
@@ -714,6 +717,51 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(adminSuccessions)
       .orderBy(desc(adminSuccessions.handoverDate));
+  }
+
+  /**
+   * Admin Promotion: Allow an admin to promote another user to admin role
+   * WITHOUT demoting themselves (different from handover)
+   */
+  async promoteUserToAdmin(
+    currentAdminId: string,
+    userId: string
+  ): Promise<{ success: boolean; message: string }> {
+    const currentAdmin = await this.getUser(currentAdminId);
+    if (!currentAdmin || currentAdmin.role !== "admin") {
+      return { success: false, message: "Only admins can promote users" };
+    }
+
+    const targetUser = await this.getUser(userId);
+    if (!targetUser) {
+      return { success: false, message: "User not found" };
+    }
+
+    if (targetUser.role === "admin") {
+      return { success: false, message: "User is already an admin" };
+    }
+
+    if (currentAdminId === userId) {
+      return { success: false, message: "You are already an admin" };
+    }
+
+    try {
+      await db
+        .update(users)
+        .set({ 
+          role: "admin",
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+
+      return { 
+        success: true, 
+        message: `Successfully promoted ${targetUser.name} to admin` 
+      };
+    } catch (error) {
+      console.error("Error promoting user to admin:", error);
+      return { success: false, message: "Failed to promote user to admin" };
+    }
   }
 
   // ==================== CREDIBILITY & REPUTATION ENGINE ====================
