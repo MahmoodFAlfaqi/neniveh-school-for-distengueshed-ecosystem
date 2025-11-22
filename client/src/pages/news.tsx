@@ -357,12 +357,17 @@ export default function NewsPage() {
                         />
                         <span>{post.likesCount}</span>
                       </Button>
-                      <Collapsible open={showCommentsForPostId === post.id} onOpenChange={(open) => setShowCommentsForPostId(open ? post.id : null)} className="flex items-center gap-2">
-                        <CollapsibleTrigger className="flex items-center gap-2 text-sm hover-elevate px-2 py-1 rounded-md" data-testid={`button-comment-${post.id}`}>
-                          <MessageSquare className="w-4 h-4" />
-                          <span>{post.commentsCount}</span>
-                          {showCommentsForPostId === post.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      <Collapsible open={showCommentsForPostId === post.id} onOpenChange={(open) => setShowCommentsForPostId(open ? post.id : null)} className="w-full">
+                        <CollapsibleTrigger asChild>
+                          <Button variant="ghost" size="sm" className="gap-2" data-testid={`button-comment-${post.id}`}>
+                            <MessageSquare className="w-4 h-4" />
+                            <span>{post.commentsCount}</span>
+                            {showCommentsForPostId === post.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </Button>
                         </CollapsibleTrigger>
+                        <CollapsibleContent className="w-full pt-3">
+                          <PostCommentSection postId={post.id} />
+                        </CollapsibleContent>
                       </Collapsible>
                     </div>
                     
@@ -390,12 +395,6 @@ export default function NewsPage() {
                       <span className="text-xs ml-0.5 font-semibold">{(post.currentUserAccuracyRating || 0).toFixed(1)}</span>
                     </div>
                   </div>
-
-                  <Collapsible open={showCommentsForPostId === post.id} className="w-full">
-                    <CollapsibleContent className="space-y-3 pt-2 w-full">
-                      <PostCommentSection postId={post.id} />
-                    </CollapsibleContent>
-                  </Collapsible>
                 </CardFooter>
               </Card>
             ))
@@ -490,12 +489,12 @@ function PostCommentSection({ postId }: { postId: string }) {
             data-testid="input-post-comment"
           />
           <Button size="sm" onClick={handleSubmitComment} disabled={!commentText.trim() || createCommentMutation.isPending} data-testid="button-submit-comment">
-            <Send className="w-4 h-4" />
+            <Send className="w-3.5 h-3.5" />
           </Button>
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 max-h-64 overflow-y-auto">
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading comments...</p>
         ) : comments.length === 0 ? (
