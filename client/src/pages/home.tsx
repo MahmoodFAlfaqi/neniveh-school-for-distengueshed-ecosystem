@@ -2,8 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Calendar, Trophy, TrendingUp, Newspaper, Clock } from "lucide-react";
+import { Calendar, Trophy, TrendingUp, Newspaper, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
+import { useState, useMemo } from "react";
+import { Button } from "@/components/ui/button";
 
 type User = {
   id: string;
@@ -47,6 +49,8 @@ export default function Home() {
     queryKey: ["/api/events"],
   });
 
+  const [calendarDate, setCalendarDate] = useState(new Date());
+
   const getUserInitials = (name: string) => {
     return name
       .split(" ")
@@ -56,7 +60,42 @@ export default function Home() {
       .slice(0, 2);
   };
 
-  const upcomingEvents = events.slice(0, 2);
+  // Calendar logic
+  const getDaysInMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
+
+  const calendarDays = useMemo(() => {
+    const days = [];
+    const daysInMonth = getDaysInMonth(calendarDate);
+    const firstDay = getFirstDayOfMonth(calendarDate);
+
+    for (let i = 0; i < firstDay; i++) {
+      days.push(null);
+    }
+
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(i);
+    }
+
+    return days;
+  }, [calendarDate]);
+
+  const eventDates = useMemo(() => {
+    return events.map(e => new Date(e.date).getDate()).filter(d => !isNaN(d));
+  }, [events]);
+
+  const prevMonth = () => {
+    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1));
+  };
+
+  const nextMonth = () => {
+    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1));
+  };
 
   return (
     <div className="h-full overflow-y-auto bg-gradient-to-br from-background via-background to-muted/20">
@@ -113,31 +152,71 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            {/* Quick Events */}
+            {/* Mini Calendar */}
             <Link href="/schedule" className="md:col-span-2">
               <Card className="hover-elevate active-elevate-2 cursor-pointer h-full" data-testid="card-upcoming-events">
-                <CardContent className="pt-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="w-4 h-4 text-primary" />
-                    <h2 className="text-sm font-semibold">Upcoming</h2>
+                <CardContent className="pt-3 pb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-sm font-semibold flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      Calendar
+                    </h2>
+                    <span className="text-[0.65rem] text-muted-foreground">
+                      {calendarDate.toLocaleString('default', { month: 'short', year: 'numeric' })}
+                    </span>
                   </div>
-                  
-                  {upcomingEvents.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No events</p>
-                  ) : (
-                    <div className="space-y-1">
-                      {upcomingEvents.map((event) => (
-                        <div
-                          key={event.id}
-                          className="flex items-center gap-2 p-1.5 rounded-lg bg-rose-50/50 dark:bg-rose-950/30 text-xs"
-                          data-testid={`event-${event.id}`}
-                        >
-                          <div className="w-1 h-1 rounded-full bg-rose-600 dark:bg-rose-400 flex-shrink-0" />
-                          <p className="truncate flex-1">{event.title}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+
+                  {/* Month Navigation */}
+                  <div className="flex items-center justify-between mb-2 px-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        prevMonth();
+                      }}
+                    >
+                      <ChevronLeft className="w-3 h-3" />
+                    </Button>
+                    <span className="text-[0.7rem] font-medium">
+                      {calendarDate.toLocaleString('default', { month: 'short', year: 'numeric' })}
+                    </span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        nextMonth();
+                      }}
+                    >
+                      <ChevronRight className="w-3 h-3" />
+                    </Button>
+                  </div>
+
+                  {/* Compact Calendar Grid */}
+                  <div className="grid grid-cols-7 gap-0.5 px-1">
+                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => (
+                      <div key={day} className="text-center text-[0.55rem] font-bold text-muted-foreground py-0.5">
+                        {day}
+                      </div>
+                    ))}
+                    {calendarDays.map((day, idx) => (
+                      <div
+                        key={idx}
+                        className={`aspect-square flex items-center justify-center text-[0.6rem] rounded-sm ${
+                          day === null 
+                            ? '' 
+                            : eventDates.includes(day)
+                            ? 'bg-primary/40 text-primary font-bold'
+                            : 'text-foreground'
+                        }`}
+                      >
+                        {day}
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             </Link>
