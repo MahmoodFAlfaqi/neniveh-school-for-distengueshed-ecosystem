@@ -250,8 +250,8 @@ export default function ProfilePage() {
                   {Array.from({ length: 5 }).map((_, i) => {
                     const scores = STAT_METRICS.map((metric) => {
                       let score = user[metric.key] as number | null;
-                      // Inverse misconduct and temper scores
-                      if (metric.isInverse && score !== null) {
+                      // Skip inverse transformation for null/0 scores
+                      if (metric.isInverse && score !== null && score !== undefined && score !== 0) {
                         score = 6 - score; // Convert 1->5, 2->4, 3->3, 4->2, 5->1
                       }
                       return score;
@@ -277,8 +277,8 @@ export default function ProfilePage() {
                   {(() => {
                     const scores = STAT_METRICS.map((metric) => {
                       let score = user[metric.key] as number | null;
-                      // Inverse misconduct and temper scores
-                      if (metric.isInverse && score !== null) {
+                      // Skip inverse transformation for null/0 scores
+                      if (metric.isInverse && score !== null && score !== undefined && score !== 0) {
                         score = 6 - score;
                       }
                       return score;
