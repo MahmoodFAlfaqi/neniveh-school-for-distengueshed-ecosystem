@@ -213,6 +213,26 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Failed Login Attempts - Track login failures for rate limiting (3 attempts max)
+export const failedLoginAttempts = pgTable("failed_login_attempts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull(), // Track by username (not userId since user might not exist)
+  attemptCount: integer("attempt_count").notNull().default(1),
+  lastAttemptAt: timestamp("last_attempt_at").notNull().defaultNow(),
+  lockedUntil: timestamp("locked_until"), // Account locked until this time (null if not locked)
+});
+
+// Remember Me Tokens - Device tracking for "remember me" functionality
+export const rememberMeTokens = pgTable("remember_me_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(), // Secure random token stored in cookie
+  deviceFingerprint: text("device_fingerprint"), // Optional device identifier
+  lastUsedAt: timestamp("last_used_at").notNull().defaultNow(), // Track last activity
+  expiresAt: timestamp("expires_at").notNull(), // Token expires after 7 days of inactivity
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Teacher Reviews
 export const teacherReviews = pgTable("teacher_reviews", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -656,3 +676,20 @@ export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTo
 
 export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
+export const insertFailedLoginAttemptSchema = createInsertSchema(failedLoginAttempts).omit({
+  id: true,
+  lastAttemptAt: true,
+});
+
+export type InsertFailedLoginAttempt = z.infer<typeof insertFailedLoginAttemptSchema>;
+export type FailedLoginAttempt = typeof failedLoginAttempts.$inferSelect;
+
+export const insertRememberMeTokenSchema = createInsertSchema(rememberMeTokens).omit({
+  id: true,
+  createdAt: true,
+  lastUsedAt: true,
+});
+
+export type InsertRememberMeToken = z.infer<typeof insertRememberMeTokenSchema>;
+export type RememberMeToken = typeof rememberMeTokens.$inferSelect;
