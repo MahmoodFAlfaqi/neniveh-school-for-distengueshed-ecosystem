@@ -11,9 +11,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, MapPin, Clock, Users, Plus, ChevronDown, ChevronUp, Star, Send } from "lucide-react";
+import { Calendar, MapPin, Clock, Users, Plus, ChevronDown, ChevronUp, Star, Send, MessageSquare } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
-import { Input } from "@/components/ui/input";
 import {
   Collapsible,
   CollapsibleContent,
