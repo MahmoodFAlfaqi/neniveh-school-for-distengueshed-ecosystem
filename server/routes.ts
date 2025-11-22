@@ -18,6 +18,7 @@ import {
   insertEventCommentSchema,
   insertAdminStudentIdSchema,
   insertPeerRatingSchema,
+  insertPostAccuracyRatingSchema,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { z } from "zod";
@@ -622,6 +623,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ liked: !!reaction });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch like status" });
+    }
+  });
+
+  // Rate post accuracy (1-5 stars)
+  app.post("/api/posts/:id/rate-accuracy", requireAuth, async (req, res) => {
+    try {
+      const postId = req.params.id;
+      const userId = req.session.userId!;
+      const { rating } = req.body;
+      
+      // Validate rating
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be an integer between 1 and 5" });
+      }
+      
+      const result = await storage.ratePostAccuracy(postId, userId, rating);
+      res.json({ success: true, rating: result.rating });
+    } catch (error) {
+      console.error("Failed to rate post accuracy:", error);
+      res.status(500).json({ message: "Failed to rate post accuracy" });
     }
   });
 

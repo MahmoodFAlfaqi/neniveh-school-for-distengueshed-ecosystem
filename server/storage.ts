@@ -6,6 +6,7 @@ import {
   adminStudentIds,
   posts,
   postReactions,
+  postAccuracyRatings,
   postComments,
   events,
   eventRsvps,
@@ -29,6 +30,8 @@ import {
   type InsertPost,
   type PostReaction,
   type InsertPostReaction,
+  type PostAccuracyRating,
+  type InsertPostAccuracyRating,
   type PostComment,
   type InsertPostComment,
   type Event,
@@ -112,6 +115,8 @@ export interface IStorage {
   getPosts(scopeId?: string | null, userId?: string): Promise<any[]>;
   getPost(id: string): Promise<Post | undefined>;
   updatePostCredibility(postId: string, rating: number): Promise<Post | undefined>;
+  ratePostAccuracy(postId: string, userId: string, rating: number): Promise<PostAccuracyRating>;
+  getUserPostAccuracyRating(postId: string, userId: string): Promise<PostAccuracyRating | undefined>;
   
   // Events
   createEvent(event: InsertEvent): Promise<Event>;
@@ -678,12 +683,18 @@ export class DatabaseStorage implements IStorage {
         .where(sql`${posts.scopeId} IS NULL`)
         .orderBy(desc(posts.createdAt));
       
-      // Get user's liked posts if userId provided
+      // Get user's liked posts and accuracy ratings if userId provided
       const likedPostIds = userId ? (await db
         .select({ postId: postReactions.postId })
         .from(postReactions)
         .where(eq(postReactions.userId, userId)))
         .map(r => r.postId) : [];
+      
+      const accuracyRatings = userId ? (await db
+        .select({ postId: postAccuracyRatings.postId, rating: postAccuracyRatings.rating })
+        .from(postAccuracyRatings)
+        .where(eq(postAccuracyRatings.userId, userId)))
+        .reduce((map, r) => ({ ...map, [r.postId]: r.rating }), {} as Record<string, number>) : {};
       
       // Transform to ensure author always exists and include liked status and average rating
       return results.map(post => {
@@ -708,6 +719,7 @@ export class DatabaseStorage implements IStorage {
         return {
           ...post,
           isLikedByCurrentUser: likedPostIds.includes(post.id),
+          currentUserAccuracyRating: accuracyRatings[post.id] || null,
           author: {
             name: post.authorName || "Unknown User",
             role: post.authorRole || "student",
@@ -754,12 +766,18 @@ export class DatabaseStorage implements IStorage {
       .where(eq(posts.scopeId, scopeId))
       .orderBy(desc(posts.createdAt));
     
-    // Get user's liked posts if userId provided
+    // Get user's liked posts and accuracy ratings if userId provided
     const likedPostIds = userId ? (await db
       .select({ postId: postReactions.postId })
       .from(postReactions)
       .where(eq(postReactions.userId, userId)))
       .map(r => r.postId) : [];
+    
+    const accuracyRatings = userId ? (await db
+      .select({ postId: postAccuracyRatings.postId, rating: postAccuracyRatings.rating })
+      .from(postAccuracyRatings)
+      .where(eq(postAccuracyRatings.userId, userId)))
+      .reduce((map, r) => ({ ...map, [r.postId]: r.rating }), {} as Record<string, number>) : {};
     
     // Transform to ensure author always exists and include liked status and average rating
     return results.map(post => {
@@ -784,6 +802,7 @@ export class DatabaseStorage implements IStorage {
       return {
         ...post,
         isLikedByCurrentUser: likedPostIds.includes(post.id),
+        currentUserAccuracyRating: accuracyRatings[post.id] || null,
         author: {
           name: post.authorName || "Unknown User",
           role: post.authorRole || "student",
@@ -821,6 +840,69 @@ export class DatabaseStorage implements IStorage {
     }
     
     return post || undefined;
+  }
+
+  async ratePostAccuracy(postId: string, userId: string, rating: number): Promise<PostAccuracyRating> {
+    // Check if rating already exists
+    const existing = await db
+      .select()
+      .from(postAccuracyRatings)
+      .where(and(
+        eq(postAccuracyRatings.postId, postId),
+        eq(postAccuracyRatings.userId, userId)
+      ));
+
+    let result;
+    if (existing.length > 0) {
+      // Update existing rating
+      const [updated] = await db
+        .update(postAccuracyRatings)
+        .set({ 
+          rating,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(postAccuracyRatings.postId, postId),
+          eq(postAccuracyRatings.userId, userId)
+        ))
+        .returning();
+      result = updated;
+    } else {
+      // Create new rating
+      const [created] = await db
+        .insert(postAccuracyRatings)
+        .values({ postId, userId, rating })
+        .returning();
+      result = created;
+    }
+
+    // Recalculate post author's credibility based on average post accuracy ratings
+    const post = await this.getPost(postId);
+    if (post) {
+      const allRatings = await db
+        .select()
+        .from(postAccuracyRatings)
+        .where(eq(postAccuracyRatings.postId, postId));
+      
+      const avgAccuracy = allRatings.length > 0
+        ? (allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length) * 20
+        : 50;
+      
+      await this.updatePostCredibility(postId, avgAccuracy);
+    }
+
+    return result;
+  }
+
+  async getUserPostAccuracyRating(postId: string, userId: string): Promise<PostAccuracyRating | undefined> {
+    const [rating] = await db
+      .select()
+      .from(postAccuracyRatings)
+      .where(and(
+        eq(postAccuracyRatings.postId, postId),
+        eq(postAccuracyRatings.userId, userId)
+      ));
+    return rating || undefined;
   }
 
   // ==================== EVENTS ====================

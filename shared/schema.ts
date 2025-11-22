@@ -213,6 +213,19 @@ export const teacherReviews = pgTable("teacher_reviews", {
   uniqueTeacherStudent: unique().on(table.teacherId, table.studentId),
 }));
 
+// Post Accuracy Ratings - users rate post accuracy (1-5 stars)
+export const postAccuracyRatings = pgTable("post_accuracy_ratings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  rating: integer("rating").notNull(), // 1-5 stars, default 3
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueUserPost: unique().on(table.postId, table.userId),
+}));
+
 // Post Comments
 export const postComments = pgTable("post_comments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -567,11 +580,22 @@ export const insertPostReactionSchema = createInsertSchema(postReactions).omit({
   createdAt: true,
 });
 
+export const insertPostAccuracyRatingSchema = createInsertSchema(postAccuracyRatings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  rating: z.number().int().min(1).max(5).default(3),
+});
+
 export type InsertPost = z.infer<typeof insertPostSchema>;
 export type Post = typeof posts.$inferSelect;
 
 export type InsertPostReaction = z.infer<typeof insertPostReactionSchema>;
 export type PostReaction = typeof postReactions.$inferSelect;
+
+export type InsertPostAccuracyRating = z.infer<typeof insertPostAccuracyRatingSchema>;
+export type PostAccuracyRating = typeof postAccuracyRatings.$inferSelect;
 
 export type InsertEvent = z.infer<typeof insertEventSchema>;
 export type Event = typeof events.$inferSelect;

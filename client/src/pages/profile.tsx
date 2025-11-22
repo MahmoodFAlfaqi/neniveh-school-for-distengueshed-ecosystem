@@ -248,7 +248,14 @@ export default function ProfilePage() {
               <CardContent className="flex flex-col items-center">
                 <div className="flex items-center gap-1 mb-2">
                   {Array.from({ length: 5 }).map((_, i) => {
-                    const scores = STAT_METRICS.map((metric) => user[metric.key] as number | null);
+                    const scores = STAT_METRICS.map((metric) => {
+                      let score = user[metric.key] as number | null;
+                      // Inverse misconduct and temper scores
+                      if (metric.isInverse && score !== null) {
+                        score = 6 - score; // Convert 1->5, 2->4, 3->3, 4->2, 5->1
+                      }
+                      return score;
+                    });
                     const validScores = scores.filter((s) => s !== null) as number[];
                     const avgScore = validScores.length > 0 
                       ? validScores.reduce((sum, s) => sum + s, 0) / validScores.length 
@@ -268,7 +275,14 @@ export default function ProfilePage() {
                 </div>
                 <div className="text-3xl font-bold">
                   {(() => {
-                    const scores = STAT_METRICS.map((metric) => user[metric.key] as number | null);
+                    const scores = STAT_METRICS.map((metric) => {
+                      let score = user[metric.key] as number | null;
+                      // Inverse misconduct and temper scores
+                      if (metric.isInverse && score !== null) {
+                        score = 6 - score;
+                      }
+                      return score;
+                    });
                     const validScores = scores.filter((s) => s !== null) as number[];
                     const avgScore = validScores.length > 0 
                       ? validScores.reduce((sum, s) => sum + s, 0) / validScores.length 
@@ -290,7 +304,11 @@ export default function ProfilePage() {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {STAT_METRICS.map((metric) => {
-                    const score = user[metric.key] as number | null;
+                    let score = user[metric.key] as number | null;
+                    // Inverse misconduct and temper scores for display
+                    if (metric.isInverse && score !== null) {
+                      score = 6 - score;
+                    }
                     const displayScore = score || 0;
                     
                     return (
@@ -306,7 +324,7 @@ export default function ProfilePage() {
                           </div>
                           {metric.isInverse && (
                             <div className="text-xs text-yellow-600 dark:text-yellow-500">
-                              Lower is better
+                              Lower is better (inverted display)
                             </div>
                           )}
                         </div>

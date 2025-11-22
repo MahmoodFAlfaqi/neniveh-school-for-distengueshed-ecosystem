@@ -31,6 +31,7 @@ type Post = {
   authorRole: string;
   authorAvatarUrl: string | null;
   isLikedByCurrentUser: boolean;
+  currentUserAccuracyRating?: number | null;
   author: {
     name: string;
     role: string;
@@ -112,8 +113,28 @@ export default function NewsPage() {
     },
   });
 
+  const rateAccuracyMutation = useMutation({
+    mutationFn: async (data: { postId: string; rating: number }) => {
+      return await apiRequest("POST", `/api/posts/${data.postId}/rate-accuracy`, { rating: data.rating });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/posts", selectedScope] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to rate post accuracy",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleToggleLike = (postId: string) => {
     toggleLikeMutation.mutate(postId);
+  };
+
+  const handleRatePostAccuracy = (postId: string, rating: number) => {
+    rateAccuracyMutation.mutate({ postId, rating });
   };
 
   const handleSubmitPost = (e: React.FormEvent) => {
@@ -294,22 +315,28 @@ export default function NewsPage() {
                       </Collapsible>
                     </div>
                     
-                    {/* Post Accuracy Stars */}
+                    {/* Post Accuracy Rating */}
                     <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid={`post-accuracy-${post.id}`}>
                       <span className="font-medium">Post Accuracy</span>
                       <div className="flex gap-0.5">
                         {[...Array(5)].map((_, i) => (
-                          <Star
+                          <button
                             key={i}
-                            className={`w-3.5 h-3.5 ${
-                              i < Math.round(post.credibilityRating / 20)
-                                ? "fill-amber-400 text-amber-400"
-                                : "text-muted-foreground"
-                            }`}
-                          />
+                            onClick={() => handleRatePostAccuracy(post.id, i + 1)}
+                            className="hover:opacity-80 transition-opacity"
+                            data-testid={`button-rate-accuracy-${post.id}-${i + 1}`}
+                          >
+                            <Star
+                              className={`w-3.5 h-3.5 cursor-pointer ${
+                                i < (post.currentUserAccuracyRating || 0)
+                                  ? "fill-amber-400 text-amber-400"
+                                  : "text-muted-foreground hover:text-amber-300"
+                              }`}
+                            />
+                          </button>
                         ))}
                       </div>
-                      <span className="text-xs ml-0.5 font-semibold">{(post.credibilityRating / 20).toFixed(1)}</span>
+                      <span className="text-xs ml-0.5 font-semibold">{(post.currentUserAccuracyRating || 0).toFixed(1)}</span>
                     </div>
                   </div>
 
