@@ -146,9 +146,9 @@ export function PeerRatingForm({ ratedUserId, ratedUserName, currentUserId }: Pe
                         data-testid={`button-rate-${metric.key}-${star}`}
                       >
                         <Star
-                          className={`h-5 w-5 ${
+                          className={`h-6 w-6 ${
                             star <= ratings[metric.key]
-                              ? "fill-primary text-primary"
+                              ? "fill-yellow-400 text-yellow-400"
                               : "text-muted-foreground"
                           }`}
                         />

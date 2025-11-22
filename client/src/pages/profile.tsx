@@ -234,43 +234,102 @@ export default function ProfilePage() {
         </div>
 
         {user.role === "student" && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Student Performance Ratings</CardTitle>
-              <CardDescription>
-                Peer-rated metrics (1-5 stars)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {STAT_METRICS.map((metric) => {
-                  const score = user[metric.key] as number | null;
-                  const displayScore = score || 0;
-                  
-                  return (
-                    <div
-                      key={metric.key}
-                      className="flex items-center justify-between p-3 rounded-lg border"
-                      data-testid={`stat-${metric.key}`}
-                    >
-                      <div>
-                        <div className="font-medium">{metric.label}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {metric.arabicLabel}
-                        </div>
-                        {metric.isInverse && (
-                          <div className="text-xs text-yellow-600 dark:text-yellow-500">
-                            Lower is better
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+                  Average Performance Rating
+                </CardTitle>
+                <CardDescription>
+                  Overall peer rating across all metrics
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center">
+                <div className="flex items-center gap-1 mb-2">
+                  {Array.from({ length: 5 }).map((_, i) => {
+                    const scores = STAT_METRICS.map((metric) => user[metric.key] as number | null);
+                    const validScores = scores.filter((s) => s !== null) as number[];
+                    const avgScore = validScores.length > 0 
+                      ? validScores.reduce((sum, s) => sum + s, 0) / validScores.length 
+                      : 0;
+                    
+                    return (
+                      <Star
+                        key={i}
+                        className={`w-8 h-8 ${
+                          i < Math.round(avgScore)
+                            ? "fill-yellow-400 text-yellow-400"
+                            : "text-muted-foreground"
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="text-3xl font-bold">
+                  {(() => {
+                    const scores = STAT_METRICS.map((metric) => user[metric.key] as number | null);
+                    const validScores = scores.filter((s) => s !== null) as number[];
+                    const avgScore = validScores.length > 0 
+                      ? validScores.reduce((sum, s) => sum + s, 0) / validScores.length 
+                      : 0;
+                    return avgScore.toFixed(1);
+                  })()}
+                </div>
+                <p className="text-sm text-muted-foreground">out of 5.0</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Individual Performance Metrics</CardTitle>
+                <CardDescription>
+                  Detailed peer-rated metrics (1-5 stars)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {STAT_METRICS.map((metric) => {
+                    const score = user[metric.key] as number | null;
+                    const displayScore = score || 0;
+                    
+                    return (
+                      <div
+                        key={metric.key}
+                        className="flex items-center justify-between p-2 rounded-lg border"
+                        data-testid={`stat-${metric.key}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{metric.label}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {metric.arabicLabel}
                           </div>
-                        )}
+                          {metric.isInverse && (
+                            <div className="text-xs text-yellow-600 dark:text-yellow-500">
+                              Lower is better
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-0.5 ml-2">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-3 h-3 ${
+                                i < Math.round(displayScore)
+                                  ? "fill-yellow-400 text-yellow-400"
+                                  : "text-muted-foreground"
+                              }`}
+                            />
+                          ))}
+                          <span className="ml-1 text-xs font-medium">{displayScore.toFixed(1)}</span>
+                        </div>
                       </div>
-                      <StarRating score={displayScore} />
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </>
         )}
 
         {!isOwnProfile && currentUser && (
@@ -300,10 +359,7 @@ function ProfileCommentsSection({ userId, currentUserId }: { userId: string; cur
 
   const createCommentMutation = useMutation({
     mutationFn: async (content: string) => {
-      return await apiRequest(`/api/users/${userId}/comments`, {
-        method: "POST",
-        body: JSON.stringify({ content }),
-      });
+      return await apiRequest("POST", `/api/users/${userId}/comments`, { content });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users", userId, "comments"] });
@@ -391,24 +447,15 @@ function ProfileCommentsSection({ userId, currentUserId }: { userId: string; cur
                 className="flex gap-3 p-3 rounded-lg border"
                 data-testid={`comment-${comment.id}`}
               >
-                <UserProfileLink userId={comment.authorId}>
-                  <Avatar className="w-10 h-10">
-                    {comment.authorAvatarUrl && <AvatarImage src={comment.authorAvatarUrl} />}
-                    <AvatarFallback>
-                      {comment.authorName
-                        ?.split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .toUpperCase()
-                        .slice(0, 2) || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                </UserProfileLink>
+                <UserProfileLink
+                  userId={comment.authorId}
+                  name={comment.authorName || "Unknown User"}
+                  avatarUrl={comment.authorAvatarUrl}
+                  showAvatar={true}
+                  className="items-start"
+                />
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <UserProfileLink userId={comment.authorId}>
-                      <p className="font-semibold text-sm">{comment.authorName || "Unknown User"}</p>
-                    </UserProfileLink>
                     {comment.authorRole && (
                       <Badge variant="outline" className="text-xs">
                         {comment.authorRole}
