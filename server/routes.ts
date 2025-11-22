@@ -970,10 +970,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== POST COMMENTS ====================
   app.post("/api/posts/:postId/comments", requireAuth, async (req, res) => {
     try {
-      if (req.body.content?.trim()) {
-        await requireModeration(req.body.content);
-      }
-      
       const commentData = insertPostCommentSchema.parse({
         ...req.body,
         postId: req.params.postId,
@@ -985,9 +981,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
-      }
-      if (error instanceof Error && error.message.includes("community guidelines")) {
-        return res.status(400).json({ message: error.message });
       }
       res.status(500).json({ message: "Failed to create comment" });
     }
@@ -1005,10 +998,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== EVENT COMMENTS ====================
   app.post("/api/events/:eventId/comments", requireAuth, async (req, res) => {
     try {
-      if (req.body.content?.trim()) {
-        await requireModeration(req.body.content);
-      }
-      
       const commentData = insertEventCommentSchema.parse({
         ...req.body,
         eventId: req.params.eventId,
@@ -1020,9 +1009,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
-      }
-      if (error instanceof Error && error.message.includes("community guidelines")) {
-        return res.status(400).json({ message: error.message });
       }
       res.status(500).json({ message: "Failed to create comment" });
     }
