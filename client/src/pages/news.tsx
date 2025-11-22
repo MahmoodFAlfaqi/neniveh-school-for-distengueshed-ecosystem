@@ -224,10 +224,10 @@ export default function NewsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
         <div>
-          <h1 className="text-4xl font-bold mb-2">Public Square</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl sm:text-4xl font-bold mb-2">Public Square</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Share news and updates with the entire school community
           </p>
         </div>
@@ -287,8 +287,8 @@ export default function NewsPage() {
         </Card>
 
         {/* News Feed */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
+        <div className="space-y-4 sm:space-y-6">
+          <h2 className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
             Latest News
           </h2>
@@ -306,7 +306,8 @@ export default function NewsPage() {
               </CardContent>
             </Card>
           ) : (
-            posts.map((post) => (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+              {posts.map((post) => (
               <Card key={post.id} className="hover-elevate" data-testid={`card-post-${post.id}`}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
@@ -439,7 +440,8 @@ export default function NewsPage() {
                   </Collapsible>
                 </CardFooter>
               </Card>
-            ))
+              ))}
+            </div>
           )}
         </div>
 
@@ -536,7 +538,7 @@ function PostCommentSection({ postId }: { postId: string }) {
         </div>
       </div>
 
-      <div className="space-y-2 max-h-[200px] overflow-y-auto">
+      <div className="space-y-2 max-h-[200px] overflow-y-auto scrollbar-thin">
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading comments...</p>
         ) : comments.length === 0 ? (
