@@ -12,7 +12,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { UserProfileLink } from "@/components/UserProfileLink";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
 type User = {
@@ -416,6 +416,7 @@ export default function ProfilePage() {
         <DialogContent data-testid="dialog-edit-profile">
           <DialogHeader>
             <DialogTitle>Edit Profile</DialogTitle>
+            <DialogDescription>Update your profile bio and information.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">

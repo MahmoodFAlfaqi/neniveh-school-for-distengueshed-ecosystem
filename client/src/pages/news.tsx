@@ -15,7 +15,7 @@ import { useHasAccessToScope } from "@/hooks/use-digital-keys";
 import { UserProfileLink } from "@/components/UserProfileLink";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 type Post = {
   id: string;
@@ -406,6 +406,7 @@ export default function NewsPage() {
           <DialogContent data-testid="dialog-edit-post">
             <DialogHeader>
               <DialogTitle>Edit Post</DialogTitle>
+              <DialogDescription>Make changes to your post content.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <Textarea
