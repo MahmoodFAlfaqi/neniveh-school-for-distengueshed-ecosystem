@@ -1,16 +1,16 @@
 import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertCircle, Eye, EyeOff, ShieldCheck, User, Users } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type RoleType = "student" | "admin" | "visitor" | null;
 
@@ -20,7 +20,10 @@ export default function AuthPage() {
   const [selectedRole, setSelectedRole] = useState<RoleType>(null);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
-  const [adminAnswer, setAdminAnswer] = useState("");
+  const [showAdminRegisterPassword, setShowAdminRegisterPassword] = useState(false);
+  const [showAdminLoginPassword, setShowAdminLoginPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  
   const [registerData, setRegisterData] = useState({
     username: "",
     studentId: "",
@@ -28,15 +31,24 @@ export default function AuthPage() {
     password: "",
     phone: "",
   });
+  
   const [loginData, setLoginData] = useState({
     username: "",
     password: "",
   });
 
-  // Fetch random security question for admin
-  const { data: questionData } = useQuery({
-    queryKey: ["/api/auth/admin-question"],
-    enabled: selectedRole === "admin",
+  const [adminRegisterData, setAdminRegisterData] = useState({
+    scientificAnswer: "",
+    username: "",
+    password: "",
+    name: "",
+    email: "",
+  });
+
+  const [adminLoginData, setAdminLoginData] = useState({
+    username: "",
+    password: "",
+    rememberMe: false,
   });
 
   const registerMutation = useMutation({
@@ -77,10 +89,30 @@ export default function AuthPage() {
     },
   });
 
-  // Admin verification mutation
-  const adminVerifyMutation = useMutation({
-    mutationFn: async (answer: string) => {
-      return await apiRequest("POST", "/api/auth/admin-verify", { answer });
+  const adminRegisterMutation = useMutation({
+    mutationFn: async (data: typeof adminRegisterData) => {
+      return await apiRequest("POST", "/api/auth/admin/register", data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Admin registration successful",
+        description: "You've been automatically logged in",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      navigate("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Admin registration failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const adminLoginMutation = useMutation({
+    mutationFn: async (data: typeof adminLoginData) => {
+      return await apiRequest("POST", "/api/auth/admin/login", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
@@ -88,14 +120,13 @@ export default function AuthPage() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Verification failed",
+        title: "Admin login failed",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  // Visitor access mutation
   const visitorMutation = useMutation({
     mutationFn: async () => {
       return await apiRequest("POST", "/api/auth/visitor", {});
@@ -123,9 +154,14 @@ export default function AuthPage() {
     loginMutation.mutate(loginData);
   };
 
-  const handleAdminVerify = (e: React.FormEvent) => {
+  const handleAdminRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    adminVerifyMutation.mutate(adminAnswer);
+    adminRegisterMutation.mutate(adminRegisterData);
+  };
+
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    adminLoginMutation.mutate(adminLoginData);
   };
 
   const handleVisitorAccess = () => {
@@ -165,7 +201,7 @@ export default function AuthPage() {
                   <ShieldCheck className="mr-2 h-5 w-5" />
                   <div className="text-left">
                     <div className="font-semibold">Admin</div>
-                    <div className="text-xs text-muted-foreground">Verify admin access via security question</div>
+                    <div className="text-xs text-muted-foreground">Login or register with credentials</div>
                   </div>
                 </Button>
                 <Button
@@ -183,39 +219,180 @@ export default function AuthPage() {
               </div>
             </div>
           ) : selectedRole === "admin" ? (
-            <div className="space-y-4">
+            <>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setSelectedRole(null)}
-                className="mb-2"
+                className="mb-4"
                 data-testid="button-back"
               >
                 ← Back
               </Button>
-              <Alert>
-                <ShieldCheck className="h-4 w-4" />
-                <AlertDescription className="text-sm">
-                  Answer the security question to verify admin access
-                </AlertDescription>
-              </Alert>
-              <form onSubmit={handleAdminVerify} className="space-y-4">
-                <div className="space-y-2">
-                  <Label>{questionData?.question || "Loading question..."}</Label>
-                  <Input
-                    type="text"
-                    placeholder="Enter your answer"
-                    value={adminAnswer}
-                    onChange={(e) => setAdminAnswer(e.target.value)}
-                    required
-                    data-testid="input-admin-answer"
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={adminVerifyMutation.isPending} data-testid="button-admin-verify">
-                  {adminVerifyMutation.isPending ? "Verifying..." : "Verify Admin Access"}
-                </Button>
-              </form>
-            </div>
+              <Tabs defaultValue="login">
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="login" data-testid="tab-admin-login">Login</TabsTrigger>
+                  <TabsTrigger value="register" data-testid="tab-admin-register">Register</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="login">
+                  <form onSubmit={handleAdminLogin} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-login-username">Username</Label>
+                      <Input
+                        id="admin-login-username"
+                        type="text"
+                        placeholder="admin.username"
+                        value={adminLoginData.username}
+                        onChange={(e) => setAdminLoginData({ ...adminLoginData, username: e.target.value })}
+                        required
+                        data-testid="input-admin-username-login"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-login-password">Password</Label>
+                      <div className="relative">
+                        <Input
+                          id="admin-login-password"
+                          type={showAdminLoginPassword ? "text" : "password"}
+                          value={adminLoginData.password}
+                          onChange={(e) => setAdminLoginData({ ...adminLoginData, password: e.target.value })}
+                          required
+                          data-testid="input-admin-password-login"
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                          onClick={() => setShowAdminLoginPassword(!showAdminLoginPassword)}
+                          data-testid="button-toggle-admin-password-login"
+                        >
+                          {showAdminLoginPassword ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="remember-me" 
+                        checked={adminLoginData.rememberMe}
+                        onCheckedChange={(checked) => 
+                          setAdminLoginData({ ...adminLoginData, rememberMe: checked as boolean })
+                        }
+                        data-testid="checkbox-remember-me"
+                      />
+                      <Label htmlFor="remember-me" className="text-sm cursor-pointer">
+                        Remember me for 7 days
+                      </Label>
+                    </div>
+                    <Button type="submit" className="w-full" disabled={adminLoginMutation.isPending} data-testid="button-admin-login">
+                      {adminLoginMutation.isPending ? "Logging in..." : "Admin Login"}
+                    </Button>
+                  </form>
+                </TabsContent>
+            
+                <TabsContent value="register">
+                  <form onSubmit={handleAdminRegister} className="space-y-4">
+                    <Alert>
+                      <ShieldCheck className="h-4 w-4" />
+                      <AlertDescription className="text-sm">
+                        You need to answer a scientific question to register as an admin. Contact the system administrator for the answer.
+                      </AlertDescription>
+                    </Alert>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-scientific-answer">Scientific Question Answer</Label>
+                      <Input
+                        id="admin-scientific-answer"
+                        type="password"
+                        placeholder="Enter the answer provided by admin"
+                        value={adminRegisterData.scientificAnswer}
+                        onChange={(e) => setAdminRegisterData({ ...adminRegisterData, scientificAnswer: e.target.value })}
+                        required
+                        data-testid="input-admin-scientific-answer"
+                      />
+                      <p className="text-xs text-muted-foreground">This is a one-time invitation code</p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-register-name">Full Name</Label>
+                      <Input
+                        id="admin-register-name"
+                        placeholder="John Doe"
+                        value={adminRegisterData.name}
+                        onChange={(e) => setAdminRegisterData({ ...adminRegisterData, name: e.target.value })}
+                        required
+                        data-testid="input-admin-name"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-register-username">Username</Label>
+                      <Input
+                        id="admin-register-username"
+                        placeholder="admin.username"
+                        value={adminRegisterData.username}
+                        onChange={(e) => setAdminRegisterData({ ...adminRegisterData, username: e.target.value })}
+                        required
+                        data-testid="input-admin-username"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-register-email">Email</Label>
+                      <Input
+                        id="admin-register-email"
+                        type="email"
+                        placeholder="admin@school.edu"
+                        value={adminRegisterData.email}
+                        onChange={(e) => setAdminRegisterData({ ...adminRegisterData, email: e.target.value })}
+                        required
+                        data-testid="input-admin-email"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-register-password">Password</Label>
+                      <div className="relative">
+                        <Input
+                          id="admin-register-password"
+                          type={showAdminRegisterPassword ? "text" : "password"}
+                          placeholder="Minimum 6 characters"
+                          value={adminRegisterData.password}
+                          onChange={(e) => setAdminRegisterData({ ...adminRegisterData, password: e.target.value })}
+                          required
+                          data-testid="input-admin-password"
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                          onClick={() => setShowAdminRegisterPassword(!showAdminRegisterPassword)}
+                          data-testid="button-toggle-admin-password-register"
+                        >
+                          {showAdminRegisterPassword ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <Button type="submit" className="w-full" disabled={adminRegisterMutation.isPending} data-testid="button-admin-register">
+                      {adminRegisterMutation.isPending ? "Registering..." : "Register as Admin"}
+                    </Button>
+                  </form>
+                </TabsContent>
+              </Tabs>
+            </>
           ) : selectedRole === "visitor" ? (
             <div className="space-y-4">
               <Button
