@@ -4,7 +4,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Star } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Star, ChevronDown } from "lucide-react";
 import { z } from "zod";
 import { insertPeerRatingSchema } from "@shared/schema";
 
@@ -41,6 +42,14 @@ export function PeerRatingForm({ ratedUserId, ratedUserName, currentUserId }: Pe
     const initial: Record<string, number> = {};
     METRICS.forEach(metric => {
       initial[metric.key] = 3; // Default to 3 stars
+    });
+    return initial;
+  });
+
+  const [expandedMetrics, setExpandedMetrics] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    METRICS.forEach(metric => {
+      initial[metric.key] = false;
     });
     return initial;
   });
@@ -125,18 +134,33 @@ export function PeerRatingForm({ ratedUserId, ratedUserName, currentUserId }: Pe
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid gap-6 text-left ml-[0px] mr-[0px] pl-[0px] pr-[0px] text-[17px]">
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="space-y-2">
             {METRICS.map((metric) => (
-              <div key={metric.key} className="space-y-2">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="font-medium">{metric.label}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {metric.description}
+              <Collapsible
+                key={metric.key}
+                open={expandedMetrics[metric.key]}
+                onOpenChange={(open) =>
+                  setExpandedMetrics((prev) => ({ ...prev, [metric.key]: open }))
+                }
+              >
+                <CollapsibleTrigger className="w-full text-left" data-testid={`trigger-metric-${metric.key}`}>
+                  <div className="flex items-center justify-between p-3 rounded-lg border hover-elevate">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{metric.label}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {metric.description}
+                      </div>
                     </div>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${
+                        expandedMetrics[metric.key] ? "rotate-180" : ""
+                      }`}
+                    />
                   </div>
-                  <div className="flex gap-1">
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-2 pb-3 px-3">
+                  <div className="flex gap-1 justify-end">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <button
                         key={star}
@@ -155,12 +179,12 @@ export function PeerRatingForm({ ratedUserId, ratedUserName, currentUserId }: Pe
                       </button>
                     ))}
                   </div>
-                </div>
-              </div>
+                </CollapsibleContent>
+              </Collapsible>
             ))}
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-4">
             <Button 
               type="submit" 
               disabled={submitRatingMutation.isPending}
