@@ -15,6 +15,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type StudentId = {
   id: string;
@@ -63,6 +73,7 @@ export default function AdminPage() {
   
   // Promote to admin state
   const [selectedUserToPromote, setSelectedUserToPromote] = useState<string>("");
+  const [showPromoteDialog, setShowPromoteDialog] = useState(false);
 
   const { data: studentIds, isLoading } = useQuery<StudentId[]>({
     queryKey: ["/api/admin/student-ids"],
@@ -152,6 +163,7 @@ export default function AdminPage() {
         description: "The user has been successfully promoted to admin",
       });
       setSelectedUserToPromote("");
+      setShowPromoteDialog(false);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/students"] });
     },
     onError: (error: Error) => {
@@ -160,19 +172,21 @@ export default function AdminPage() {
         description: error.message,
         variant: "destructive",
       });
+      setShowPromoteDialog(false);
     },
   });
 
-  const handlePromoteUser = () => {
+  const handlePromoteClick = () => {
     if (!selectedUserToPromote) return;
-    
-    const user = students?.find(s => s.id === selectedUserToPromote);
-    if (!user) return;
-
-    if (window.confirm(`Are you sure you want to promote ${user.name} to admin? They will have full administrative privileges.`)) {
-      promoteMutation.mutate(selectedUserToPromote);
-    }
+    setShowPromoteDialog(true);
   };
+
+  const handleConfirmPromotion = () => {
+    if (!selectedUserToPromote) return;
+    promoteMutation.mutate(selectedUserToPromote);
+  };
+
+  const selectedUserData = students?.find(s => s.id === selectedUserToPromote);
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -608,10 +622,14 @@ export default function AdminPage() {
                   onValueChange={setSelectedUserToPromote}
                 >
                   <SelectTrigger id="select-user-promote" data-testid="select-user-promote">
-                    <SelectValue placeholder="Choose a student..." />
+                    <SelectValue placeholder={studentsLoading ? "Loading..." : "Choose a student..."} />
                   </SelectTrigger>
                   <SelectContent>
-                    {students && students.length > 0 ? (
+                    {studentsLoading ? (
+                      <SelectItem value="loading" disabled>
+                        Loading students...
+                      </SelectItem>
+                    ) : students && students.length > 0 ? (
                       students.map((student) => (
                         <SelectItem key={student.id} value={student.id}>
                           {student.name} (@{student.username}) - Grade {student.grade}-{student.className}
@@ -627,7 +645,7 @@ export default function AdminPage() {
               </div>
               
               <Button
-                onClick={handlePromoteUser}
+                onClick={handlePromoteClick}
                 disabled={!selectedUserToPromote || promoteMutation.isPending}
                 data-testid="button-promote-to-admin"
                 className="w-full"
@@ -648,6 +666,38 @@ export default function AdminPage() {
             </div>
           </CardContent>
         </Card>
+
+        <AlertDialog open={showPromoteDialog} onOpenChange={setShowPromoteDialog}>
+          <AlertDialogContent data-testid="dialog-confirm-promote">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Promote User to Admin?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {selectedUserData && (
+                  <span>
+                    Are you sure you want to promote <strong>{selectedUserData.name}</strong> (@{selectedUserData.username}) to admin? 
+                    They will have full administrative privileges including:
+                    <ul className="mt-2 space-y-1 list-disc list-inside">
+                      <li>Managing student IDs and accounts</li>
+                      <li>Deleting posts and content</li>
+                      <li>Promoting other users to admin</li>
+                      <li>All other administrative functions</li>
+                    </ul>
+                  </span>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-promote">Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleConfirmPromotion} 
+                disabled={promoteMutation.isPending}
+                data-testid="button-confirm-promote"
+              >
+                {promoteMutation.isPending ? "Promoting..." : "Promote to Admin"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
