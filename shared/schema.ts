@@ -126,6 +126,16 @@ export const posts = pgTable("posts", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Post Reactions (likes)
+export const postReactions = pgTable("post_reactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  uniquePostUser: unique().on(table.postId, table.userId),
+}));
+
 // Events with RSVP tracking
 export const events = pgTable("events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -273,7 +283,7 @@ export const digitalKeysRelations = relations(digitalKeys, ({ one }) => ({
   }),
 }));
 
-export const postsRelations = relations(posts, ({ one }) => ({
+export const postsRelations = relations(posts, ({ one, many }) => ({
   author: one(users, {
     fields: [posts.authorId],
     references: [users.id],
@@ -281,6 +291,18 @@ export const postsRelations = relations(posts, ({ one }) => ({
   scope: one(scopes, {
     fields: [posts.scopeId],
     references: [scopes.id],
+  }),
+  reactions: many(postReactions),
+}));
+
+export const postReactionsRelations = relations(postReactions, ({ one }) => ({
+  post: one(posts, {
+    fields: [postReactions.postId],
+    references: [posts.id],
+  }),
+  user: one(users, {
+    fields: [postReactions.userId],
+    references: [users.id],
   }),
 }));
 
@@ -506,8 +528,16 @@ export type AdminSuccession = typeof adminSuccessions.$inferSelect;
 export type InsertAdminStudentId = z.infer<typeof insertAdminStudentIdSchema>;
 export type AdminStudentId = typeof adminStudentIds.$inferSelect;
 
+export const insertPostReactionSchema = createInsertSchema(postReactions).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type InsertPost = z.infer<typeof insertPostSchema>;
 export type Post = typeof posts.$inferSelect;
+
+export type InsertPostReaction = z.infer<typeof insertPostReactionSchema>;
+export type PostReaction = typeof postReactions.$inferSelect;
 
 export type InsertEvent = z.infer<typeof insertEventSchema>;
 export type Event = typeof events.$inferSelect;

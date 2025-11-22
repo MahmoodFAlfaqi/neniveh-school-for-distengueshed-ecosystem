@@ -558,7 +558,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/posts", requireAuth, async (req, res) => {
     try {
       const scopeId = req.query.scopeId as string | undefined;
-      const posts = await storage.getPosts(scopeId === "null" ? null : scopeId);
+      const userId = req.session.userId!;
+      const posts = await storage.getPosts(scopeId === "null" ? null : scopeId, userId);
       res.json(posts);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch posts" });
@@ -583,6 +584,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(post);
     } catch (error) {
       res.status(500).json({ message: "Failed to update post credibility" });
+    }
+  });
+
+  // Like a post (toggle)
+  app.post("/api/posts/:id/like", requireAuth, async (req, res) => {
+    try {
+      const postId = req.params.id;
+      const userId = req.session.userId!;
+      
+      // Check if user already liked this post
+      const existingReaction = await storage.getUserPostReaction(postId, userId);
+      
+      if (existingReaction) {
+        // Unlike - delete reaction
+        await storage.deletePostReaction(postId, userId);
+        res.json({ liked: false, message: "Post unliked" });
+      } else {
+        // Like - create reaction
+        await storage.createPostReaction(postId, userId);
+        res.json({ liked: true, message: "Post liked" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to toggle like" });
+    }
+  });
+
+  // Get user's like status for a post
+  app.get("/api/posts/:id/like-status", requireAuth, async (req, res) => {
+    try {
+      const postId = req.params.id;
+      const userId = req.session.userId!;
+      
+      const reaction = await storage.getUserPostReaction(postId, userId);
+      res.json({ liked: !!reaction });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch like status" });
     }
   });
 

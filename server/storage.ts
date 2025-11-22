@@ -5,6 +5,7 @@ import {
   adminSuccessions,
   adminStudentIds,
   posts,
+  postReactions,
   events,
   eventRsvps,
   schedules,
@@ -24,6 +25,8 @@ import {
   type InsertAdminStudentId,
   type Post,
   type InsertPost,
+  type PostReaction,
+  type InsertPostReaction,
   type Event,
   type InsertEvent,
   type EventRsvp,
@@ -81,7 +84,7 @@ export interface IStorage {
   
   // Posts
   createPost(post: InsertPost): Promise<Post>;
-  getPosts(scopeId?: string | null): Promise<Post[]>;
+  getPosts(scopeId?: string | null, userId?: string): Promise<any[]>;
   getPost(id: string): Promise<Post | undefined>;
   updatePostCredibility(postId: string, rating: number): Promise<Post | undefined>;
   
@@ -603,7 +606,7 @@ export class DatabaseStorage implements IStorage {
     return post;
   }
 
-  async getPosts(scopeId?: string | null): Promise<any[]> {
+  async getPosts(scopeId?: string | null, userId?: string): Promise<any[]> {
     if (scopeId === null || scopeId === undefined) {
       // Get public square posts (no scope) with author info
       const results = await db
@@ -627,9 +630,17 @@ export class DatabaseStorage implements IStorage {
         .where(sql`${posts.scopeId} IS NULL`)
         .orderBy(desc(posts.createdAt));
       
-      // Transform to ensure author always exists
+      // Get user's liked posts if userId provided
+      const likedPostIds = userId ? (await db
+        .select({ postId: postReactions.postId })
+        .from(postReactions)
+        .where(eq(postReactions.userId, userId)))
+        .map(r => r.postId) : [];
+      
+      // Transform to ensure author always exists and include liked status
       return results.map(post => ({
         ...post,
+        isLikedByCurrentUser: likedPostIds.includes(post.id),
         author: {
           name: post.authorName || "Unknown User",
           role: post.authorRole || "student",
@@ -659,9 +670,17 @@ export class DatabaseStorage implements IStorage {
       .where(eq(posts.scopeId, scopeId))
       .orderBy(desc(posts.createdAt));
     
-    // Transform to ensure author always exists
+    // Get user's liked posts if userId provided
+    const likedPostIds = userId ? (await db
+      .select({ postId: postReactions.postId })
+      .from(postReactions)
+      .where(eq(postReactions.userId, userId)))
+      .map(r => r.postId) : [];
+    
+    // Transform to ensure author always exists and include liked status
     return results.map(post => ({
       ...post,
+      isLikedByCurrentUser: likedPostIds.includes(post.id),
       author: {
         name: post.authorName || "Unknown User",
         role: post.authorRole || "student",
@@ -947,6 +966,56 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(profileComments.createdAt));
     
     return results as Array<ProfileComment & { authorName?: string; authorRole?: string; authorAvatarUrl?: string | null }>;
+  }
+
+  // ==================== POST REACTIONS ====================
+  async createPostReaction(postId: string, userId: string): Promise<PostReaction> {
+    const [reaction] = await db
+      .insert(postReactions)
+      .values({ postId, userId })
+      .returning();
+    
+    // Increment likes count
+    await db
+      .update(posts)
+      .set({ likesCount: sql`${posts.likesCount} + 1` })
+      .where(eq(posts.id, postId));
+    
+    return reaction;
+  }
+
+  async deletePostReaction(postId: string, userId: string): Promise<void> {
+    const result = await db
+      .delete(postReactions)
+      .where(
+        and(
+          eq(postReactions.postId, postId),
+          eq(postReactions.userId, userId)
+        )
+      )
+      .returning();
+    
+    // Only decrement likes count if a reaction was actually deleted
+    if (result.length > 0) {
+      await db
+        .update(posts)
+        .set({ likesCount: sql`GREATEST(${posts.likesCount} - 1, 0)` })
+        .where(eq(posts.id, postId));
+    }
+  }
+
+  async getUserPostReaction(postId: string, userId: string): Promise<PostReaction | undefined> {
+    const [reaction] = await db
+      .select()
+      .from(postReactions)
+      .where(
+        and(
+          eq(postReactions.postId, postId),
+          eq(postReactions.userId, userId)
+        )
+      );
+    
+    return reaction;
   }
 
   // ==================== PEER RATINGS ====================

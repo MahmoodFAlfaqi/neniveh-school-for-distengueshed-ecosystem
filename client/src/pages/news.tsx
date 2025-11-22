@@ -28,6 +28,7 @@ type Post = {
   authorName: string;
   authorRole: string;
   authorAvatarUrl: string | null;
+  isLikedByCurrentUser: boolean;
 };
 
 export default function NewsPage() {
@@ -60,6 +61,23 @@ export default function NewsPage() {
     queryKey: ["/api/auth/me"],
   });
 
+  const toggleLikeMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      return await apiRequest("POST", `/api/posts/${postId}/like`);
+    },
+    onSuccess: () => {
+      // Refetch posts to get updated likes count and status
+      queryClient.invalidateQueries({ queryKey: ["/api/posts", selectedScope] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update like",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const createPostMutation = useMutation({
     mutationFn: async (content: string) => {
       return await apiRequest("POST", "/api/posts", {
@@ -83,6 +101,10 @@ export default function NewsPage() {
       });
     },
   });
+
+  const handleToggleLike = (postId: string) => {
+    toggleLikeMutation.mutate(postId);
+  };
 
   const handleSubmitPost = (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,8 +248,20 @@ export default function NewsPage() {
                 </CardContent>
                 <Separator />
                 <CardFooter className="py-3 gap-4">
-                  <Button variant="ghost" size="sm" className="gap-2" data-testid={`button-like-${post.id}`}>
-                    <Heart className="w-4 h-4" />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => handleToggleLike(post.id)}
+                    data-testid={`button-like-${post.id}`}
+                  >
+                    <Heart
+                      className={`w-4 h-4 ${
+                        post.isLikedByCurrentUser
+                          ? "fill-red-500 text-red-500"
+                          : ""
+                      }`}
+                    />
                     <span>{post.likesCount}</span>
                   </Button>
                   <Button variant="ghost" size="sm" className="gap-2" data-testid={`button-comment-${post.id}`}>
