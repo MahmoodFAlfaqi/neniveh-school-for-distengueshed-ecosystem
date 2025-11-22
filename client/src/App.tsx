@@ -58,10 +58,14 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1">
-          <header className="flex items-center justify-between p-2 border-b">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
+          <header className="sticky top-0 z-40 flex items-center justify-between px-6 py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm dark:bg-background/70">
+            <div className="flex items-center gap-3">
+              <SidebarTrigger data-testid="button-sidebar-toggle" className="h-9 w-9 rounded-lg hover:bg-background dark:hover:bg-background/50 transition-colors" />
+              <div className="h-8 w-px bg-border/30" />
+              <h2 className="text-sm font-semibold text-foreground hidden md:block">School Community Ecosystem</h2>
+            </div>
           </header>
-          <main className="flex-1 overflow-auto">{children}</main>
+          <main className="flex-1 overflow-auto bg-gradient-to-br from-background via-background to-background/50 dark:from-background dark:via-background dark:to-background/40">{children}</main>
         </div>
       </div>
     </SidebarProvider>

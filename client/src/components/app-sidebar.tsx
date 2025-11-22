@@ -122,22 +122,37 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar data-testid="sidebar-main">
-      <SidebarContent>
+    <Sidebar data-testid="sidebar-main" className="border-r border-border/50">
+      <SidebarContent className="space-y-4">
+        {/* Logo/Branding */}
+        <div className="px-4 py-3 flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+            <span className="text-white font-bold text-sm">SC</span>
+          </div>
+          <div>
+            <h1 className="font-bold text-sm">School Community</h1>
+            <p className="text-xs text-muted-foreground">Connected & Engaged</p>
+          </div>
+        </div>
+
         <SidebarGroup>
-          <SidebarGroupLabel>School Community</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wider px-2">Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-1">
               {mainNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
                     data-testid={`nav-${item.title.toLowerCase()}`}
-                    className={location === item.url ? "bg-sidebar-accent" : ""}
+                    className={`transition-all ${
+                      location === item.url 
+                        ? "bg-gradient-to-r from-primary/20 to-secondary/20 text-primary font-semibold rounded-lg" 
+                        : "hover:bg-background/50"
+                    }`}
                   >
-                    <Link href={item.url}>
+                    <Link href={item.url} className="flex items-center gap-3">
                       <item.icon className="w-4 h-4" />
-                      <span>{item.title}</span>
+                      <span className="text-sm">{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -148,19 +163,23 @@ export function AppSidebar() {
 
         {user?.role === "admin" && (
           <SidebarGroup>
-            <SidebarGroupLabel>Administration</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wider px-2">Administration</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="space-y-1">
                 {adminNavItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                       asChild
                       data-testid={`nav-${item.title.toLowerCase().replace(" ", "-")}`}
-                      className={location === item.url ? "bg-sidebar-accent" : ""}
+                      className={`transition-all ${
+                        location === item.url 
+                          ? "bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-600 dark:text-amber-400 font-semibold rounded-lg" 
+                          : "hover:bg-background/50"
+                      }`}
                     >
-                      <Link href={item.url}>
+                      <Link href={item.url} className="flex items-center gap-3">
                         <item.icon className="w-4 h-4" />
-                        <span>{item.title}</span>
+                        <span className="text-sm">{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -171,19 +190,23 @@ export function AppSidebar() {
         )}
 
         <SidebarGroup>
-          <SidebarGroupLabel>Account</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wider px-2">Account</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-1">
               {bottomNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
                     data-testid={`nav-${item.title.toLowerCase()}`}
-                    className={location === item.url ? "bg-sidebar-accent" : ""}
+                    className={`transition-all ${
+                      location === item.url 
+                        ? "bg-gradient-to-r from-primary/20 to-secondary/20 text-primary font-semibold rounded-lg" 
+                        : "hover:bg-background/50"
+                    }`}
                   >
-                    <Link href={item.url}>
+                    <Link href={item.url} className="flex items-center gap-3">
                       <item.icon className="w-4 h-4" />
-                      <span>{item.title}</span>
+                      <span className="text-sm">{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -195,21 +218,30 @@ export function AppSidebar() {
 
       {user && (
         <SidebarFooter>
-          <div className="flex flex-col gap-2 p-4 border-t">
+          <div className="flex flex-col gap-3 p-4 border-t border-border/50 rounded-t-lg bg-background/50 dark:bg-background/30">
             <div className="flex items-center gap-3">
-              <Avatar className="w-10 h-10">
-                <AvatarFallback>{getUserInitials(user.name)}</AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                <Avatar className="w-10 h-10 ring-2 ring-primary/20">
+                  <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-white font-bold">
+                    {getUserInitials(user.name)}
+                  </AvatarFallback>
+                </Avatar>
+                {user.role === "admin" && (
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
+                    ★
+                  </div>
+                )}
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold truncate" data-testid="text-username">
                   {user.name}
                 </p>
                 <div className="flex items-center gap-2 mt-1">
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-[0.65rem]">
                     {user.role}
                   </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    Score: {user.credibilityScore}
+                  <span className="text-xs text-muted-foreground font-medium">
+                    {user.credibilityScore.toFixed(0)}⭐
                   </span>
                 </div>
               </div>
@@ -217,7 +249,7 @@ export function AppSidebar() {
             <button
               onClick={handleLogout}
               data-testid="button-logout"
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover-elevate active-elevate-2"
+              className="flex items-center justify-center gap-2 w-full px-3 py-2 text-sm rounded-lg hover-elevate active-elevate-2 bg-destructive/10 hover:bg-destructive/20 text-destructive font-medium transition-colors"
             >
               <LogOut className="w-4 h-4" />
               <span>Logout</span>

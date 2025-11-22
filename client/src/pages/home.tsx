@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Calendar, Trophy, TrendingUp, Newspaper, Clock, BookOpen, Volleyball } from "lucide-react";
+import { Calendar, Trophy, TrendingUp, Newspaper, Clock, BookOpen, Volleyball, Flame, Star } from "lucide-react";
 import { Link } from "wouter";
 import { useMemo } from "react";
 
@@ -58,22 +58,17 @@ export default function Home() {
       .slice(0, 2);
   };
 
-  // Get today's date at midnight
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
   }, []);
 
-  // Generate 15-day window: 1 day before to 14 days ahead
   const calendarDays = useMemo(() => {
     const days = [];
-    
-    // Start from yesterday
     const startDate = new Date(today);
     startDate.setDate(startDate.getDate() - 1);
     
-    // Generate 15 days
     for (let i = 0; i < 15; i++) {
       const date = new Date(startDate);
       date.setDate(date.getDate() + i);
@@ -83,7 +78,6 @@ export default function Home() {
     return days;
   }, [today]);
 
-  // Helper function to get date string (YYYY-MM-DD)
   const getDateString = (date: Date) => {
     if (!(date instanceof Date) || isNaN(date.getTime())) {
       return null;
@@ -94,21 +88,17 @@ export default function Home() {
     return `${year}-${month}-${day}`;
   };
 
-  // Map events by date string
   const eventsByDate = useMemo(() => {
     const map: Record<string, Event[]> = {};
     
     events.forEach(event => {
       try {
-        // Parse the event date from startTime
         const eventDate = new Date(event.startTime);
         
-        // Check if date is valid
         if (!(eventDate instanceof Date) || isNaN(eventDate.getTime())) {
           return;
         }
         
-        // Set to midnight
         eventDate.setHours(0, 0, 0, 0);
         const dateStr = getDateString(eventDate);
         
@@ -126,19 +116,18 @@ export default function Home() {
     return map;
   }, [events]);
 
-  // Get event type icon and color
   const getEventTypeStyle = (eventType: string) => {
     if (eventType === "curricular") {
       return {
-        bg: "bg-violet-600/30 dark:bg-violet-400/30",
-        text: "text-violet-700 dark:text-violet-300",
+        bg: "bg-indigo-500/20 dark:bg-indigo-400/20",
+        text: "text-indigo-700 dark:text-indigo-300",
         icon: BookOpen,
         label: "Class",
       };
     } else {
       return {
-        bg: "bg-cyan-600/30 dark:bg-cyan-400/30",
-        text: "text-cyan-700 dark:text-cyan-300",
+        bg: "bg-teal-500/20 dark:bg-teal-400/20",
+        text: "text-teal-700 dark:text-teal-300",
         icon: Volleyball,
         label: "Activity",
       };
@@ -146,188 +135,275 @@ export default function Home() {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="max-w-6xl mx-auto px-4 py-6 space-y-4">
-        
-        {/* Hero Section */}
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Welcome back{user ? `, ${user.name.split(' ')[0]}` : ''}!
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Your school community updates
-          </p>
+    <div className="h-full overflow-y-auto">
+      <div className="w-full">
+        {/* Hero/Header Section */}
+        <div className="relative bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 dark:from-primary/10 dark:via-transparent dark:to-secondary/10 border-b border-border/50">
+          <div className="max-w-7xl mx-auto px-6 lg:px-8 py-12 lg:py-16">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-8 bg-gradient-to-b from-primary to-secondary rounded-full" />
+                <h1 className="text-4xl lg:text-5xl font-bold tracking-tight">
+                  Welcome back{user ? `, ${user.name.split(' ')[0]}` : ''}!
+                </h1>
+              </div>
+              <p className="text-base text-muted-foreground max-w-2xl">
+                Stay connected with your school community. Track your progress, explore upcoming events, and engage with classmates.
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Stats Grid */}
-        {user && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            
-            {/* Profile Card */}
-            <Link href="/profile">
-              <Card className="hover-elevate active-elevate-2 cursor-pointer h-full" data-testid="card-user-stats">
-                <CardContent className="pt-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Avatar className="w-10 h-10">
-                      <AvatarFallback className="text-sm font-semibold">
-                        {getUserInitials(user.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm truncate" data-testid="text-user-name">{user.name}</p>
-                      <Badge variant="secondary" className="mt-0.5 text-[0.65rem]">{user.role}</Badge>
+        {/* Main Content */}
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8 lg:py-12 space-y-8">
+          
+          {/* Stats Grid */}
+          {user && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              
+              {/* User Profile Card */}
+              <Link href="/profile" className="group">
+                <Card className="hover-elevate active-elevate-2 cursor-pointer h-full transition-all" data-testid="card-user-stats">
+                  <CardContent className="p-6 flex flex-col h-full">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="relative">
+                        <Avatar className="w-12 h-12 ring-2 ring-primary/20">
+                          <AvatarFallback className="text-sm font-bold bg-gradient-to-br from-primary to-secondary text-white">
+                            {getUserInitials(user.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        {user.role === "admin" && (
+                          <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-lg">
+                            ⭐
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate group-hover:text-primary transition-colors" data-testid="text-user-name">
+                          {user.name}
+                        </p>
+                        <Badge variant="secondary" className="mt-1 text-xs font-medium">
+                          {user.role}
+                        </Badge>
+                      </div>
                     </div>
+                    
+                    <div className="space-y-3 flex-1">
+                      <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 dark:from-primary/20 dark:to-primary/10 border border-primary/20 dark:border-primary/30">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Trophy className="w-4 h-4 text-primary" />
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Credibility</span>
+                        </div>
+                        <p className="text-2xl font-bold text-primary" data-testid="text-credibility">
+                          {user.credibilityScore.toFixed(0)}
+                        </p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-gradient-to-br from-secondary/10 to-secondary/5 dark:from-secondary/20 dark:to-secondary/10 border border-secondary/20 dark:border-secondary/30">
+                        <div className="flex items-center gap-2 mb-2">
+                          <TrendingUp className="w-4 h-4 text-secondary" />
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reputation</span>
+                        </div>
+                        <p className="text-2xl font-bold text-secondary" data-testid="text-reputation">
+                          {user.reputationScore.toFixed(0)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-border/50 text-xs text-muted-foreground flex items-center gap-1">
+                      <span>View full profile</span>
+                      <span className="group-hover:translate-x-1 transition-transform">→</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+
+              {/* Status Overview Card */}
+              <Card className="h-full" data-testid="card-status-overview">
+                <CardContent className="p-6 flex flex-col h-full">
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center">
+                      <Flame className="w-4 h-4 text-white" />
+                    </div>
+                    <h3 className="font-semibold text-sm">Activity Status</h3>
                   </div>
-                  <div className="space-y-2">
-                    <div className="p-2 rounded-lg bg-violet-50 dark:bg-violet-950/20">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Trophy className="w-3 h-3 text-violet-600 dark:text-violet-400" />
-                        <span className="text-[0.65rem] font-medium text-muted-foreground">Credibility</span>
-                      </div>
-                      <p className="text-xl font-bold text-violet-600 dark:text-violet-400" data-testid="text-credibility">
-                        {user.credibilityScore.toFixed(0)}
-                      </p>
+                  
+                  <div className="space-y-3 flex-1">
+                    <div className="bg-background/50 dark:bg-background/30 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Account Status</p>
+                      <Badge variant="outline" className="text-xs font-medium">
+                        {user.accountStatus}
+                      </Badge>
                     </div>
-                    <div className="p-2 rounded-lg bg-cyan-50 dark:bg-cyan-950/20">
-                      <div className="flex items-center gap-2 mb-1">
-                        <TrendingUp className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
-                        <span className="text-[0.65rem] font-medium text-muted-foreground">Reputation</span>
-                      </div>
-                      <p className="text-xl font-bold text-cyan-600 dark:text-cyan-400" data-testid="text-reputation">
-                        {user.reputationScore.toFixed(0)}
-                      </p>
+                    <div className="bg-background/50 dark:bg-background/30 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Participation</p>
+                      <p className="font-semibold text-sm">{recentPosts.length} posts</p>
+                    </div>
+                    <div className="bg-background/50 dark:bg-background/30 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Upcoming Events</p>
+                      <p className="font-semibold text-sm">{events.length} total</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            </Link>
 
-            {/* Compact Calendar with Events */}
-            <Link href="/schedule" className="md:col-span-2">
-              <Card className="hover-elevate active-elevate-2 cursor-pointer h-full" data-testid="card-upcoming-events">
-                <CardContent className="pt-3 pb-3">
-                  <h2 className="text-sm font-semibold flex items-center gap-1 mb-2">
-                    <Calendar className="w-3.5 h-3.5" />
-                    Upcoming Events
-                  </h2>
+              {/* Quick Actions Card */}
+              <Card className="h-full" data-testid="card-quick-actions">
+                <CardContent className="p-6 flex flex-col h-full">
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
+                      <Star className="w-4 h-4 text-white" />
+                    </div>
+                    <h3 className="font-semibold text-sm">Quick Access</h3>
+                  </div>
+                  
+                  <div className="space-y-2 flex-1">
+                    <Link href="/news" className="block">
+                      <div className="p-3 rounded-lg bg-background/50 dark:bg-background/30 hover:bg-background dark:hover:bg-background/50 transition-colors group">
+                        <p className="text-xs font-medium text-muted-foreground">Latest News</p>
+                        <p className="text-sm font-semibold group-hover:text-primary transition-colors">View posts →</p>
+                      </div>
+                    </Link>
+                    <Link href="/events" className="block">
+                      <div className="p-3 rounded-lg bg-background/50 dark:bg-background/30 hover:bg-background dark:hover:bg-background/50 transition-colors group">
+                        <p className="text-xs font-medium text-muted-foreground">Events</p>
+                        <p className="text-sm font-semibold group-hover:text-primary transition-colors">Explore events →</p>
+                      </div>
+                    </Link>
+                    <Link href="/teachers" className="block">
+                      <div className="p-3 rounded-lg bg-background/50 dark:bg-background/30 hover:bg-background dark:hover:bg-background/50 transition-colors group">
+                        <p className="text-xs font-medium text-muted-foreground">Faculty</p>
+                        <p className="text-sm font-semibold group-hover:text-primary transition-colors">Meet teachers →</p>
+                      </div>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
 
-                  {/* 15-Day Calendar Grid */}
-                  <div className="grid grid-cols-7 gap-1">
-                    {calendarDays.map((date, idx) => {
-                      const dateStr = getDateString(date);
-                      const dayEvents = dateStr ? (eventsByDate[dateStr] || []) : [];
-                      const isToday = date.getTime() === today.getTime();
-                      const isPast = date.getTime() < today.getTime();
+              {/* Calendar Preview Card */}
+              <Link href="/schedule" className="group">
+                <Card className="hover-elevate active-elevate-2 cursor-pointer h-full transition-all" data-testid="card-upcoming-events">
+                  <CardContent className="p-6 flex flex-col h-full">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center">
+                        <Calendar className="w-4 h-4 text-white" />
+                      </div>
+                      <h3 className="font-semibold text-sm">Calendar</h3>
+                    </div>
 
-                      return (
-                        <div
-                          key={idx}
-                          className={`text-center text-[0.65rem] p-1 rounded-sm min-h-12 flex flex-col ${
-                            isToday
-                              ? 'bg-primary/30 text-primary font-bold border-2 border-primary'
-                              : isPast
-                              ? 'bg-muted/30 text-muted-foreground'
-                              : 'bg-background'
-                          }`}
-                        >
-                          <div className="font-semibold">{date.getDate()}</div>
-                          <div className="text-[0.5rem] flex-1 flex flex-col justify-center gap-0.5 overflow-hidden">
-                            {dayEvents.slice(0, 2).map((event, eventIdx) => {
-                              const typeStyle = getEventTypeStyle(event.eventType);
-                              const TypeIcon = typeStyle.icon;
-                              
-                              return (
-                                <div
-                                  key={eventIdx}
-                                  className={`flex items-center gap-0.5 px-0.5 rounded-sm line-clamp-1 ${typeStyle.bg} ${typeStyle.text}`}
-                                  title={`${typeStyle.label}: ${event.title}`}
-                                  data-testid={`event-${event.id}`}
-                                >
-                                  <TypeIcon className="w-2 h-2 flex-shrink-0" />
-                                  <span className="truncate">{event.title}</span>
-                                </div>
-                              );
-                            })}
-                            {dayEvents.length > 2 && (
-                              <div className="text-[0.5rem] text-muted-foreground">+{dayEvents.length - 2}</div>
+                    {/* Mini Calendar Grid */}
+                    <div className="grid grid-cols-7 gap-1 flex-1">
+                      {calendarDays.slice(0, 14).map((date, idx) => {
+                        const dateStr = getDateString(date);
+                        const dayEvents = dateStr ? (eventsByDate[dateStr] || []) : [];
+                        const isToday = date.getTime() === today.getTime();
+                        const isPast = date.getTime() < today.getTime();
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`
+                              text-center text-[0.65rem] p-1 rounded-lg min-h-10 flex flex-col items-center justify-center font-medium transition-colors
+                              ${isToday 
+                                ? 'bg-gradient-to-br from-primary to-secondary text-white font-bold shadow-md' 
+                                : isPast 
+                                ? 'text-muted-foreground/50' 
+                                : dayEvents.length > 0
+                                ? 'bg-accent/20 dark:bg-accent/30 text-accent-foreground font-semibold'
+                                : 'hover:bg-background/50 dark:hover:bg-background/30'
+                              }
+                            `}
+                            data-testid={`event-${date.getDate()}`}
+                          >
+                            <div>{date.getDate()}</div>
+                            {dayEvents.length > 0 && !isToday && (
+                              <div className="w-1 h-1 bg-accent rounded-full mt-0.5" />
                             )}
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-border/50 text-xs text-muted-foreground flex items-center gap-1">
+                      <span>View calendar</span>
+                      <span className="group-hover:translate-x-1 transition-transform">→</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            </div>
+          )}
+
+          {/* Featured Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-6 bg-gradient-to-b from-primary to-secondary rounded-full" />
+              <h2 className="text-2xl font-bold">Community Highlights</h2>
+            </div>
+
+            <Link href="/news" className="group">
+              <Card className="hover-elevate active-elevate-2 cursor-pointer transition-all" data-testid="card-news-preview">
+                <CardContent className="p-8">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center">
+                      <Newspaper className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold">Latest News & Posts</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {recentPosts.length} posts from your school community
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Legend */}
-                  <div className="mt-2 flex gap-2 text-[0.5rem]">
-                    <div className="flex items-center gap-0.5">
-                      <BookOpen className="w-2 h-2 text-violet-600 dark:text-violet-400" />
-                      <span className="text-muted-foreground">Class</span>
+                  {recentPosts.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">No posts yet. Be the first to share!</p>
                     </div>
-                    <div className="flex items-center gap-0.5">
-                      <Volleyball className="w-2 h-2 text-cyan-600 dark:text-cyan-400" />
-                      <span className="text-muted-foreground">Activity</span>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {recentPosts.slice(0, 6).map((post: Post) => (
+                        <div 
+                          key={post.id} 
+                          className="p-4 rounded-xl bg-background/50 dark:bg-background/30 border border-border/50 hover:border-primary/30 hover:bg-background dark:hover:bg-background/50 transition-all group/post"
+                          data-testid={`post-preview-${post.id}`}
+                        >
+                          <div className="flex items-start gap-3 mb-3">
+                            <Avatar className="w-8 h-8 flex-shrink-0 ring-2 ring-primary/20">
+                              <AvatarFallback className="text-xs font-bold">
+                                {post.author ? getUserInitials(post.author.name) : "U"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold truncate group-hover/post:text-primary transition-colors">
+                                {post.author?.name || "Unknown"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {post.author?.role}
+                              </p>
+                            </div>
+                          </div>
+                          <p className="text-sm text-foreground/80 line-clamp-2 mb-3">
+                            {post.content}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Clock className="w-3 h-3" />
+                            {new Date(post.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                      ))}
                     </div>
+                  )}
+
+                  <div className="mt-6 flex items-center gap-2 text-primary font-medium text-sm group-hover:gap-3 transition-all">
+                    <span>View all posts</span>
+                    <span>→</span>
                   </div>
                 </CardContent>
               </Card>
             </Link>
           </div>
-        )}
 
-        {/* News & Activity Section */}
-        <Link href="/news">
-          <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid="card-news-preview">
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Newspaper className="w-4 h-4 text-primary" />
-                <h2 className="text-sm font-semibold">Latest News</h2>
-                <span className="text-xs text-muted-foreground ml-auto">
-                  {recentPosts.length} posts
-                </span>
-              </div>
-
-              {recentPosts.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">No posts yet</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                  {recentPosts.slice(0, 6).map((post: Post) => (
-                    <div 
-                      key={post.id} 
-                      className="p-3 rounded-lg bg-rose-50/50 dark:bg-rose-950/20 hover:bg-rose-100/50 dark:hover:bg-rose-950/40 transition-colors group"
-                      data-testid={`post-preview-${post.id}`}
-                    >
-                      <div className="flex items-start gap-2 mb-2">
-                        <Avatar className="w-7 h-7 flex-shrink-0">
-                          <AvatarFallback className="text-[0.6rem] font-semibold">
-                            {post.author ? getUserInitials(post.author.name) : "U"}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold truncate">
-                            {post.author?.name || "Unknown"}
-                          </p>
-                          {post.author && (
-                            <Badge variant="outline" className="text-[0.6rem] mt-0.5">
-                              {post.author.role}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground line-clamp-2 mb-1">
-                        {post.content}
-                      </p>
-                      <div className="flex items-center gap-1 text-[0.65rem] text-muted-foreground">
-                        <Clock className="w-2.5 h-2.5" />
-                        {new Date(post.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </Link>
-
+        </div>
       </div>
     </div>
   );
