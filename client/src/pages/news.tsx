@@ -22,6 +22,7 @@ type Post = {
   authorId: string;
   scopeId: string | null;
   credibilityRating: number;
+  authorCredibilityScore: number;
   mediaUrl: string | null;
   mediaType: string | null;
   createdAt: string;
@@ -264,8 +265,8 @@ export default function NewsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Badge variant="outline" className={getCredibilityColor(post.credibilityRating)}>
-                        {post.credibilityRating.toFixed(0)}% credibility
+                      <Badge variant="outline" className={getCredibilityColor(post.authorCredibilityScore)}>
+                        {post.authorCredibilityScore.toFixed(0)}% credibility
                       </Badge>
                     </div>
                   </div>
