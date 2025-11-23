@@ -1053,6 +1053,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete scope (admin only)
+  app.delete("/api/scopes/:id", requireAdmin, async (req, res) => {
+    try {
+      const deleted = await storage.deleteScope(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Scope not found" });
+      }
+      res.json({ message: "Scope deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete scope" });
+    }
+  });
+
   // ==================== POSTS ====================
   
   // Create post (uses authenticated user) with optional file upload

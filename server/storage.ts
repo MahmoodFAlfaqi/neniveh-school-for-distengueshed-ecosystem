@@ -131,6 +131,7 @@ export interface IStorage {
   getScope(id: string): Promise<Scope | undefined>;
   getAllScopes(): Promise<Scope[]>;
   createScope(scope: InsertScope): Promise<Scope>;
+  deleteScope(id: string): Promise<boolean>;
   
   // Posts
   createPost(post: InsertPost): Promise<Post>;
@@ -774,12 +775,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async hasAccessToScope(userId: string, scopeId: string): Promise<boolean> {
-    // Global scope is always accessible for reading
-    const scope = await this.getScope(scopeId);
-    if (scope?.type === "global") {
-      return true;
-    }
-
     // Check if user has the digital key
     const keys = await db
       .select()
@@ -1002,6 +997,11 @@ export class DatabaseStorage implements IStorage {
   async createScope(insertScope: InsertScope): Promise<Scope> {
     const [scope] = await db.insert(scopes).values(insertScope).returning();
     return scope;
+  }
+
+  async deleteScope(id: string): Promise<boolean> {
+    const result = await db.delete(scopes).where(eq(scopes.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
   }
 
   // ==================== POSTS ====================
