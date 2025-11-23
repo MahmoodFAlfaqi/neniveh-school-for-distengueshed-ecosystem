@@ -7,7 +7,7 @@ import { z } from "zod";
 // Enums
 export const userRoleEnum = pgEnum("user_role", ["student", "admin", "visitor"]);
 export const accountStatusEnum = pgEnum("account_status", ["active", "threatened", "suspended"]);
-export const scopeTypeEnum = pgEnum("scope_type", ["global", "stage", "section"]);
+export const scopeTypeEnum = pgEnum("scope_type", ["grade", "section"]);
 export const eventTypeEnum = pgEnum("event_type", ["curricular", "extracurricular"]);
 
 // Users table with reputation and credibility
@@ -62,14 +62,14 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// Scopes define the three-tier access system
+// Scopes define the two-tier access system: grade and section (class)
 export const scopes = pgTable("scopes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   type: scopeTypeEnum("type").notNull(),
-  stageLevel: integer("stage_level"), // 1-6 for stages, null for global/section
-  sectionName: text("section_name"), // e.g., "10-A" for sections, null for global/stage
-  accessCode: text("access_code").notNull(), // The secret code users must enter
+  gradeNumber: integer("grade_number"), // 1-6 for grade scopes, null for section
+  sectionName: text("section_name"), // e.g., "1-A" for class sections, null for grades
+  accessCode: text("access_code").notNull().unique(), // The secret code users must enter
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
