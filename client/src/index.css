@@ -296,23 +296,29 @@
   }
 
   /* Custom scrollbar styling - minimal and clean */
-  .scrollbar-thin::-webkit-scrollbar {
+  ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   
-  .scrollbar-thin::-webkit-scrollbar-track {
+  ::-webkit-scrollbar-track {
     background: hsl(var(--muted) / 0.3);
     border-radius: 3px;
   }
   
-  .scrollbar-thin::-webkit-scrollbar-thumb {
+  ::-webkit-scrollbar-thumb {
     background: hsl(var(--muted-foreground) / 0.3);
     border-radius: 3px;
   }
   
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  ::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Firefox scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) hsl(var(--muted) / 0.3);
   }
 
   /* Mobile touch optimization */
