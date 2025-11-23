@@ -494,8 +494,8 @@ export const insertAdminStudentIdSchema = createInsertSchema(adminStudentIds)
       .trim()
       .min(1, "Username is required")
       .regex(
-        /^[A-Za-z.,-]+(\s+[A-Za-z.,-]+){1,4}$/,
-        "Username must contain 2-5 names with only letters, periods, hyphens, commas, and spaces"
+        /^[A-Za-z.,-]+(\s[A-Za-z.,-]+){0,4}$/,
+        "Username must contain 1-5 names with only letters, periods, hyphens, commas, and single spaces between names"
       ),
     grade: z.number().int().min(1).max(6),
     className: z.string().trim().min(1, "Class name is required"),

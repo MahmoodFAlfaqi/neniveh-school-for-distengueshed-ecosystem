@@ -528,7 +528,7 @@ export default function AuthPage() {
                     required
                     data-testid="input-username"
                       />
-                      <p className="text-xs text-muted-foreground">2-5 names with letters, periods, hyphens, or commas only</p>
+                      <p className="text-xs text-muted-foreground">1-5 names, letters/periods/hyphens/commas, single spaces between names</p>
                     </div>
                     
                     <div className="space-y-2">
