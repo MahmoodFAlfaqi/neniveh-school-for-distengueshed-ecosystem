@@ -54,6 +54,330 @@ type Student = {
 type SortField = "name" | "grade" | "class" | "date";
 type SortDirection = "asc" | "desc";
 
+type Scope = {
+  id: string;
+  name: string;
+  type: "grade" | "section";
+  gradeNumber: number | null;
+  sectionName: string | null;
+  accessCode: string;
+  createdAt: string;
+};
+
+function ScopeManagement() {
+  const { toast } = useToast();
+  const [scopeName, setScopeName] = useState("");
+  const [scopeType, setScopeType] = useState<"grade" | "section">("section");
+  const [gradeNumber, setGradeNumber] = useState("");
+  const [sectionName, setSectionName] = useState("");
+  const [accessCode, setAccessCode] = useState("");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [scopeToDelete, setScopeToDelete] = useState<Scope | null>(null);
+
+  const { data: scopes, isLoading } = useQuery<Scope[]>({
+    queryKey: ["/api/scopes"],
+  });
+
+  const createScopeMutation = useMutation({
+    mutationFn: async (data: { name: string; type: string; gradeNumber?: number; sectionName?: string; accessCode: string }) => {
+      return await apiRequest("POST", "/api/scopes", data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Scope created",
+        description: "New access scope has been created successfully",
+      });
+      setScopeName("");
+      setGradeNumber("");
+      setSectionName("");
+      setAccessCode("");
+      queryClient.invalidateQueries({ queryKey: ["/api/scopes"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create scope",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteScopeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/scopes/${id}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Scope deleted",
+        description: "Access scope has been removed successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/scopes"] });
+      setShowDeleteDialog(false);
+      setScopeToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete scope",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateScope = () => {
+    // Validate scope name
+    if (!scopeName.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Scope name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate access code (alphanumeric, no spaces)
+    if (!accessCode.trim() || !/^[A-Za-z0-9]+$/.test(accessCode)) {
+      toast({
+        title: "Validation Error",
+        description: "Access code must be alphanumeric with no spaces",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (scopeType === "grade") {
+      // Validate grade number
+      const gradeNum = parseInt(gradeNumber);
+      if (!gradeNumber || isNaN(gradeNum) || gradeNum < 1 || gradeNum > 6) {
+        toast({
+          title: "Validation Error",
+          description: "Grade number must be between 1 and 6",
+          variant: "destructive",
+        });
+        return;
+      }
+      createScopeMutation.mutate({
+        name: scopeName,
+        type: scopeType,
+        gradeNumber: gradeNum,
+        accessCode: accessCode.trim(),
+      });
+    } else {
+      // Validate section name format (e.g., "1-A", "2-B")
+      if (!sectionName.trim() || !/^\d+-[A-E]$/.test(sectionName.trim())) {
+        toast({
+          title: "Validation Error",
+          description: "Section name must be in format: grade-section (e.g., 1-A, 2-B)",
+          variant: "destructive",
+        });
+        return;
+      }
+      createScopeMutation.mutate({
+        name: scopeName,
+        type: scopeType,
+        sectionName: sectionName.trim(),
+        accessCode: accessCode.trim(),
+      });
+    }
+  };
+
+  const handleDeleteClick = (scope: Scope) => {
+    setScopeToDelete(scope);
+    setShowDeleteDialog(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (scopeToDelete) {
+      deleteScopeMutation.mutate(scopeToDelete.id);
+    }
+  };
+
+  const gradeScopes = scopes?.filter(s => s.type === "grade").sort((a, b) => (a.gradeNumber || 0) - (b.gradeNumber || 0)) || [];
+  const classScopes = scopes?.filter(s => s.type === "section").sort((a, b) => (a.sectionName || "").localeCompare(b.sectionName || "")) || [];
+
+  return (
+    <div className="space-y-6">
+      {/* Create New Scope */}
+      <div className="space-y-4 p-4 border rounded-lg">
+        <h3 className="font-semibold">Create New Class Scope</h3>
+        
+        <div className="grid gap-4">
+          <div>
+            <Label htmlFor="scope-name">Scope Name *</Label>
+            <Input
+              id="scope-name"
+              placeholder="e.g., Class 1-A"
+              value={scopeName}
+              onChange={(e) => setScopeName(e.target.value)}
+              data-testid="input-scope-name"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="scope-type">Scope Type</Label>
+            <Select value={scopeType} onValueChange={(value: "grade" | "section") => setScopeType(value)}>
+              <SelectTrigger id="scope-type" data-testid="select-scope-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="grade">Grade Scope</SelectItem>
+                <SelectItem value="section">Class Scope</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {scopeType === "grade" && (
+            <div>
+              <Label htmlFor="grade-number">Grade Number *</Label>
+              <Input
+                id="grade-number"
+                type="number"
+                min="1"
+                max="6"
+                placeholder="1-6"
+                value={gradeNumber}
+                onChange={(e) => setGradeNumber(e.target.value)}
+                data-testid="input-grade-number"
+              />
+            </div>
+          )}
+
+          {scopeType === "section" && (
+            <div>
+              <Label htmlFor="section-name">Section Name *</Label>
+              <Input
+                id="section-name"
+                placeholder="e.g., 1-A, 2-B"
+                value={sectionName}
+                onChange={(e) => setSectionName(e.target.value)}
+                data-testid="input-section-name"
+              />
+            </div>
+          )}
+
+          <div>
+            <Label htmlFor="access-code">Access Code *</Label>
+            <Input
+              id="access-code"
+              placeholder="Custom access code for this scope"
+              value={accessCode}
+              onChange={(e) => setAccessCode(e.target.value)}
+              data-testid="input-access-code"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Students will need this code to access content in this scope
+            </p>
+          </div>
+
+          <Button
+            onClick={handleCreateScope}
+            disabled={createScopeMutation.isPending}
+            data-testid="button-create-scope"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            {createScopeMutation.isPending ? "Creating..." : "Create Scope"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Existing Scopes */}
+      <div className="space-y-4">
+        <h3 className="font-semibold">Existing Scopes</h3>
+        
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <>
+            {/* Grade Scopes */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-muted-foreground">Grade Scopes ({gradeScopes.length})</h4>
+              {gradeScopes.map((scope) => (
+                <div
+                  key={scope.id}
+                  className="flex items-center justify-between gap-3 p-3 rounded-lg border hover-elevate"
+                  data-testid={`scope-${scope.id}`}
+                >
+                  <div className="flex-1">
+                    <div className="font-medium">{scope.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      Code: <code className="font-mono">{scope.accessCode}</code>
+                    </div>
+                  </div>
+                  <Badge variant="secondary">Grade {scope.gradeNumber}</Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeleteClick(scope)}
+                    data-testid={`button-delete-scope-${scope.id}`}
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            {/* Class Scopes */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-muted-foreground">Class Scopes ({classScopes.length})</h4>
+              {classScopes.map((scope) => (
+                <div
+                  key={scope.id}
+                  className="flex items-center justify-between gap-3 p-3 rounded-lg border hover-elevate"
+                  data-testid={`scope-${scope.id}`}
+                >
+                  <div className="flex-1">
+                    <div className="font-medium">{scope.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      Code: <code className="font-mono">{scope.accessCode}</code>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{scope.sectionName}</Badge>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDeleteClick(scope)}
+                      disabled={deleteScopeMutation.isPending}
+                      data-testid={`button-delete-scope-${scope.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent data-testid="dialog-confirm-delete-scope">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Scope?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the scope <strong>{scopeToDelete?.name}</strong>?
+              This will remove access for all students who have unlocked this scope.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-scope">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={deleteScopeMutation.isPending}
+              data-testid="button-confirm-delete-scope"
+            >
+              {deleteScopeMutation.isPending ? "Deleting..." : "Delete Scope"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { toast } = useToast();
   const [username, setUsername] = useState("");
@@ -600,6 +924,19 @@ export default function AdminPage() {
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Scope Management Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Manage Access Scopes</CardTitle>
+            <CardDescription>
+              Create and manage grade and class scopes with custom access codes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScopeManagement />
           </CardContent>
         </Card>
 

@@ -1042,6 +1042,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create scope (admin only)
   app.post("/api/scopes", requireAdmin, async (req, res) => {
     try {
+      // Additional validation
+      const { type, gradeNumber, sectionName, accessCode, name } = req.body;
+
+      // Validate access code format (alphanumeric, no spaces)
+      if (!accessCode || !/^[A-Za-z0-9]+$/.test(accessCode)) {
+        return res.status(400).json({ message: "Access code must be alphanumeric with no spaces" });
+      }
+
+      // Validate based on scope type
+      if (type === "grade") {
+        if (!gradeNumber || typeof gradeNumber !== "number" || gradeNumber < 1 || gradeNumber > 6) {
+          return res.status(400).json({ message: "Grade number must be a number between 1 and 6" });
+        }
+        
+        // Check if grade scope already exists
+        const allScopes = await storage.getAllScopes();
+        const existingGrade = allScopes.find(s => s.type === "grade" && s.gradeNumber === gradeNumber);
+        if (existingGrade) {
+          return res.status(400).json({ message: `Grade ${gradeNumber} scope already exists` });
+        }
+      } else if (type === "section") {
+        if (!sectionName || typeof sectionName !== "string" || !sectionName.trim()) {
+          return res.status(400).json({ message: "Section name is required for class scopes" });
+        }
+        // Validate section name format (e.g., "1-A", "2-B")
+        if (!/^\d+-[A-E]$/.test(sectionName)) {
+          return res.status(400).json({ message: "Section name must be in format: grade-section (e.g., 1-A, 2-B)" });
+        }
+        
+        // Extract grade number from section name and verify parent grade exists
+        const sectionGrade = parseInt(sectionName.split('-')[0]);
+        const allScopes = await storage.getAllScopes();
+        const parentGrade = allScopes.find(s => s.type === "grade" && s.gradeNumber === sectionGrade);
+        if (!parentGrade) {
+          return res.status(400).json({ message: `Parent grade scope (Grade ${sectionGrade}) must exist before creating class sections` });
+        }
+        
+        // Check if section already exists
+        const existingSection = allScopes.find(s => s.type === "section" && s.sectionName === sectionName);
+        if (existingSection) {
+          return res.status(400).json({ message: `Class section ${sectionName} already exists` });
+        }
+      }
+
       const scopeData = insertScopeSchema.parse(req.body);
       const scope = await storage.createScope(scopeData);
       res.json(scope);
@@ -1062,6 +1106,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ message: "Scope deleted successfully" });
     } catch (error) {
+      if (error instanceof Error) {
+        // Return specific error message from storage layer
+        return res.status(400).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to delete scope" });
     }
   });

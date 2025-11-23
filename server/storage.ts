@@ -1000,6 +1000,70 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteScope(id: string): Promise<boolean> {
+    // Get the scope to check its type
+    const scope = await this.getScope(id);
+    if (!scope) {
+      throw new Error("Scope not found");
+    }
+
+    // If it's a grade scope, check for dependent section scopes
+    if (scope.type === "grade" && scope.gradeNumber) {
+      const dependentSections = await db
+        .select()
+        .from(scopes)
+        .where(
+          and(
+            eq(scopes.type, "section"),
+            sql`${scopes.sectionName} LIKE ${scope.gradeNumber + '-%'}`
+          )
+        );
+      
+      if (dependentSections.length > 0) {
+        throw new Error(`Cannot delete grade scope: ${dependentSections.length} class section(s) belong to this grade. Delete the class sections first.`);
+      }
+    }
+
+    // Check if scope has digital keys (users with access)
+    const keysCount = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(digitalKeys)
+      .where(eq(digitalKeys.scopeId, id));
+    
+    if (keysCount[0]?.count > 0) {
+      throw new Error(`Cannot delete scope: ${keysCount[0].count} user(s) have access to this scope`);
+    }
+
+    // Check if scope has posts
+    const postsCount = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(posts)
+      .where(eq(posts.scopeId, id));
+    
+    if (postsCount[0]?.count > 0) {
+      throw new Error(`Cannot delete scope: ${postsCount[0].count} post(s) exist in this scope`);
+    }
+
+    // Check if scope has events
+    const eventsCount = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(events)
+      .where(eq(events.scopeId, id));
+    
+    if (eventsCount[0]?.count > 0) {
+      throw new Error(`Cannot delete scope: ${eventsCount[0].count} event(s) exist in this scope`);
+    }
+
+    // Check if scope has schedules
+    const schedulesCount = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(schedules)
+      .where(eq(schedules.scopeId, id));
+    
+    if (schedulesCount[0]?.count > 0) {
+      throw new Error(`Cannot delete scope: ${schedulesCount[0].count} schedule(s) exist in this scope`);
+    }
+
+    // All checks passed, safe to delete
     const result = await db.delete(scopes).where(eq(scopes.id, id));
     return result.rowCount !== null && result.rowCount > 0;
   }

@@ -14,6 +14,8 @@ Preferred communication style: Simple, everyday language.
 
 The platform features a modern and premium design, incorporating a vibrant color palette (rich purple, vibrant teal, warm coral), Inter and Outfit typography, and consistent design elements like 0.875rem border radii. It utilizes an elevation system with colored shadows, glassmorphism effects, and smooth 300ms animations. Key design principles include clear hierarchy, generous whitespace, consistency, dark/light mode harmony, micro-interactions, and accessibility. The home page features a hero section, 4-column stat card grid, quick action cards, a mini calendar, and a featured news section. Responsive design is implemented with breakpoints for mobile, tablet, and desktop, using a defined spacing scale and container strategy.
 
+**Navigation Controls:** Sidebar can be toggled via Tab key (desktop) or swipe gesture from left edge (mobile), removing need for manual trigger button.
+
 ### Technical Implementations
 
 The frontend is built with React, TypeScript, and Vite, utilizing Shadcn UI (based on Radix UI) with Tailwind CSS for styling. State management is handled by TanStack Query for server state and React hooks for local state, with Wouter for client-side routing. The backend uses Node.js and Express, providing a RESTful API. Drizzle ORM with a PostgreSQL dialect manages database interactions. The project is structured as a monorepo (`/client`, `/server`, `/shared`) for full-stack type safety.
@@ -48,6 +50,13 @@ The frontend is built with React, TypeScript, and Vite, utilizing Shadcn UI (bas
 ### Database Schema
 
 Includes tables for `Users` (roles, gamification scores, peer-ratable metrics), `Scopes`, `DigitalKeys`, `Posts`, `Events`, `Schedules`, `Teachers` (with review system), `PeerRatings`, `ProfileComments`, `PostReactions`, `Settings`, `failed_login_attempts`, and `remember_me_tokens`.
+
+**Scopes System:** Two-tier hierarchy with grade scopes (grades 1-6) and class section scopes (format: grade-section, e.g., "1-A"). Each scope has a unique access code. Admin UI provides full CRUD capabilities with comprehensive validation:
+- Grade scopes: 6 grades with unique access codes (e.g., gaDrIE5Lo0, SolELo74F)
+- Class scopes: 30 sections across 6 grades (5 sections per grade: A-E) with unique codes (e.g., jtKJdrDS9K, HJdr3cVj90p)
+- Referential integrity: Cannot delete grade scopes while child sections exist; cannot delete scopes with users, posts, events, or schedules
+- Parent-child validation: Section scopes require parent grade scope to exist before creation
+- Automatic seeding on server boot with safe duplicate-check logic
 
 ## External Dependencies
 
