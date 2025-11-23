@@ -264,36 +264,34 @@ export default function SchedulePage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 space-y-4 sm:space-y-6">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Calendar className="w-8 h-8" />
-            Schedule & Events
+          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2 sm:gap-3">
+            <Calendar className="w-6 h-6 sm:w-8 sm:h-8" />
+            <span className="truncate">Schedule & Events</span>
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-muted-foreground mt-2 text-sm sm:text-base truncate">
             Class {user.grade}-{user.className} • {relevantEvents.length} upcoming events
           </p>
         </div>
 
         {/* Calendar with Events */}
         <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <CardTitle>Upcoming Events</CardTitle>
-                <CardDescription>
+          <CardHeader className="pb-3 sm:pb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-start justify-between gap-2 sm:gap-4">
+              <div className="min-w-0">
+                <CardTitle className="text-lg sm:text-xl">Upcoming Events</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
                   Showing events you're attending and events for your class/grade
                 </CardDescription>
               </div>
-              <div className="text-right">
-                <div className="text-lg font-semibold">
-                  {today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                </div>
+              <div className="text-right text-sm sm:text-base font-semibold whitespace-nowrap flex-shrink-0">
+                {today.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 gap-1 sm:gap-2">
               {calendarDates.map((date, idx) => {
                 const dateStr = date.toDateString();
                 const dayEvents = eventsByDate.get(dateStr) || [];
@@ -303,19 +301,19 @@ export default function SchedulePage() {
                 return (
                   <div
                     key={idx}
-                    className={`p-3 rounded-lg border ${
+                    className={`p-1 sm:p-2 md:p-3 rounded-lg border text-center transition-colors ${
                       isToday ? 'bg-primary/10 border-primary' : isPast ? 'bg-muted/50' : 'bg-card'
                     }`}
                     data-testid={`calendar-day-${idx}`}
                   >
-                    <div className="text-xs font-medium text-muted-foreground">
+                    <div className="text-xs font-medium text-muted-foreground hidden sm:block">
                       {date.toLocaleDateString('en-US', { weekday: 'short' })}
                     </div>
-                    <div className={`text-2xl font-bold ${isToday ? 'text-primary' : ''}`}>
+                    <div className={`text-lg sm:text-2xl font-bold ${isToday ? 'text-primary' : ''}`}>
                       {date.getDate()}
                     </div>
-                    <div className="mt-2 space-y-1">
-                      {dayEvents.slice(0, 2).map(event => {
+                    <div className="mt-1 sm:mt-2 space-y-0.5">
+                      {dayEvents.slice(0, 1).map(event => {
                         const isRsvped = rsvpedEventIds.has(event.id);
                         return (
                           <Link
@@ -324,7 +322,7 @@ export default function SchedulePage() {
                             data-testid={`link-event-badge-${event.id}`}
                           >
                             <div
-                              className={`text-xs p-1 rounded truncate cursor-pointer hover-elevate ${
+                              className={`text-xs p-0.5 sm:p-1 rounded truncate cursor-pointer hover-elevate ${
                                 isRsvped ? 'bg-primary text-primary-foreground' : 'bg-accent text-accent-foreground'
                               }`}
                               title={event.title}
@@ -334,9 +332,9 @@ export default function SchedulePage() {
                           </Link>
                         );
                       })}
-                      {dayEvents.length > 2 && (
+                      {dayEvents.length > 1 && (
                         <div className="text-xs text-muted-foreground">
-                          +{dayEvents.length - 2} more
+                          +{dayEvents.length - 1}
                         </div>
                       )}
                     </div>
@@ -356,18 +354,18 @@ export default function SchedulePage() {
           </Card>
         ) : (
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <CardTitle>Weekly Timetable</CardTitle>
-                  <CardDescription>
+            <CardHeader className="pb-3 sm:pb-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-2">
+                <div className="min-w-0">
+                  <CardTitle className="text-lg sm:text-xl">Weekly Timetable</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
                     {schedules.length > 0
                       ? `${schedules.length} class periods scheduled`
                       : "No schedule entries yet"}
                   </CardDescription>
                 </div>
                 {canEdit && (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-shrink-0">
                     {isEditing ? (
                       <>
                         <Button
@@ -407,14 +405,15 @@ export default function SchedulePage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+              <div className="overflow-x-auto -mx-6 sm:mx-0">
+                <table className="w-full border-collapse text-sm sm:text-base">
                   <thead>
                     <tr className="border-b">
-                      <th className="p-3 text-left font-semibold bg-muted">Period</th>
+                      <th className="p-2 sm:p-3 text-left text-xs sm:text-sm font-semibold bg-muted sticky left-0 z-10">Period</th>
                       {days.map((day) => (
-                        <th key={day} className="p-3 text-center font-semibold bg-muted">
-                          {day}
+                        <th key={day} className="p-2 sm:p-3 text-center text-xs sm:text-sm font-semibold bg-muted whitespace-nowrap">
+                          <span className="hidden sm:inline">{day}</span>
+                          <span className="sm:hidden">{day.substring(0, 3)}</span>
                         </th>
                       ))}
                     </tr>
@@ -422,10 +421,11 @@ export default function SchedulePage() {
                   <tbody>
                     {periods.map((period) => (
                       <tr key={period} className="border-b">
-                        <td className="p-3 font-medium bg-muted/50">
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4" />
-                            Period {period}
+                        <td className="p-2 sm:p-3 text-xs sm:text-sm font-medium bg-muted/50 sticky left-0 z-10">
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <Clock className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                            <span className="hidden sm:inline">Period {period}</span>
+                            <span className="sm:hidden">P{period}</span>
                           </div>
                         </td>
                         {days.map((day, dayIndex) => {
@@ -435,18 +435,18 @@ export default function SchedulePage() {
                           return (
                             <td
                               key={day}
-                              className="p-2"
+                              className="p-1 sm:p-2 text-xs sm:text-sm"
                               data-testid={`schedule-cell-${dayIndex + 1}-${period}`}
                             >
                               {isEditing ? (
-                                <div className="space-y-2 p-2">
+                                <div className="space-y-1 p-1 sm:p-2">
                                   <Select
                                     value={currentSubject || "NONE"}
                                     onValueChange={(value) =>
                                       updateScheduleSlot(dayIndex, period, 'subject', value === "NONE" ? null : value)
                                     }
                                   >
-                                    <SelectTrigger className="h-8 text-xs">
+                                    <SelectTrigger className="h-7 sm:h-8 text-xs">
                                       <SelectValue placeholder="Select subject" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -460,7 +460,7 @@ export default function SchedulePage() {
                                   </Select>
                                   <input
                                     type="text"
-                                    placeholder="Teacher name"
+                                    placeholder="Teacher"
                                     className="w-full px-2 py-1 text-xs border rounded"
                                     value={currentTeacher || ""}
                                     onChange={(e) =>
@@ -470,20 +470,20 @@ export default function SchedulePage() {
                                   />
                                 </div>
                               ) : currentSubject ? (
-                                <div className="space-y-1 p-2 rounded-lg border bg-card hover-elevate">
-                                  <div className="flex items-center gap-1 text-sm font-semibold">
-                                    <BookOpen className="w-3 h-3" />
-                                    {currentSubject}
+                                <div className="space-y-0.5 p-1 sm:p-2 rounded-lg border bg-card hover-elevate">
+                                  <div className="flex items-center gap-1 font-semibold line-clamp-1">
+                                    <BookOpen className="w-3 h-3 flex-shrink-0" />
+                                    <span className="truncate text-xs sm:text-sm">{currentSubject}</span>
                                   </div>
                                   {currentTeacher && (
-                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                      <UserIcon className="w-3 h-3" />
-                                      {currentTeacher}
+                                    <div className="flex items-center gap-1 text-muted-foreground line-clamp-1">
+                                      <UserIcon className="w-3 h-3 flex-shrink-0" />
+                                      <span className="truncate text-xs">{currentTeacher}</span>
                                     </div>
                                   )}
                                 </div>
                               ) : (
-                                <div className="p-2 text-center text-xs text-muted-foreground">
+                                <div className="p-1 sm:p-2 text-center text-muted-foreground">
                                   —
                                 </div>
                               )}
