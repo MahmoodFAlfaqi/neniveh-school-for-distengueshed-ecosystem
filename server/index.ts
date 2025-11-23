@@ -4,9 +4,13 @@ import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedAdminAccounts } from "./seed-admins";
+import { seedScopes } from "./seed-scopes";
 import { storage } from "./storage";
 
 const app = express();
+
+// Trust proxy - Required for secure cookies to work in production behind Replit's proxy
+app.set('trust proxy', 1);
 
 // Cookie parser middleware (for remember-me tokens)
 app.use(cookieParser());
@@ -141,8 +145,9 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
 
-  // Automatically seed admin accounts on startup
+  // Automatically seed admin accounts and scopes on startup
   await seedAdminAccounts();
+  await seedScopes();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
