@@ -1,9 +1,10 @@
+import { useState, useEffect } from "react";
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/contexts/theme";
 import { AppSidebar } from "@/components/app-sidebar";
 import Home from "@/pages/home";
@@ -32,6 +33,49 @@ type User = {
   role: string;
 };
 
+function HeaderWithGestures() {
+  const { toggleSidebar } = useSidebar();
+  const [touchStart, setTouchStart] = useState(0);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Tab key to toggle sidebar on desktop
+      if (e.key === "Tab" && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      setTouchStart(e.touches[0].clientX);
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      const touchEnd = e.changedTouches[0].clientX;
+      // Swipe from left edge (within 50px) to the right to open sidebar
+      if (touchStart < 50 && touchEnd - touchStart > 100) {
+        toggleSidebar();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("touchstart", handleTouchStart);
+    window.addEventListener("touchend", handleTouchEnd);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [toggleSidebar]);
+
+  return (
+    <header className="sticky top-0 z-40 flex items-center justify-between px-6 py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm dark:bg-background/70">
+      <h2 className="text-sm font-semibold text-foreground hidden md:block">School Community Ecosystem</h2>
+    </header>
+  );
+}
+
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const { data: user, isLoading } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -59,13 +103,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen w-full scrollbar-thin">
         <AppSidebar />
         <div className="flex flex-col flex-1">
-          <header className="sticky top-0 z-40 flex items-center justify-between px-6 py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm dark:bg-background/70">
-            <div className="flex items-center gap-3">
-              <SidebarTrigger data-testid="button-sidebar-toggle" className="h-9 w-9 rounded-lg hover:bg-background dark:hover:bg-background/50 transition-colors" />
-              <div className="h-8 w-px bg-border/30" />
-              <h2 className="text-sm font-semibold text-foreground hidden md:block">School Community Ecosystem</h2>
-            </div>
-          </header>
+          <HeaderWithGestures />
           <main className="flex-1 overflow-auto scrollbar-thin bg-gradient-to-br from-background via-background to-background/50 dark:from-background dark:via-background dark:to-background/40">{children}</main>
         </div>
       </div>
