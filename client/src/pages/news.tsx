@@ -50,6 +50,7 @@ export default function NewsPage() {
   const [commentText, setCommentText] = useState<{ [postId: string]: string }>({});
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
 
   // Check if user has access to selected scope
   const hasAccess = useHasAccessToScope(selectedScope);
@@ -232,59 +233,72 @@ export default function NewsPage() {
           </p>
         </div>
 
-        {/* Create Post Card */}
-        <Card data-testid="card-create-post">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={user?.avatarUrl || undefined} />
-                <AvatarFallback>{user?.name?.charAt(0) || "U"}</AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="font-medium">{user?.name || "User"}</p>
-                <Badge variant="secondary" className="text-xs">
-                  {user?.role || "student"}
-                </Badge>
-              </div>
-            </div>
-          </CardHeader>
-          <form onSubmit={handleSubmitPost}>
-            <CardContent className="space-y-4">
-              <div className="space-y-1">
-                <Textarea
-                  placeholder="What's happening in our school community?"
-                  value={newPost}
-                  onChange={(e) => setNewPost(e.target.value)}
-                  className="min-h-24 resize-none border-0 text-base focus-visible:ring-0"
-                  data-testid="textarea-new-post"
-                  maxLength={4000}
-                />
-                <div className="flex justify-end">
-                  <span className={`text-xs ${newPost.length > 4000 ? "text-destructive" : "text-muted-foreground"}`} data-testid="text-character-count">
-                    {newPost.length}/4000
-                  </span>
+        {/* Create Post Card - Collapsible */}
+        <Collapsible open={isCreatePostOpen} onOpenChange={setIsCreatePostOpen}>
+          <Card className="transition-all duration-300 ease-out" data-testid="card-create-post">
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover-elevate py-3 sm:py-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={user?.avatarUrl || undefined} />
+                      <AvatarFallback>{user?.name?.charAt(0) || "U"}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{user?.name || "User"}</p>
+                      <Badge variant="secondary" className="text-xs">
+                        {user?.role || "student"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="text-muted-foreground transition-transform duration-300" style={{
+                    transform: isCreatePostOpen ? "rotate(180deg)" : "rotate(0deg)"
+                  }}>
+                    <ChevronDown className="w-5 h-5" />
+                  </div>
                 </div>
-              </div>
-              <Separator />
-              <ScopeSelector
-                value={selectedScope}
-                onChange={setSelectedScope}
-                label="Post to"
-                placeholder="Select where to post"
-              />
-            </CardContent>
-            <CardFooter className="justify-end">
-              <Button
-                type="submit"
-                disabled={!newPost.trim() || newPost.length > 4000 || createPostMutation.isPending || (selectedScope !== null && !hasAccess)}
-                data-testid="button-submit-post"
-              >
-                <Send className="w-4 h-4 mr-2" />
-                {createPostMutation.isPending ? "Posting..." : "Post"}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <form onSubmit={handleSubmitPost}>
+                <CardContent className="space-y-4 animate-in fade-in duration-300">
+                  <div className="space-y-1">
+                    <Textarea
+                      placeholder="What's happening in our school community?"
+                      value={newPost}
+                      onChange={(e) => setNewPost(e.target.value)}
+                      className="min-h-24 resize-none border-0 text-base focus-visible:ring-0"
+                      data-testid="textarea-new-post"
+                      maxLength={4000}
+                    />
+                    <div className="flex justify-end">
+                      <span className={`text-xs ${newPost.length > 4000 ? "text-destructive" : "text-muted-foreground"}`} data-testid="text-character-count">
+                        {newPost.length}/4000
+                      </span>
+                    </div>
+                  </div>
+                  <Separator />
+                  <ScopeSelector
+                    value={selectedScope}
+                    onChange={setSelectedScope}
+                    label="Post to"
+                    placeholder="Select where to post"
+                  />
+                </CardContent>
+                <CardFooter className="justify-end animate-in fade-in duration-300">
+                  <Button
+                    type="submit"
+                    disabled={!newPost.trim() || newPost.length > 4000 || createPostMutation.isPending || (selectedScope !== null && !hasAccess)}
+                    data-testid="button-submit-post"
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    {createPostMutation.isPending ? "Posting..." : "Post"}
+                  </Button>
+                </CardFooter>
+              </form>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* News Feed */}
         <div className="space-y-4 sm:space-y-6">

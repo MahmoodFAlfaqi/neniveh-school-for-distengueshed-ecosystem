@@ -36,6 +36,7 @@ export default function AuthPage() {
   const [loginData, setLoginData] = useState({
     username: "",
     password: "",
+    rememberMe: false,
   });
 
   const [adminRegisterData, setAdminRegisterData] = useState({
@@ -498,6 +499,21 @@ export default function AuthPage() {
                     </Button>
                       </div>
                     </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="remember-me-student" 
+                        checked={loginData.rememberMe}
+                        onCheckedChange={(checked) => 
+                          setLoginData({ ...loginData, rememberMe: checked as boolean })
+                        }
+                        data-testid="checkbox-remember-me-student"
+                      />
+                      <Label htmlFor="remember-me-student" className="text-sm cursor-pointer">
+                        Remember me for 7 days
+                      </Label>
+                    </div>
+                    
                     <Button type="submit" className="w-full" disabled={loginMutation.isPending} data-testid="button-login">
                       {loginMutation.isPending ? "Logging in..." : "Login"}
                     </Button>

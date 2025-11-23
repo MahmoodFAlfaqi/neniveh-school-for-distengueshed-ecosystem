@@ -141,7 +141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Login (username + password)
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { username, password } = req.body;
+      const { username, password, rememberMe } = req.body;
       
       if (!username || !password) {
         console.log("[AUTH] Missing credentials");
@@ -165,6 +165,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set session
       req.session.userId = user.id;
       console.log("[AUTH] Session set:", req.session.userId);
+      
+      // Handle remember me for students (same as admins)
+      if (rememberMe) {
+        const token = crypto.randomBytes(32).toString('hex');
+        await storage.createRememberMeToken(user.id, token);
+        
+        // Set remember-me cookie (7 days)
+        res.cookie('remember_token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          sameSite: 'lax'
+        });
+      }
       
       // Don't send password back
       const { password: _, ...userWithoutPassword } = user;
