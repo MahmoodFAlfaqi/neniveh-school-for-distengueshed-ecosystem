@@ -263,7 +263,7 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto scrollbar-thin">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 space-y-4 sm:space-y-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2 sm:gap-3">
@@ -405,7 +405,7 @@ export default function SchedulePage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto -mx-6 sm:mx-0">
+              <div className="overflow-x-auto scrollbar-thin -mx-6 sm:mx-0">
                 <table className="w-full border-collapse text-sm sm:text-base">
                   <thead>
                     <tr className="border-b">
