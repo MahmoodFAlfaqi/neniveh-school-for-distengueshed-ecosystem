@@ -51,12 +51,13 @@ The frontend is built with React, TypeScript, and Vite, utilizing Shadcn UI (bas
 
 Includes tables for `Users` (roles, gamification scores, peer-ratable metrics), `Scopes`, `DigitalKeys`, `Posts`, `Events`, `Schedules`, `Teachers` (with review system), `PeerRatings`, `ProfileComments`, `PostReactions`, `Settings`, `failed_login_attempts`, and `remember_me_tokens`.
 
-**Scopes System:** Two-tier hierarchy with grade scopes (grades 1-6) and class section scopes (format: grade-section, e.g., "1-A"). Each scope has a unique access code. Admin UI provides full CRUD capabilities with comprehensive validation:
+**Scopes System:** Three-tier hierarchy with public square scope (always accessible), grade scopes (grades 1-6), and class section scopes (format: grade-section, e.g., "1-A"). Each non-public scope has a unique access code. Admin UI provides full CRUD capabilities with comprehensive validation:
+- Public square: Always accessible scope with no access code required
 - Grade scopes: 6 grades with unique access codes (e.g., gaDrIE5Lo0, SolELo74F)
 - Class scopes: 30 sections across 6 grades (5 sections per grade: A-E) with unique codes (e.g., jtKJdrDS9K, HJdr3cVj90p)
 - Referential integrity: Cannot delete grade scopes while child sections exist; cannot delete scopes with users, posts, events, or schedules
 - Parent-child validation: Section scopes require parent grade scope to exist before creation
-- Automatic seeding on server boot with safe duplicate-check logic
+- Automatic seeding on server boot with safe duplicate-check logic (1 public + 6 grades + 30 sections = 37 total scopes)
 
 ## External Dependencies
 

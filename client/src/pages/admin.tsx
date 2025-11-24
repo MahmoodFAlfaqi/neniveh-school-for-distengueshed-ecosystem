@@ -135,17 +135,22 @@ function ScopeManagement() {
       return;
     }
 
-    // Validate access code (alphanumeric, no spaces)
-    if (!accessCode.trim() || !/^[A-Za-z0-9]+$/.test(accessCode)) {
-      toast({
-        title: "Validation Error",
-        description: "Access code must be alphanumeric with no spaces",
-        variant: "destructive",
+    if (scopeType === "public") {
+      createScopeMutation.mutate({
+        name: scopeName,
+        type: scopeType,
+        accessCode: null,
       });
-      return;
-    }
-
-    if (scopeType === "grade") {
+    } else if (scopeType === "grade") {
+      // Validate access code (alphanumeric, no spaces)
+      if (!accessCode.trim() || !/^[A-Za-z0-9]+$/.test(accessCode)) {
+        toast({
+          title: "Validation Error",
+          description: "Access code must be alphanumeric with no spaces",
+          variant: "destructive",
+        });
+        return;
+      }
       // Validate grade number
       const gradeNum = parseInt(gradeNumber);
       if (!gradeNumber || isNaN(gradeNum) || gradeNum < 1 || gradeNum > 6) {
@@ -162,7 +167,17 @@ function ScopeManagement() {
         gradeNumber: gradeNum,
         accessCode: accessCode.trim(),
       });
-    } else {
+    } else if (scopeType === "section") {
+      // Validate access code (alphanumeric, no spaces)
+      if (!accessCode.trim() || !/^[A-Za-z0-9]+$/.test(accessCode)) {
+        toast({
+          title: "Validation Error",
+          description: "Access code must be alphanumeric with no spaces",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Validate section name format (e.g., "1-A", "2-B")
       if (!sectionName.trim() || !/^\d+-[A-E]$/.test(sectionName.trim())) {
         toast({
@@ -192,6 +207,7 @@ function ScopeManagement() {
     }
   };
 
+  const publicScope = scopes?.find(s => s.type === "public");
   const gradeScopes = scopes?.filter(s => s.type === "grade").sort((a, b) => (a.gradeNumber || 0) - (b.gradeNumber || 0)) || [];
   const classScopes = scopes?.filter(s => s.type === "section").sort((a, b) => (a.sectionName || "").localeCompare(b.sectionName || "")) || [];
 
@@ -215,16 +231,23 @@ function ScopeManagement() {
 
           <div>
             <Label htmlFor="scope-type">Scope Type</Label>
-            <Select value={scopeType} onValueChange={(value: "grade" | "section") => setScopeType(value)}>
+            <Select value={scopeType} onValueChange={(value: "grade" | "section" | "public") => setScopeType(value)}>
               <SelectTrigger id="scope-type" data-testid="select-scope-type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="public">Public Square</SelectItem>
                 <SelectItem value="grade">Grade Scope</SelectItem>
                 <SelectItem value="section">Class Scope</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {scopeType === "public" && (
+            <p className="text-sm text-muted-foreground">
+              The public square scope is created automatically and is accessible to all users.
+            </p>
+          )}
 
           {scopeType === "grade" && (
             <div>
@@ -255,7 +278,8 @@ function ScopeManagement() {
             </div>
           )}
 
-          <div>
+          {scopeType !== "public" && (
+            <div>
             <Label htmlFor="access-code">Access Code *</Label>
             <Input
               id="access-code"
@@ -264,10 +288,11 @@ function ScopeManagement() {
               onChange={(e) => setAccessCode(e.target.value)}
               data-testid="input-access-code"
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              Students will need this code to access content in this scope
-            </p>
-          </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Students will need this code to access content in this scope
+              </p>
+            </div>
+          )}
 
           <Button
             onClick={handleCreateScope}
@@ -290,6 +315,22 @@ function ScopeManagement() {
           </div>
         ) : (
           <>
+            {/* Public Square Scope */}
+            {publicScope && (
+              <div className="space-y-2 mb-6">
+                <h4 className="text-sm font-medium text-muted-foreground">Public Scope</h4>
+                <div className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-accent/50 hover-elevate">
+                  <div className="flex-1">
+                    <div className="font-medium">{publicScope.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      Accessible to all users without any access code
+                    </div>
+                  </div>
+                  <Badge variant="default">Public</Badge>
+                </div>
+              </div>
+            )}
+
             {/* Grade Scopes */}
             <div className="space-y-2">
               <h4 className="text-sm font-medium text-muted-foreground">Grade Scopes ({gradeScopes.length})</h4>

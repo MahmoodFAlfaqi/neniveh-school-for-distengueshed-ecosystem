@@ -995,7 +995,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createScope(insertScope: InsertScope): Promise<Scope> {
-    const [scope] = await db.insert(scopes).values(insertScope).returning();
+    // For public scopes, ensure accessCode is null
+    const scopeData = insertScope.type === "public" 
+      ? { ...insertScope, accessCode: null }
+      : insertScope;
+    const [scope] = await db.insert(scopes).values(scopeData).returning();
     return scope;
   }
 

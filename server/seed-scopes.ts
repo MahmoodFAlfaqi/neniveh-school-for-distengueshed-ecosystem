@@ -17,6 +17,14 @@ export async function seedScopes() {
     
     console.log("[SEED] 🌱 No scopes found, initializing default scopes...");
     
+    // Public Square Scope (always accessible, no access code needed)
+    await storage.createScope({
+      name: "Public Square",
+      type: "public",
+      accessCode: null,
+    });
+    console.log(`[SEED] ✓ Created public square scope`);
+    
     // Grade Scopes (6 grades)
     const gradeScopes = [
       { grade: 1, accessCode: "gaDrIE5Lo0" },
@@ -88,7 +96,7 @@ export async function seedScopes() {
     }
     
     console.log(`[SEED] ✓ Created ${classScopes.length} class section scopes`);
-    console.log(`[SEED] ✅ Scope initialization complete! (${gradeScopes.length} grades + ${classScopes.length} class sections)`);
+    console.log(`[SEED] ✅ Scope initialization complete! (1 public + ${gradeScopes.length} grades + ${classScopes.length} class sections)`);
     
   } catch (error) {
     console.error("[SEED] ❌ Failed to seed scopes:", error);

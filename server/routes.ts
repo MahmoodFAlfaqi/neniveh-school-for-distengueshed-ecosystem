@@ -1045,13 +1045,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Additional validation
       const { type, gradeNumber, sectionName, accessCode, name } = req.body;
 
-      // Validate access code format (alphanumeric, no spaces)
-      if (!accessCode || !/^[A-Za-z0-9]+$/.test(accessCode)) {
-        return res.status(400).json({ message: "Access code must be alphanumeric with no spaces" });
+      // Public scopes don't need access codes, but other scopes do
+      if (type !== "public") {
+        // Validate access code format (alphanumeric, no spaces)
+        if (!accessCode || !/^[A-Za-z0-9]+$/.test(accessCode)) {
+          return res.status(400).json({ message: "Access code must be alphanumeric with no spaces" });
+        }
       }
 
       // Validate based on scope type
-      if (type === "grade") {
+      if (type === "public") {
+        // Public scope is always allowed and doesn't require additional validation
+        // Check if public scope already exists
+        const allScopes = await storage.getAllScopes();
+        const existingPublic = allScopes.find(s => s.type === "public");
+        if (existingPublic) {
+          return res.status(400).json({ message: "Public square scope already exists" });
+        }
+      } else if (type === "grade") {
         if (!gradeNumber || typeof gradeNumber !== "number" || gradeNumber < 1 || gradeNumber > 6) {
           return res.status(400).json({ message: "Grade number must be a number between 1 and 6" });
         }
