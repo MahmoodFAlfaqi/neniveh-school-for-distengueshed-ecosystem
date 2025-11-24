@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, MapPin, Clock, Users, Plus, ChevronDown, ChevronUp, Star, Send, MessageSquare } from "lucide-react";
+import { Calendar, MapPin, Clock, Users, Plus, ChevronDown, ChevronUp, Star, Send, MessageSquare, Filter } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   Collapsible,
@@ -65,7 +65,7 @@ type Attendee = {
   credibilityScore: number;
 };
 
-function EventCard({ event, globalScopeId }: { event: Event; globalScopeId: string }) {
+function EventCard({ event, publicScopeId }: { event: Event; publicScopeId: string }) {
   const { toast } = useToast();
   const [showAttendees, setShowAttendees] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -107,7 +107,7 @@ function EventCard({ event, globalScopeId }: { event: Event; globalScopeId: stri
           description: "You've been added to the event attendance list",
         });
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/events", globalScopeId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events", publicScopeId] });
       queryClient.invalidateQueries({ queryKey: ["/api/events", event.id, "attendees"] });
     },
     onError: (error: Error) => {
@@ -300,6 +300,9 @@ export default function EventsPage() {
   const { toast } = useToast();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedScope, setSelectedScope] = useState<string | null>(null);
+  const [filterBy, setFilterBy] = useState<"all" | "upcoming" | "past">("upcoming");
+  const [sortBy, setSortBy] = useState<"dateAsc" | "dateDesc" | "popular">("dateAsc");
+  const [typeFilter, setTypeFilter] = useState<"all" | "curricular" | "extracurricular">("all");
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -322,18 +325,48 @@ export default function EventsPage() {
   });
 
   // Get the global scope ID
-  const globalScope = scopes.find(s => s.type === "global");
+  const publicScope = scopes.find(s => s.type === "public");
 
-  // Fetch global events (using global scope ID)
-  const { data: events = [], isLoading } = useQuery<Event[]>({
-    queryKey: ["/api/events", globalScope?.id],
-    enabled: !!globalScope,
+  // Fetch public events (using public scope ID)
+  const { data: rawEvents = [], isLoading } = useQuery<Event[]>({
+    queryKey: ["/api/events", publicScope?.id],
+    enabled: !!publicScope,
     queryFn: async () => {
-      const response = await fetch(`/api/events?scopeId=${globalScope!.id}`);
+      const response = await fetch(`/api/events?scopeId=${publicScope!.id}`);
       if (!response.ok) throw new Error("Failed to fetch events");
       return response.json();
     },
   });
+
+  // Filter and sort events
+  const events = useMemo(() => {
+    const now = new Date();
+    let filtered = [...rawEvents];
+    
+    // Filter by time (upcoming/past)
+    if (filterBy === "upcoming") {
+      filtered = filtered.filter(e => new Date(e.startTime) >= now);
+    } else if (filterBy === "past") {
+      filtered = filtered.filter(e => new Date(e.startTime) < now);
+    }
+    
+    // Filter by type
+    if (typeFilter !== "all") {
+      filtered = filtered.filter(e => e.eventType === typeFilter);
+    }
+    
+    // Sort
+    switch (sortBy) {
+      case "dateAsc":
+        return filtered.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+      case "dateDesc":
+        return filtered.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+      case "popular":
+        return filtered.sort((a, b) => b.rsvpCount - a.rsvpCount);
+      default:
+        return filtered;
+    }
+  }, [rawEvents, filterBy, sortBy, typeFilter]);
 
   // Get current user info
   const { data: user } = useQuery<{
@@ -347,7 +380,7 @@ export default function EventsPage() {
 
   const createEventMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const scopeId = selectedScope || globalScope?.id || null;
+      const scopeId = selectedScope || publicScope?.id || null;
       return await apiRequest("POST", "/api/events", {
         ...data,
         scopeId,
@@ -370,7 +403,7 @@ export default function EventsPage() {
       });
       setSelectedScope(null);
       setShowCreateForm(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/events", globalScope?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events", publicScope?.id] });
     },
     onError: (error: Error) => {
       toast({
@@ -533,10 +566,47 @@ export default function EventsPage() {
 
         {/* Events List */}
         <div className="space-y-4 sm:space-y-6">
-          <h2 className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Upcoming Events
-          </h2>
+          <div className="flex flex-col gap-4">
+            <h2 className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              Events
+            </h2>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex items-center gap-2 flex-1">
+                <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <Select value={filterBy} onValueChange={(value: typeof filterBy) => setFilterBy(value)}>
+                  <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-filter-events">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Events</SelectItem>
+                    <SelectItem value="upcoming">Upcoming Only</SelectItem>
+                    <SelectItem value="past">Past Events</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Select value={typeFilter} onValueChange={(value: typeof typeFilter) => setTypeFilter(value)}>
+                <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-type-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="curricular">Curricular</SelectItem>
+                  <SelectItem value="extracurricular">Extracurricular</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortBy} onValueChange={(value: typeof sortBy) => setSortBy(value)}>
+                <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-sort-events">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dateAsc">Date: Soonest First</SelectItem>
+                  <SelectItem value="dateDesc">Date: Latest First</SelectItem>
+                  <SelectItem value="popular">Most Popular</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
           {isLoading ? (
             <div className="text-center py-12">
@@ -556,7 +626,7 @@ export default function EventsPage() {
                 <EventCard 
                   key={event.id} 
                   event={event} 
-                  globalScopeId={globalScope!.id} 
+                  publicScopeId={publicScope!.id} 
                 />
               ))}
             </div>

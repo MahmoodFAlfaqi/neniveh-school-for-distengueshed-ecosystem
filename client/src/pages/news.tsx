@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Heart, MessageSquare, Send, TrendingUp, Star, ChevronDown, ChevronUp, Edit2, X, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Heart, MessageSquare, Send, TrendingUp, Star, ChevronDown, ChevronUp, Edit2, X, Trash2, Filter } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ScopeSelector } from "@/components/ScopeSelector";
 import { useHasAccessToScope } from "@/hooks/use-digital-keys";
@@ -45,6 +46,7 @@ type Post = {
 export default function NewsPage() {
   const { toast } = useToast();
   const [newPost, setNewPost] = useState("");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "mostLiked" | "highestCredibility">("newest");
   
   // Fetch scopes to find public scope for default selection
   const { data: scopes = [] } = useQuery<Array<{ id: string; type: string; name: string }>>({
@@ -74,7 +76,7 @@ export default function NewsPage() {
   const hasAccess = useHasAccessToScope(selectedScope);
 
   // Fetch news posts for the selected scope (or all global posts if no scope selected)
-  const { data: posts = [], isLoading } = useQuery<Post[]>({
+  const { data: rawPosts = [], isLoading } = useQuery<Post[]>({
     queryKey: ["/api/posts", selectedScope],
     queryFn: async () => {
       const scopeParam = selectedScope === null ? "null" : selectedScope;
@@ -83,6 +85,23 @@ export default function NewsPage() {
       return response.json();
     },
   });
+
+  // Sort posts based on selected criteria
+  const posts = useMemo(() => {
+    const sorted = [...rawPosts];
+    switch (sortBy) {
+      case "newest":
+        return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      case "oldest":
+        return sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      case "mostLiked":
+        return sorted.sort((a, b) => b.likesCount - a.likesCount);
+      case "highestCredibility":
+        return sorted.sort((a, b) => b.authorCredibilityScore - a.authorCredibilityScore);
+      default:
+        return sorted;
+    }
+  }, [rawPosts, sortBy]);
 
   // Get current user info
   const { data: user } = useQuery<{
@@ -320,10 +339,26 @@ export default function NewsPage() {
 
         {/* News Feed */}
         <div className="space-y-4 sm:space-y-6">
-          <h2 className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" />
-            Latest News
-          </h2>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <h2 className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Latest News
+            </h2>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <Select value={sortBy} onValueChange={(value: typeof sortBy) => setSortBy(value)}>
+                <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-sort-news">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest First</SelectItem>
+                  <SelectItem value="oldest">Oldest First</SelectItem>
+                  <SelectItem value="mostLiked">Most Liked</SelectItem>
+                  <SelectItem value="highestCredibility">Highest Credibility</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
           {isLoading ? (
             <div className="text-center py-12">

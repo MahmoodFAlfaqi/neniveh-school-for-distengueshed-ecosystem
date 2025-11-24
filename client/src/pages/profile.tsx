@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { Star, Award, TrendingUp, User as UserIcon, Calendar, MessageSquare, Edit2, Trash2, ChevronDown } from "lucide-react";
-import { PeerRatingForm } from "@/components/PeerRatingForm";
+import { Star, Award, TrendingUp, User as UserIcon, Calendar, MessageSquare, Edit2, Trash2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -31,28 +30,29 @@ type User = {
   reputationScore: number;
   accountStatus: "active" | "threatened" | "suspended";
   createdAt: string;
-  initiativeScore: number | null;
-  communicationScore: number | null;
-  cooperationScore: number | null;
-  kindnessScore: number | null;
-  perseveranceScore: number | null;
-  fitnessScore: number | null;
-  playingSkillsScore: number | null;
-  inClassMisconductScore: number | null;
-  outClassMisconductScore: number | null;
-  literaryScienceScore: number | null;
-  naturalScienceScore: number | null;
-  electronicScienceScore: number | null;
-  confidenceScore: number | null;
-  temperScore: number | null;
-  cheerfulnessScore: number | null;
-};
-
-type StatMetric = {
-  key: keyof User;
-  label: string;
-  arabicLabel: string;
-  isInverse?: boolean;
+  // Hexagon tendency charts - Social Personality
+  empathy: number | null;
+  angerManagement: number | null;
+  cooperation: number | null;
+  selfConfidence: number | null;
+  acceptingCriticism: number | null;
+  listening: number | null;
+  // Hexagon tendency charts - Skills & Abilities
+  problemSolving: number | null;
+  creativity: number | null;
+  memoryFocus: number | null;
+  planningOrganization: number | null;
+  communicationExpression: number | null;
+  leadershipInitiative: number | null;
+  // Hexagon tendency charts - Interests
+  artisticCreative: number | null;
+  athleticPhysical: number | null;
+  technicalTech: number | null;
+  linguisticReading: number | null;
+  socialHumanitarian: number | null;
+  naturalEnvironmental: number | null;
+  // Hobbies
+  hobbies: string[] | null;
 };
 
 type ProfileComment = {
@@ -67,42 +67,6 @@ type ProfileComment = {
   authorAvatarUrl?: string | null;
 };
 
-const STAT_METRICS: StatMetric[] = [
-  { key: "initiativeScore", label: "Initiative", arabicLabel: "المبادرة" },
-  { key: "communicationScore", label: "Communication", arabicLabel: "التواصل" },
-  { key: "cooperationScore", label: "Cooperation", arabicLabel: "التعاون مع الآخرين" },
-  { key: "kindnessScore", label: "Kindness", arabicLabel: "الطيبة" },
-  { key: "perseveranceScore", label: "Perseverance", arabicLabel: "الإصرار" },
-  { key: "fitnessScore", label: "Fitness", arabicLabel: "اللياقة" },
-  { key: "playingSkillsScore", label: "Playing Skills", arabicLabel: "مهارات اللعب" },
-  { key: "inClassMisconductScore", label: "In-Class Conduct", arabicLabel: "المشاغبة داخل الصف", isInverse: true },
-  { key: "outClassMisconductScore", label: "Out-Class Conduct", arabicLabel: "المشاغبة خارج الصف", isInverse: true },
-  { key: "literaryScienceScore", label: "Literary Science", arabicLabel: "العلم الأدبي" },
-  { key: "naturalScienceScore", label: "Natural Science", arabicLabel: "العلم الطبيعي" },
-  { key: "electronicScienceScore", label: "Electronic Science", arabicLabel: "العلم الإلكتروني" },
-  { key: "confidenceScore", label: "Confidence", arabicLabel: "الثقة" },
-  { key: "temperScore", label: "Temper", arabicLabel: "الغضب", isInverse: true },
-  { key: "cheerfulnessScore", label: "Cheerfulness", arabicLabel: "البشاشة" },
-];
-
-function StarRating({ score, max = 5 }: { score: number; max?: number }) {
-  return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: max }).map((_, i) => (
-        <Star
-          key={i}
-          className={`w-4 h-4 ${
-            i < Math.round(score)
-              ? "fill-yellow-400 text-yellow-400"
-              : "text-muted-foreground"
-          }`}
-        />
-      ))}
-      <span className="ml-1 text-sm font-medium">{score.toFixed(1)}</span>
-    </div>
-  );
-}
-
 export default function ProfilePage() {
   const [, params] = useRoute("/profile/:userId");
   const userId = params?.userId;
@@ -110,7 +74,6 @@ export default function ProfilePage() {
   const [editBio, setEditBio] = useState("");
   const [editGrade, setEditGrade] = useState("");
   const [editClassName, setEditClassName] = useState("");
-  const [expandMetrics, setExpandMetrics] = useState(false);
   const { toast } = useToast();
 
   const { data: user, isLoading } = useQuery<User>({
@@ -335,146 +298,6 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
         </div>
-
-        {user.role === "student" && (
-          <>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                  Average Performance Rating
-                </CardTitle>
-                <CardDescription>
-                  Overall peer rating across all metrics
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center">
-                <div className="flex items-center gap-1 mb-2">
-                  {Array.from({ length: 5 }).map((_, i) => {
-                    const scores = STAT_METRICS.map((metric) => {
-                      let score = user[metric.key] as number | null;
-                      // Skip inverse transformation for null/0 scores
-                      if (metric.isInverse && score !== null && score !== undefined && score !== 0) {
-                        score = 6 - score; // Convert 1->5, 2->4, 3->3, 4->2, 5->1
-                      }
-                      return score;
-                    });
-                    const validScores = scores.filter((s) => s !== null && s !== undefined && s !== 0) as number[];
-                    const avgScore = validScores.length > 0 
-                      ? validScores.reduce((sum, s) => sum + s, 0) / validScores.length 
-                      : 3;
-                    
-                    return (
-                      <Star
-                        key={i}
-                        className={`w-8 h-8 ${
-                          i < Math.round(avgScore)
-                            ? "fill-yellow-400 text-yellow-400"
-                            : "text-muted-foreground"
-                        }`}
-                      />
-                    );
-                  })}
-                </div>
-                <div className="text-3xl font-bold">
-                  {(() => {
-                    const scores = STAT_METRICS.map((metric) => {
-                      let score = user[metric.key] as number | null;
-                      // Skip inverse transformation for null/0 scores
-                      if (metric.isInverse && score !== null && score !== undefined && score !== 0) {
-                        score = 6 - score;
-                      }
-                      return score;
-                    });
-                    const validScores = scores.filter((s) => s !== null && s !== undefined && s !== 0) as number[];
-                    const avgScore = validScores.length > 0 
-                      ? validScores.reduce((sum, s) => sum + s, 0) / validScores.length 
-                      : 3;
-                    return avgScore.toFixed(1);
-                  })()}
-                </div>
-                <p className="text-sm text-muted-foreground">out of 5.0</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <button
-                onClick={() => setExpandMetrics(!expandMetrics)}
-                className="w-full hover-elevate active-elevate-2"
-                data-testid="button-toggle-metrics"
-              >
-                <CardHeader className="cursor-pointer">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 text-left">
-                      <CardTitle>Individual Performance Metrics</CardTitle>
-                      <CardDescription>
-                        Detailed peer-rated metrics (1-5 stars)
-                      </CardDescription>
-                    </div>
-                    <ChevronDown 
-                      className={`w-5 h-5 transition-transform duration-200 flex-shrink-0 ${expandMetrics ? "rotate-180" : ""}`}
-                    />
-                  </div>
-                </CardHeader>
-              </button>
-              {expandMetrics && (
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {STAT_METRICS.map((metric) => {
-                      let score = user[metric.key] as number | null;
-                      // Inverse misconduct and temper scores for display
-                      if (metric.isInverse && score !== null && score !== undefined && score !== 0) {
-                        score = 6 - score;
-                      }
-                      const displayScore = score || 3;
-                      
-                      return (
-                        <div
-                          key={metric.key}
-                          className="flex items-center justify-between p-2 rounded-lg border"
-                          data-testid={`stat-${metric.key}`}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">{metric.label}</div>
-                            <div className="text-xs text-muted-foreground truncate">
-                              {metric.arabicLabel}
-                            </div>
-                            {metric.isInverse && (
-                              <div className="text-xs text-yellow-600 dark:text-yellow-500">
-                                Lower is better (inverted display)
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-0.5 ml-2">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                              <Star
-                                key={i}
-                                className={`w-3 h-3 ${
-                                  i < Math.round(displayScore)
-                                    ? "fill-yellow-400 text-yellow-400"
-                                    : "text-muted-foreground"
-                                }`}
-                              />
-                            ))}
-                            <span className="ml-1 text-xs font-medium">{displayScore.toFixed(1)}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-          </>
-        )}
-
-        {!isOwnProfile && currentUser && (
-          <PeerRatingForm
-            ratedUserId={user.id}
-            ratedUserName={user.name}
-            currentUserId={currentUser.id}
-          />
-        )}
 
         <ProfileCommentsSection userId={user.id} currentUserId={currentUser?.id} />
       </div>

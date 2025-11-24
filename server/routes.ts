@@ -19,7 +19,6 @@ import {
   insertPostCommentSchema,
   insertEventCommentSchema,
   insertAdminStudentIdSchema,
-  insertPeerRatingSchema,
   insertPostAccuracyRatingSchema,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
@@ -1668,57 +1667,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ==================== PEER RATINGS ====================
-  
-  // Submit or update a peer rating
-  app.post("/api/users/:userId/rate", requireAuth, requireNonVisitor, async (req, res) => {
-    try {
-      const ratedUserId = req.params.userId;
-      const raterUserId = req.session.userId!;
-      
-      // Prevent self-rating (server-side validation)
-      if (ratedUserId === raterUserId) {
-        return res.status(400).json({ message: "You cannot rate yourself" });
-      }
-      
-      // Validate that the user being rated exists
-      const ratedUser = await storage.getUser(ratedUserId);
-      if (!ratedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      // Extract rating scores from request body (exclude ratedUserId and raterUserId)
-      const { ratedUserId: _, raterUserId: __, ...scores } = req.body;
-      
-      // Parse and validate the rating data - derive IDs from route/session only
-      const ratingData = insertPeerRatingSchema.parse({
-        ...scores,
-        ratedUserId,
-        raterUserId, // Always use session user ID, never trust client
-      });
-      
-      const rating = await storage.submitPeerRating(ratingData);
-      res.json(rating);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to submit rating" });
-    }
-  });
-  
-  // Get user's existing rating for another user
-  app.get("/api/users/:userId/rating", requireAuth, async (req, res) => {
-    try {
-      const ratedUserId = req.params.userId;
-      const raterUserId = req.session.userId!;
-      
-      const rating = await storage.getUserRating(ratedUserId, raterUserId);
-      res.json(rating || null);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch rating" });
-    }
-  });
 
   // ==================== FILE UPLOADS ====================
   

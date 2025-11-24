@@ -15,7 +15,6 @@ import {
   teachers,
   teacherReviews,
   profileComments,
-  peerRatings,
   settings,
   passwordResetTokens,
   failedLoginAttempts,
@@ -52,8 +51,6 @@ import {
   type InsertTeacherReview,
   type ProfileComment,
   type InsertProfileComment,
-  type PeerRating,
-  type InsertPeerRating,
   type Setting,
   type InsertSetting,
   type PasswordResetToken,
@@ -68,25 +65,6 @@ import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
 const CREDIBILITY_THRESHOLD_FOR_THREAT = 25.0; // Below this, account becomes "threatened"
-
-// Helper function to calculate average rating from user's 15 performance metrics
-function calculateAverageRating(user: any): number {
-  const metricKeys = [
-    'initiativeScore', 'communicationScore', 'cooperationScore', 'kindnessScore',
-    'perseveranceScore', 'fitnessScore', 'playingSkillsScore', 'inClassMisconductScore',
-    'outClassMisconductScore', 'literaryScienceScore', 'naturalScienceScore',
-    'electronicScienceScore', 'confidenceScore', 'temperScore', 'cheerfulnessScore'
-  ];
-  
-  const validScores = metricKeys
-    .map(key => user[key])
-    .filter((score): score is number => score !== null && score !== undefined);
-  
-  if (validScores.length === 0) return 3;
-  
-  const sum = validScores.reduce((acc, score) => acc + score, 0);
-  return sum / validScores.length;
-}
 
 export interface IStorage {
   // User management
@@ -165,11 +143,7 @@ export interface IStorage {
   deleteTeacher(id: string): Promise<boolean>;
   getTeacherWithReviews(id: string): Promise<{ teacher: Teacher; reviews: TeacherReview[]; averageRating: number } | undefined>;
   
-  // Peer Ratings
-  submitPeerRating(rating: InsertPeerRating): Promise<PeerRating>;
-  getUserRatings(userId: string): Promise<PeerRating[]>;
-  getUserRating(ratedUserId: string, raterUserId: string): Promise<PeerRating | undefined>;
-  calculateAndUpdateUserStats(userId: string): Promise<void>;
+  // Teacher Reviews
   createTeacherReview(review: InsertTeacherReview): Promise<TeacherReview>;
   getTeacherReviews(teacherId: string): Promise<TeacherReview[]>;
   
@@ -520,12 +494,6 @@ export class DatabaseStorage implements IStorage {
         
         // Delete all teacher reviews by the user
         await tx.delete(teacherReviews).where(eq(teacherReviews.studentId, userId));
-        
-        // Delete all peer ratings where user is the rater
-        await tx.delete(peerRatings).where(eq(peerRatings.raterUserId, userId));
-        
-        // Delete all peer ratings where user is being rated
-        await tx.delete(peerRatings).where(eq(peerRatings.ratedUserId, userId));
         
         // Delete all digital keys (unlocked scopes)
         await tx.delete(digitalKeys).where(eq(digitalKeys.userId, userId));
@@ -1084,7 +1052,7 @@ export class DatabaseStorage implements IStorage {
 
   async getPosts(scopeId?: string | null, userId?: string): Promise<any[]> {
     if (scopeId === null || scopeId === undefined) {
-      // Get public square posts (no scope) with author info including all rating metrics
+      // Get public square posts (no scope) with author info
       const results = await db
         .select({
           id: posts.id,
@@ -1101,21 +1069,6 @@ export class DatabaseStorage implements IStorage {
           authorRole: users.role,
           authorAvatarUrl: users.avatarUrl,
           authorCredibilityScore: users.credibilityScore,
-          authorInitiativeScore: users.initiativeScore,
-          authorCommunicationScore: users.communicationScore,
-          authorCooperationScore: users.cooperationScore,
-          authorKindnessScore: users.kindnessScore,
-          authorPerseveranceScore: users.perseveranceScore,
-          authorFitnessScore: users.fitnessScore,
-          authorPlayingSkillsScore: users.playingSkillsScore,
-          authorInClassMisconductScore: users.inClassMisconductScore,
-          authorOutClassMisconductScore: users.outClassMisconductScore,
-          authorLiteraryScienceScore: users.literaryScienceScore,
-          authorNaturalScienceScore: users.naturalScienceScore,
-          authorElectronicScienceScore: users.electronicScienceScore,
-          authorConfidenceScore: users.confidenceScore,
-          authorTemperScore: users.temperScore,
-          authorCheerfulnessScore: users.cheerfulnessScore,
         })
         .from(posts)
         .leftJoin(users, eq(posts.authorId, users.id))
@@ -1143,26 +1096,8 @@ export class DatabaseStorage implements IStorage {
         // Table might not exist yet, continue without accuracy ratings
       }
       
-      // Transform to ensure author always exists and include liked status and average rating
+      // Transform to ensure author always exists and include liked status
       return results.map(post => {
-        const authorData = {
-          initiativeScore: post.authorInitiativeScore,
-          communicationScore: post.authorCommunicationScore,
-          cooperationScore: post.authorCooperationScore,
-          kindnessScore: post.authorKindnessScore,
-          perseveranceScore: post.authorPerseveranceScore,
-          fitnessScore: post.authorFitnessScore,
-          playingSkillsScore: post.authorPlayingSkillsScore,
-          inClassMisconductScore: post.authorInClassMisconductScore,
-          outClassMisconductScore: post.authorOutClassMisconductScore,
-          literaryScienceScore: post.authorLiteraryScienceScore,
-          naturalScienceScore: post.authorNaturalScienceScore,
-          electronicScienceScore: post.authorElectronicScienceScore,
-          confidenceScore: post.authorConfidenceScore,
-          temperScore: post.authorTemperScore,
-          cheerfulnessScore: post.authorCheerfulnessScore,
-        };
-        
         return {
           ...post,
           isLikedByCurrentUser: likedPostIds.includes(post.id),
@@ -1171,7 +1106,6 @@ export class DatabaseStorage implements IStorage {
             name: post.authorName || "Unknown User",
             role: post.authorRole || "student",
             avatarUrl: post.authorAvatarUrl,
-            averageRating: post.authorRole === "student" ? calculateAverageRating(authorData) : null,
           },
         };
       });
@@ -1193,21 +1127,6 @@ export class DatabaseStorage implements IStorage {
         authorRole: users.role,
         authorAvatarUrl: users.avatarUrl,
         authorCredibilityScore: users.credibilityScore,
-        authorInitiativeScore: users.initiativeScore,
-        authorCommunicationScore: users.communicationScore,
-        authorCooperationScore: users.cooperationScore,
-        authorKindnessScore: users.kindnessScore,
-        authorPerseveranceScore: users.perseveranceScore,
-        authorFitnessScore: users.fitnessScore,
-        authorPlayingSkillsScore: users.playingSkillsScore,
-        authorInClassMisconductScore: users.inClassMisconductScore,
-        authorOutClassMisconductScore: users.outClassMisconductScore,
-        authorLiteraryScienceScore: users.literaryScienceScore,
-        authorNaturalScienceScore: users.naturalScienceScore,
-        authorElectronicScienceScore: users.electronicScienceScore,
-        authorConfidenceScore: users.confidenceScore,
-        authorTemperScore: users.temperScore,
-        authorCheerfulnessScore: users.cheerfulnessScore,
       })
       .from(posts)
       .leftJoin(users, eq(posts.authorId, users.id))
@@ -1235,26 +1154,8 @@ export class DatabaseStorage implements IStorage {
       // Table might not exist yet, continue without accuracy ratings
     }
     
-    // Transform to ensure author always exists and include liked status and average rating
+    // Transform to ensure author always exists and include liked status
     return results.map(post => {
-      const authorData = {
-        initiativeScore: post.authorInitiativeScore,
-        communicationScore: post.authorCommunicationScore,
-        cooperationScore: post.authorCooperationScore,
-        kindnessScore: post.authorKindnessScore,
-        perseveranceScore: post.authorPerseveranceScore,
-        fitnessScore: post.authorFitnessScore,
-        playingSkillsScore: post.authorPlayingSkillsScore,
-        inClassMisconductScore: post.authorInClassMisconductScore,
-        outClassMisconductScore: post.authorOutClassMisconductScore,
-        literaryScienceScore: post.authorLiteraryScienceScore,
-        naturalScienceScore: post.authorNaturalScienceScore,
-        electronicScienceScore: post.authorElectronicScienceScore,
-        confidenceScore: post.authorConfidenceScore,
-        temperScore: post.authorTemperScore,
-        cheerfulnessScore: post.authorCheerfulnessScore,
-      };
-      
       return {
         ...post,
         isLikedByCurrentUser: likedPostIds.includes(post.id),
@@ -1263,7 +1164,6 @@ export class DatabaseStorage implements IStorage {
           name: post.authorName || "Unknown User",
           role: post.authorRole || "student",
           avatarUrl: post.authorAvatarUrl,
-          averageRating: post.authorRole === "student" ? calculateAverageRating(authorData) : null,
         },
       };
     });
@@ -1431,21 +1331,6 @@ export class DatabaseStorage implements IStorage {
         createdByName: users.name,
         createdByRole: users.role,
         createdByAvatarUrl: users.avatarUrl,
-        createdByInitiativeScore: users.initiativeScore,
-        createdByCommunicationScore: users.communicationScore,
-        createdByCooperationScore: users.cooperationScore,
-        createdByKindnessScore: users.kindnessScore,
-        createdByPerseveranceScore: users.perseveranceScore,
-        createdByFitnessScore: users.fitnessScore,
-        createdByPlayingSkillsScore: users.playingSkillsScore,
-        createdByInClassMisconductScore: users.inClassMisconductScore,
-        createdByOutClassMisconductScore: users.outClassMisconductScore,
-        createdByLiteraryScienceScore: users.literaryScienceScore,
-        createdByNaturalScienceScore: users.naturalScienceScore,
-        createdByElectronicScienceScore: users.electronicScienceScore,
-        createdByConfidenceScore: users.confidenceScore,
-        createdByTemperScore: users.temperScore,
-        createdByCheerfulnessScore: users.cheerfulnessScore,
       })
       .from(events)
       .leftJoin(users, eq(events.createdById, users.id));
@@ -1461,24 +1346,6 @@ export class DatabaseStorage implements IStorage {
           const rsvps = await this.getEventRsvps(event.id);
           const userHasRsvpd = userId ? rsvps.some(r => r.userId === userId) : false;
           
-          const creatorData = {
-            initiativeScore: event.createdByInitiativeScore,
-            communicationScore: event.createdByCommunicationScore,
-            cooperationScore: event.createdByCooperationScore,
-            kindnessScore: event.createdByKindnessScore,
-            perseveranceScore: event.createdByPerseveranceScore,
-            fitnessScore: event.createdByFitnessScore,
-            playingSkillsScore: event.createdByPlayingSkillsScore,
-            inClassMisconductScore: event.createdByInClassMisconductScore,
-            outClassMisconductScore: event.createdByOutClassMisconductScore,
-            literaryScienceScore: event.createdByLiteraryScienceScore,
-            naturalScienceScore: event.createdByNaturalScienceScore,
-            electronicScienceScore: event.createdByElectronicScienceScore,
-            confidenceScore: event.createdByConfidenceScore,
-            temperScore: event.createdByTemperScore,
-            cheerfulnessScore: event.createdByCheerfulnessScore,
-          };
-          
           return { 
             ...event, 
             rsvpCount: rsvps.length, 
@@ -1487,7 +1354,6 @@ export class DatabaseStorage implements IStorage {
               name: event.createdByName || "Unknown User",
               role: event.createdByRole || "student",
               avatarUrl: event.createdByAvatarUrl,
-              averageRating: event.createdByRole === "student" ? calculateAverageRating(creatorData) : null,
             }
           };
         })
@@ -1503,24 +1369,6 @@ export class DatabaseStorage implements IStorage {
         const rsvps = await this.getEventRsvps(event.id);
         const userHasRsvpd = userId ? rsvps.some(r => r.userId === userId) : false;
         
-        const creatorData = {
-          initiativeScore: event.createdByInitiativeScore,
-          communicationScore: event.createdByCommunicationScore,
-          cooperationScore: event.createdByCooperationScore,
-          kindnessScore: event.createdByKindnessScore,
-          perseveranceScore: event.createdByPerseveranceScore,
-          fitnessScore: event.createdByFitnessScore,
-          playingSkillsScore: event.createdByPlayingSkillsScore,
-          inClassMisconductScore: event.createdByInClassMisconductScore,
-          outClassMisconductScore: event.createdByOutClassMisconductScore,
-          literaryScienceScore: event.createdByLiteraryScienceScore,
-          naturalScienceScore: event.createdByNaturalScienceScore,
-          electronicScienceScore: event.createdByElectronicScienceScore,
-          confidenceScore: event.createdByConfidenceScore,
-          temperScore: event.createdByTemperScore,
-          cheerfulnessScore: event.createdByCheerfulnessScore,
-        };
-        
         return { 
           ...event, 
           rsvpCount: rsvps.length, 
@@ -1529,7 +1377,6 @@ export class DatabaseStorage implements IStorage {
             name: event.createdByName || "Unknown User",
             role: event.createdByRole || "student",
             avatarUrl: event.createdByAvatarUrl,
-            averageRating: event.createdByRole === "student" ? calculateAverageRating(creatorData) : null,
           }
         };
       })
@@ -1837,112 +1684,6 @@ export class DatabaseStorage implements IStorage {
     return reaction;
   }
 
-  // ==================== PEER RATINGS ====================
-  async submitPeerRating(rating: InsertPeerRating): Promise<PeerRating> {
-    // Check if rating already exists from this rater for this user
-    const [existing] = await db
-      .select()
-      .from(peerRatings)
-      .where(
-        and(
-          eq(peerRatings.ratedUserId, rating.ratedUserId),
-          eq(peerRatings.raterUserId, rating.raterUserId)
-        )
-      );
-
-    let result: PeerRating;
-    if (existing) {
-      // Update existing rating
-      const [updated] = await db
-        .update(peerRatings)
-        .set({
-          ...rating,
-          updatedAt: new Date(),
-        })
-        .where(eq(peerRatings.id, existing.id))
-        .returning();
-      result = updated;
-    } else {
-      // Create new rating
-      const [created] = await db.insert(peerRatings).values(rating).returning();
-      result = created;
-    }
-
-    // Recalculate and update user stats
-    await this.calculateAndUpdateUserStats(rating.ratedUserId);
-
-    return result;
-  }
-
-  async getUserRatings(userId: string): Promise<PeerRating[]> {
-    return await db
-      .select()
-      .from(peerRatings)
-      .where(eq(peerRatings.ratedUserId, userId));
-  }
-
-  async getUserRating(ratedUserId: string, raterUserId: string): Promise<PeerRating | undefined> {
-    const [rating] = await db
-      .select()
-      .from(peerRatings)
-      .where(
-        and(
-          eq(peerRatings.ratedUserId, ratedUserId),
-          eq(peerRatings.raterUserId, raterUserId)
-        )
-      );
-    return rating || undefined;
-  }
-
-  async calculateAndUpdateUserStats(userId: string): Promise<void> {
-    // Get all ratings for this user
-    const ratings = await this.getUserRatings(userId);
-
-    if (ratings.length === 0) {
-      // No ratings yet - keep stats as null
-      return;
-    }
-
-    // Calculate averages for each metric
-    const avgInitiative = ratings.reduce((sum, r) => sum + r.initiativeScore, 0) / ratings.length;
-    const avgCommunication = ratings.reduce((sum, r) => sum + r.communicationScore, 0) / ratings.length;
-    const avgCooperation = ratings.reduce((sum, r) => sum + r.cooperationScore, 0) / ratings.length;
-    const avgKindness = ratings.reduce((sum, r) => sum + r.kindnessScore, 0) / ratings.length;
-    const avgPerseverance = ratings.reduce((sum, r) => sum + r.perseveranceScore, 0) / ratings.length;
-    const avgFitness = ratings.reduce((sum, r) => sum + r.fitnessScore, 0) / ratings.length;
-    const avgPlayingSkills = ratings.reduce((sum, r) => sum + r.playingSkillsScore, 0) / ratings.length;
-    const avgInClassMisconduct = ratings.reduce((sum, r) => sum + r.inClassMisconductScore, 0) / ratings.length;
-    const avgOutClassMisconduct = ratings.reduce((sum, r) => sum + r.outClassMisconductScore, 0) / ratings.length;
-    const avgLiteraryScience = ratings.reduce((sum, r) => sum + r.literaryScienceScore, 0) / ratings.length;
-    const avgNaturalScience = ratings.reduce((sum, r) => sum + r.naturalScienceScore, 0) / ratings.length;
-    const avgElectronicScience = ratings.reduce((sum, r) => sum + r.electronicScienceScore, 0) / ratings.length;
-    const avgConfidence = ratings.reduce((sum, r) => sum + r.confidenceScore, 0) / ratings.length;
-    const avgTemper = ratings.reduce((sum, r) => sum + r.temperScore, 0) / ratings.length;
-    const avgCheerfulness = ratings.reduce((sum, r) => sum + r.cheerfulnessScore, 0) / ratings.length;
-
-    // Update user stats with calculated averages
-    await db
-      .update(users)
-      .set({
-        initiativeScore: avgInitiative,
-        communicationScore: avgCommunication,
-        cooperationScore: avgCooperation,
-        kindnessScore: avgKindness,
-        perseveranceScore: avgPerseverance,
-        fitnessScore: avgFitness,
-        playingSkillsScore: avgPlayingSkills,
-        inClassMisconductScore: avgInClassMisconduct,
-        outClassMisconductScore: avgOutClassMisconduct,
-        literaryScienceScore: avgLiteraryScience,
-        naturalScienceScore: avgNaturalScience,
-        electronicScienceScore: avgElectronicScience,
-        confidenceScore: avgConfidence,
-        temperScore: avgTemper,
-        cheerfulnessScore: avgCheerfulness,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId));
-  }
 
   // ==================== SETTINGS ====================
   async getSetting(key: string): Promise<Setting | undefined> {
