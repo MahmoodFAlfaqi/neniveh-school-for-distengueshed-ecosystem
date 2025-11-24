@@ -169,14 +169,12 @@ export default function ProfilePage() {
       interests: ["artisticCreative", "athleticPhysical", "technicalTech", "linguisticReading", "socialHumanitarian", "naturalEnvironmental"],
     };
     
-    // IMPORTANT: Create fresh state with ONLY the 6 metrics for this hexagon type
-    // This prevents values from other hexagons bleeding into the submission
     const initialValues: Record<string, number> = {};
     metricKeys[type].forEach((key) => {
       initialValues[key] = (user as any)[key] ?? 4;
     });
     
-    setHexagonValues(initialValues); // Fresh state, no previous hexagon data
+    setHexagonValues(initialValues);
     setEditingHexagon(type);
   };
 
@@ -263,15 +261,12 @@ export default function ProfilePage() {
   const handleSaveHexagon = () => {
     if (!editingHexagon) return;
     
-    // Define the valid keys for the current hexagon type
     const metricKeys = {
       social: ["empathy", "angerManagement", "cooperation", "selfConfidence", "acceptingCriticism", "listening"],
       skills: ["problemSolving", "creativity", "memoryFocus", "planningOrganization", "communicationExpression", "leadershipInitiative"],
       interests: ["artisticCreative", "athleticPhysical", "technicalTech", "linguisticReading", "socialHumanitarian", "naturalEnvironmental"],
     };
     
-    // Filter to send ONLY the 6 metrics for the current hexagon type
-    // This prevents cross-hexagon contamination from state batching or stale values
     const validKeys = metricKeys[editingHexagon];
     const filteredValues: Record<string, number> = {};
     validKeys.forEach(key => {
@@ -331,7 +326,6 @@ export default function ProfilePage() {
 
   const currentHexagonLabels = editingHexagon ? hexagonMetricLabels[editingHexagon] : {};
   
-  // Calculate total using ONLY the keys for the current hexagon type (prevent stale key pollution)
   const currentMetricKeys = editingHexagon ? {
     social: ["empathy", "angerManagement", "cooperation", "selfConfidence", "acceptingCriticism", "listening"],
     skills: ["problemSolving", "creativity", "memoryFocus", "planningOrganization", "communicationExpression", "leadershipInitiative"],

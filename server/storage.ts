@@ -76,7 +76,7 @@ export interface IStorage {
   createVisitorUser(userData: InsertUser): Promise<User>;
   getStudentsByClass(grade: number, className: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
-  updateUserProfile(userId: string, updates: { bio?: string; avatarUrl?: string }): Promise<User | undefined>;
+  updateUserProfile(userId: string, updates: { bio?: string; avatarUrl?: string; grade?: number; className?: string; empathy?: number; angerManagement?: number; cooperation?: number; selfConfidence?: number; acceptingCriticism?: number; listening?: number; problemSolving?: number; creativity?: number; memoryFocus?: number; planningOrganization?: number; communicationExpression?: number; leadershipInitiative?: number; artisticCreative?: number; athleticPhysical?: number; technicalTech?: number; linguisticReading?: number; socialHumanitarian?: number; naturalEnvironmental?: number; hobbies?: string[] }): Promise<User | undefined>;
   updateUserCredibility(userId: string, newScore: number): Promise<User | undefined>;
   updateUserReputation(userId: string, newScore: number): Promise<User | undefined>;
   deleteUser(userId: string): Promise<boolean>;
@@ -410,7 +410,7 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async updateUserProfile(userId: string, updates: { bio?: string; avatarUrl?: string; grade?: number; className?: string }): Promise<User | undefined> {
+  async updateUserProfile(userId: string, updates: { bio?: string; avatarUrl?: string; grade?: number; className?: string; empathy?: number; angerManagement?: number; cooperation?: number; selfConfidence?: number; acceptingCriticism?: number; listening?: number; problemSolving?: number; creativity?: number; memoryFocus?: number; planningOrganization?: number; communicationExpression?: number; leadershipInitiative?: number; artisticCreative?: number; athleticPhysical?: number; technicalTech?: number; linguisticReading?: number; socialHumanitarian?: number; naturalEnvironmental?: number; hobbies?: string[] }): Promise<User | undefined> {
     const [user] = await db
       .update(users)
       .set({ 
@@ -418,6 +418,25 @@ export class DatabaseStorage implements IStorage {
         avatarUrl: updates.avatarUrl,
         grade: updates.grade,
         className: updates.className,
+        empathy: updates.empathy,
+        angerManagement: updates.angerManagement,
+        cooperation: updates.cooperation,
+        selfConfidence: updates.selfConfidence,
+        acceptingCriticism: updates.acceptingCriticism,
+        listening: updates.listening,
+        problemSolving: updates.problemSolving,
+        creativity: updates.creativity,
+        memoryFocus: updates.memoryFocus,
+        planningOrganization: updates.planningOrganization,
+        communicationExpression: updates.communicationExpression,
+        leadershipInitiative: updates.leadershipInitiative,
+        artisticCreative: updates.artisticCreative,
+        athleticPhysical: updates.athleticPhysical,
+        technicalTech: updates.technicalTech,
+        linguisticReading: updates.linguisticReading,
+        socialHumanitarian: updates.socialHumanitarian,
+        naturalEnvironmental: updates.naturalEnvironmental,
+        hobbies: updates.hobbies,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId))
