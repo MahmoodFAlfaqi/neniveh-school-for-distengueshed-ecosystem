@@ -16,6 +16,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+type Teacher = {
+  id: string;
+  name: string;
+  subjects?: string[] | null;
+  sections?: string[] | null;
+};
+
 // Predefined subjects list
 const SUBJECTS = [
   "Math",
@@ -101,6 +108,11 @@ export default function SchedulePage() {
 
   const { data: rsvps = [] } = useQuery<RSVP[]>({
     queryKey: ["/api/rsvps"],
+    enabled: !!user,
+  });
+
+  const { data: teachers = [] } = useQuery<Teacher[]>({
+    queryKey: ["/api/teachers"],
     enabled: !!user,
   });
 
@@ -196,6 +208,17 @@ export default function SchedulePage() {
         teacherName: field === 'teacherName' ? value : (prev[key]?.teacherName || getScheduleForSlot(dayIndex, periodNum)?.teacherName || null),
       }
     }));
+  };
+
+  // Get teachers who teach the selected subject in the user's section
+  const getTeachersForSubjectAndSection = (subject: string | null): Teacher[] => {
+    if (!subject || !user?.grade || !user?.className) return [];
+    const userSection = `${user.grade}-${user.className}`;
+    return teachers.filter(
+      (teacher) =>
+        teacher.subjects?.includes(subject) &&
+        teacher.sections?.includes(userSection)
+    );
   };
 
   // Get events for calendar (RSVPed events + class/grade events)

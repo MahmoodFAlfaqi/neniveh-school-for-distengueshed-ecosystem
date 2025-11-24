@@ -189,6 +189,10 @@ export const teachers = pgTable("teachers", {
   description: text("description"), // Admin-written description of the teacher
   academicAchievements: text("academic_achievements").array(), // Degrees, certifications, awards
   
+  // Subject and section management
+  subjects: text("subjects").array(), // e.g., ["Math", "Physics"]
+  sections: text("sections").array(), // e.g., ["1-A", "1-B", "2-A"]
+  
   // Dynamic data
   classroomRules: text("classroom_rules").array(),
   

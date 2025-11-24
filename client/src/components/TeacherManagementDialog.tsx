@@ -9,6 +9,37 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { X, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+
+// Predefined subjects list
+const SUBJECTS = [
+  "Math",
+  "R.E.",
+  "P.E.",
+  "Social Studies",
+  "Biology",
+  "Chemistry",
+  "Physics",
+  "Arabic",
+  "English",
+  "French",
+  "B.P.C.",
+  "Finance",
+  "Geology",
+  "Computer Science",
+  "Arts",
+  "Moralism",
+  "Library",
+] as const;
+
+// Generate all possible sections (1-A through 6-E)
+const SECTIONS = Array.from({ length: 6 }, (_, grade) => {
+  const gradeNum = grade + 1;
+  return Array.from({ length: 5 }, (_, idx) => {
+    const section = String.fromCharCode(65 + idx); // A-E
+    return `${gradeNum}-${section}`;
+  });
+}).flat();
 
 type Teacher = {
   id: string;
@@ -16,6 +47,8 @@ type Teacher = {
   photoUrl: string | null;
   description: string | null;
   academicAchievements: string[] | null;
+  subjects?: string[] | null;
+  sections?: string[] | null;
 };
 
 type TeacherManagementDialogProps = {
@@ -37,6 +70,12 @@ export function TeacherManagementDialog({
     teacher?.academicAchievements || []
   );
   const [newAchievement, setNewAchievement] = useState("");
+  const [selectedSubjects, setSelectedSubjects] = useState<Set<string>>(
+    new Set(teacher?.subjects || [])
+  );
+  const [selectedSections, setSelectedSections] = useState<Set<string>>(
+    new Set(teacher?.sections || [])
+  );
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -113,6 +152,8 @@ export function TeacherManagementDialog({
     setDescription("");
     setAchievements([]);
     setNewAchievement("");
+    setSelectedSubjects(new Set());
+    setSelectedSections(new Set());
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -123,6 +164,8 @@ export function TeacherManagementDialog({
       photoUrl: photoUrl || null,
       description: description || null,
       academicAchievements: achievements.length > 0 ? achievements : null,
+      subjects: selectedSubjects.size > 0 ? Array.from(selectedSubjects) : null,
+      sections: selectedSections.size > 0 ? Array.from(selectedSections) : null,
     };
 
     if (teacher) {
@@ -248,6 +291,71 @@ export function TeacherManagementDialog({
                   ))}
                 </div>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Subjects Taught</Label>
+              <div className="grid grid-cols-2 gap-3">
+                {SUBJECTS.map((subject) => (
+                  <div key={subject} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`subject-${subject}`}
+                      checked={selectedSubjects.has(subject)}
+                      onCheckedChange={(checked) => {
+                        const newSubjects = new Set(selectedSubjects);
+                        if (checked) {
+                          newSubjects.add(subject);
+                        } else {
+                          newSubjects.delete(subject);
+                        }
+                        setSelectedSubjects(newSubjects);
+                      }}
+                      data-testid={`checkbox-subject-${subject}`}
+                    />
+                    <Label htmlFor={`subject-${subject}`} className="font-normal cursor-pointer">
+                      {subject}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Sections Taught</Label>
+              <div className="space-y-3 max-h-48 overflow-y-auto border rounded-md p-3">
+                {Array.from({ length: 6 }).map((_, gradeIdx) => {
+                  const gradeNum = gradeIdx + 1;
+                  const gradeSections = SECTIONS.filter((s) => s.startsWith(`${gradeNum}-`));
+                  return (
+                    <div key={`grade-${gradeNum}`}>
+                      <div className="font-semibold text-sm mb-2">Grade {gradeNum}</div>
+                      <div className="grid grid-cols-5 gap-2 ml-2">
+                        {gradeSections.map((section) => (
+                          <div key={section} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`section-${section}`}
+                              checked={selectedSections.has(section)}
+                              onCheckedChange={(checked) => {
+                                const newSections = new Set(selectedSections);
+                                if (checked) {
+                                  newSections.add(section);
+                                } else {
+                                  newSections.delete(section);
+                                }
+                                setSelectedSections(newSections);
+                              }}
+                              data-testid={`checkbox-section-${section}`}
+                            />
+                            <Label htmlFor={`section-${section}`} className="font-normal cursor-pointer">
+                              {section.split("-")[1]}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
