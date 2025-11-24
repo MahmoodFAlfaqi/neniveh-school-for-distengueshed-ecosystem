@@ -240,10 +240,12 @@ export default function Home() {
                       <p className="text-xs text-muted-foreground mb-1">Participation</p>
                       <p className="font-semibold text-sm">{recentPosts.length} posts</p>
                     </div>
-                    <div className="bg-background/50 dark:bg-background/30 rounded-lg p-3">
-                      <p className="text-xs text-muted-foreground mb-1">Upcoming Events</p>
-                      <p className="font-semibold text-sm">{events.length} total</p>
-                    </div>
+                    <Link href="/events" className="block">
+                      <div className="bg-background/50 dark:bg-background/30 rounded-lg p-3 hover:bg-background dark:hover:bg-background/50 transition-colors cursor-pointer group">
+                        <p className="text-xs text-muted-foreground mb-1">Upcoming Events</p>
+                        <p className="font-semibold text-sm group-hover:text-primary transition-colors">{events.length} total</p>
+                      </div>
+                    </Link>
                   </div>
                 </CardContent>
               </Card>
