@@ -19,6 +19,10 @@ import {
   passwordResetTokens,
   failedLoginAttempts,
   rememberMeTokens,
+  friendships,
+  chatMessages,
+  contentViolations,
+  userPunishments,
   type User,
   type InsertUser,
   type Scope,
@@ -59,6 +63,14 @@ import {
   type InsertFailedLoginAttempt,
   type RememberMeToken,
   type InsertRememberMeToken,
+  type Friendship,
+  type InsertFriendship,
+  type ChatMessage,
+  type InsertChatMessage,
+  type ContentViolation,
+  type InsertContentViolation,
+  type UserPunishment,
+  type InsertUserPunishment,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
@@ -167,6 +179,31 @@ export interface IStorage {
   createPasswordResetToken(userId: string): Promise<string>;
   validatePasswordResetToken(token: string): Promise<User | undefined>;
   resetPassword(token: string, newPassword: string): Promise<boolean>;
+  
+  // Friends
+  sendFriendRequest(user1Id: string, user2Id: string): Promise<Friendship>;
+  acceptFriendRequest(friendshipId: string): Promise<Friendship | undefined>;
+  rejectFriendRequest(friendshipId: string): Promise<Friendship | undefined>;
+  getFriends(userId: string): Promise<User[]>;
+  getPendingFriendRequests(userId: string): Promise<Array<Friendship & { initiator: User }>>;
+  unfriend(user1Id: string, user2Id: string): Promise<boolean>;
+  getFriendship(user1Id: string, user2Id: string): Promise<Friendship | undefined>;
+  
+  // Chat
+  sendChatMessage(senderId: string, receiverId: string, content: string): Promise<ChatMessage>;
+  getChatMessages(user1Id: string, user2Id: string): Promise<ChatMessage[]>;
+  markMessageAsRead(messageId: string): Promise<ChatMessage | undefined>;
+  getUnreadMessageCount(userId: string): Promise<number>;
+  
+  // Content Moderation
+  createViolation(violation: InsertContentViolation): Promise<ContentViolation>;
+  getUserViolations(userId: string): Promise<ContentViolation[]>;
+  getUserViolationCount(userId: string): Promise<number>;
+  
+  // Punishments
+  createPunishment(punishment: InsertUserPunishment): Promise<UserPunishment>;
+  getUserPunishments(userId: string): Promise<UserPunishment[]>;
+  applyPunishment(userId: string, credibilityPenalty: number, banUntil?: Date): Promise<User | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1800,6 +1837,244 @@ export class DatabaseStorage implements IStorage {
       console.error("Failed to reset password:", error);
       return false;
     }
+  }
+
+  // ==================== FRIENDS ====================
+  async sendFriendRequest(user1Id: string, user2Id: string): Promise<Friendship> {
+    const [lowerId, higherId] = [user1Id, user2Id].sort();
+    
+    const [friendship] = await db
+      .insert(friendships)
+      .values({
+        user1Id: lowerId,
+        user2Id: higherId,
+        initiatorId: user1Id,
+        status: "pending",
+      })
+      .returning();
+    
+    return friendship;
+  }
+
+  async acceptFriendRequest(friendshipId: string): Promise<Friendship | undefined> {
+    const [friendship] = await db
+      .update(friendships)
+      .set({ status: "accepted", updatedAt: new Date() })
+      .where(eq(friendships.id, friendshipId))
+      .returning();
+    
+    return friendship || undefined;
+  }
+
+  async rejectFriendRequest(friendshipId: string): Promise<Friendship | undefined> {
+    const [friendship] = await db
+      .update(friendships)
+      .set({ status: "rejected", updatedAt: new Date() })
+      .where(eq(friendships.id, friendshipId))
+      .returning();
+    
+    return friendship || undefined;
+  }
+
+  async getFriends(userId: string): Promise<User[]> {
+    const friendshipsData = await db
+      .select()
+      .from(friendships)
+      .where(
+        and(
+          sql`(${friendships.user1Id} = ${userId} OR ${friendships.user2Id} = ${userId})`,
+          eq(friendships.status, "accepted")
+        )
+      );
+    
+    const friendIds = friendshipsData.map((f) =>
+      f.user1Id === userId ? f.user2Id : f.user1Id
+    );
+    
+    if (friendIds.length === 0) return [];
+    
+    const friends = await db
+      .select()
+      .from(users)
+      .where(inArray(users.id, friendIds));
+    
+    return friends;
+  }
+
+  async getPendingFriendRequests(userId: string): Promise<Array<Friendship & { initiator: User }>> {
+    const requests = await db
+      .select({
+        friendship: friendships,
+        initiator: users,
+      })
+      .from(friendships)
+      .innerJoin(users, eq(friendships.initiatorId, users.id))
+      .where(
+        and(
+          sql`(${friendships.user1Id} = ${userId} OR ${friendships.user2Id} = ${userId})`,
+          eq(friendships.status, "pending"),
+          sql`${friendships.initiatorId} != ${userId}`
+        )
+      );
+    
+    return requests.map((r) => ({ ...r.friendship, initiator: r.initiator }));
+  }
+
+  async unfriend(user1Id: string, user2Id: string): Promise<boolean> {
+    const [lowerId, higherId] = [user1Id, user2Id].sort();
+    
+    const result = await db
+      .delete(friendships)
+      .where(
+        and(
+          eq(friendships.user1Id, lowerId),
+          eq(friendships.user2Id, higherId)
+        )
+      );
+    
+    return true;
+  }
+
+  async getFriendship(user1Id: string, user2Id: string): Promise<Friendship | undefined> {
+    const [lowerId, higherId] = [user1Id, user2Id].sort();
+    
+    const [friendship] = await db
+      .select()
+      .from(friendships)
+      .where(
+        and(
+          eq(friendships.user1Id, lowerId),
+          eq(friendships.user2Id, higherId)
+        )
+      );
+    
+    return friendship || undefined;
+  }
+
+  // ==================== CHAT ====================
+  async sendChatMessage(senderId: string, receiverId: string, content: string): Promise<ChatMessage> {
+    const [message] = await db
+      .insert(chatMessages)
+      .values({
+        senderId,
+        receiverId,
+        content,
+        isRead: false,
+      })
+      .returning();
+    
+    return message;
+  }
+
+  async getChatMessages(user1Id: string, user2Id: string): Promise<ChatMessage[]> {
+    const messages = await db
+      .select()
+      .from(chatMessages)
+      .where(
+        sql`(${chatMessages.senderId} = ${user1Id} AND ${chatMessages.receiverId} = ${user2Id}) OR (${chatMessages.senderId} = ${user2Id} AND ${chatMessages.receiverId} = ${user1Id})`
+      )
+      .orderBy(chatMessages.createdAt);
+    
+    return messages;
+  }
+
+  async markMessageAsRead(messageId: string): Promise<ChatMessage | undefined> {
+    const [message] = await db
+      .update(chatMessages)
+      .set({ isRead: true })
+      .where(eq(chatMessages.id, messageId))
+      .returning();
+    
+    return message || undefined;
+  }
+
+  async getUnreadMessageCount(userId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(chatMessages)
+      .where(
+        and(
+          eq(chatMessages.receiverId, userId),
+          eq(chatMessages.isRead, false)
+        )
+      );
+    
+    return Number(result[0]?.count || 0);
+  }
+
+  // ==================== CONTENT MODERATION ====================
+  async createViolation(violation: InsertContentViolation): Promise<ContentViolation> {
+    const [created] = await db
+      .insert(contentViolations)
+      .values(violation)
+      .returning();
+    
+    return created;
+  }
+
+  async getUserViolations(userId: string): Promise<ContentViolation[]> {
+    const violations = await db
+      .select()
+      .from(contentViolations)
+      .where(eq(contentViolations.authorId, userId))
+      .orderBy(desc(contentViolations.createdAt));
+    
+    return violations;
+  }
+
+  async getUserViolationCount(userId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(contentViolations)
+      .where(eq(contentViolations.authorId, userId));
+    
+    return Number(result[0]?.count || 0);
+  }
+
+  // ==================== PUNISHMENTS ====================
+  async createPunishment(punishment: InsertUserPunishment): Promise<UserPunishment> {
+    const [created] = await db
+      .insert(userPunishments)
+      .values(punishment)
+      .returning();
+    
+    return created;
+  }
+
+  async getUserPunishments(userId: string): Promise<UserPunishment[]> {
+    const punishments = await db
+      .select()
+      .from(userPunishments)
+      .where(eq(userPunishments.userId, userId))
+      .orderBy(desc(userPunishments.createdAt));
+    
+    return punishments;
+  }
+
+  async applyPunishment(userId: string, credibilityPenalty: number, banUntil?: Date): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+    
+    const newCredibility = Math.max(0, user.credibilityScore - credibilityPenalty);
+    
+    const updates: any = {
+      credibilityScore: newCredibility,
+      updatedAt: new Date(),
+    };
+    
+    if (banUntil) {
+      updates.accountStatus = "suspended";
+    } else if (newCredibility < CREDIBILITY_THRESHOLD_FOR_THREAT) {
+      updates.accountStatus = "threatened";
+    }
+    
+    const [updated] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, userId))
+      .returning();
+    
+    return updated || undefined;
   }
 }
 

@@ -20,10 +20,14 @@ import {
   insertEventCommentSchema,
   insertAdminStudentIdSchema,
   insertPostAccuracyRatingSchema,
+  insertFriendshipSchema,
+  insertChatMessageSchema,
+  insertContentViolationSchema,
+  insertUserPunishmentSchema,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { z } from "zod";
-import { requireModeration } from "./moderation";
+import { requireModeration, moderateContentEnhanced, calculatePunishment } from "./moderation";
 import { upload, getMediaType } from "./upload";
 
 // Authentication middleware (allows both logged-in users and visitors)
@@ -1818,6 +1822,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  // ==================== FRIENDS ====================
+  app.post("/api/friends/request", requireNonVisitor, async (req, res) => {
+    try {
+      const { receiverId } = req.body;
+      const senderId = req.session.userId!;
+      
+      if (senderId === receiverId) {
+        return res.status(400).json({ message: "Cannot send friend request to yourself" });
+      }
+      
+      const existingFriendship = await storage.getFriendship(senderId, receiverId);
+      if (existingFriendship) {
+        return res.status(400).json({ message: "Friend request already exists or you are already friends" });
+      }
+      
+      const friendship = await storage.sendFriendRequest(senderId, receiverId);
+      res.json(friendship);
+    } catch (error) {
+      console.error("Send friend request error:", error);
+      res.status(500).json({ message: "Failed to send friend request" });
+    }
+  });
+
+  app.post("/api/friends/accept/:friendshipId", requireNonVisitor, async (req, res) => {
+    try {
+      const friendship = await storage.acceptFriendRequest(req.params.friendshipId);
+      if (!friendship) {
+        return res.status(404).json({ message: "Friend request not found" });
+      }
+      res.json(friendship);
+    } catch (error) {
+      console.error("Accept friend request error:", error);
+      res.status(500).json({ message: "Failed to accept friend request" });
+    }
+  });
+
+  app.post("/api/friends/reject/:friendshipId", requireNonVisitor, async (req, res) => {
+    try {
+      const friendship = await storage.rejectFriendRequest(req.params.friendshipId);
+      if (!friendship) {
+        return res.status(404).json({ message: "Friend request not found" });
+      }
+      res.json(friendship);
+    } catch (error) {
+      console.error("Reject friend request error:", error);
+      res.status(500).json({ message: "Failed to reject friend request" });
+    }
+  });
+
+  app.get("/api/friends", requireNonVisitor, async (req, res) => {
+    try {
+      const friends = await storage.getFriends(req.session.userId!);
+      res.json(friends);
+    } catch (error) {
+      console.error("Get friends error:", error);
+      res.status(500).json({ message: "Failed to fetch friends" });
+    }
+  });
+
+  app.get("/api/friends/requests", requireNonVisitor, async (req, res) => {
+    try {
+      const requests = await storage.getPendingFriendRequests(req.session.userId!);
+      res.json(requests);
+    } catch (error) {
+      console.error("Get friend requests error:", error);
+      res.status(500).json({ message: "Failed to fetch friend requests" });
+    }
+  });
+
+  app.delete("/api/friends/:friendId", requireNonVisitor, async (req, res) => {
+    try {
+      await storage.unfriend(req.session.userId!, req.params.friendId);
+      res.json({ message: "Friend removed successfully" });
+    } catch (error) {
+      console.error("Unfriend error:", error);
+      res.status(500).json({ message: "Failed to remove friend" });
+    }
+  });
+
+  // ==================== CHAT ====================
+  app.post("/api/chat/messages", requireNonVisitor, async (req, res) => {
+    try {
+      const messageData = insertChatMessageSchema.parse({
+        ...req.body,
+        senderId: req.session.userId!,
+      });
+      
+      const friendship = await storage.getFriendship(messageData.senderId, messageData.receiverId);
+      if (!friendship || friendship.status !== "accepted") {
+        return res.status(403).json({ message: "Can only send messages to friends" });
+      }
+      
+      const moderation = await moderateContentEnhanced(messageData.content, "chat message");
+      
+      if (moderation.isViolation && moderation.severity && moderation.violationType) {
+        const violationCount = await storage.getUserViolationCount(messageData.senderId);
+        
+        const violation = await storage.createViolation({
+          contentType: "chat_message",
+          contentId: "pending",
+          authorId: messageData.senderId,
+          violationType: moderation.violationType,
+          severity: moderation.severity,
+          detectedBy: "ai",
+          aiConfidence: moderation.confidence,
+          aiReasoning: moderation.reasoning,
+          reportedById: null,
+        });
+        
+        const punishment = calculatePunishment(moderation.violationType, moderation.severity, violationCount);
+        
+        await storage.createPunishment({
+          userId: messageData.senderId,
+          violationId: violation.id,
+          punishmentType: punishment.punishmentType,
+          credibilityPenalty: punishment.credibilityPenalty,
+          banUntil: punishment.banDurationHours ? new Date(Date.now() + punishment.banDurationHours * 60 * 60 * 1000) : null,
+          notes: `AI detected ${moderation.violationType} (${moderation.severity}) in chat message`,
+        });
+        
+        await storage.applyPunishment(
+          messageData.senderId,
+          punishment.credibilityPenalty,
+          punishment.banDurationHours ? new Date(Date.now() + punishment.banDurationHours * 60 * 60 * 1000) : undefined
+        );
+        
+        return res.status(400).json({ 
+          message: `Message blocked: ${moderation.reasoning}`,
+          punishment: punishment.punishmentType,
+          credibilityLost: punishment.credibilityPenalty
+        });
+      }
+      
+      const message = await storage.sendChatMessage(messageData.senderId, messageData.receiverId, messageData.content);
+      res.json(message);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid message", errors: error.errors });
+      }
+      console.error("Send message error:", error);
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  app.get("/api/chat/messages/:friendId", requireNonVisitor, async (req, res) => {
+    try {
+      const messages = await storage.getChatMessages(req.session.userId!, req.params.friendId);
+      res.json(messages);
+    } catch (error) {
+      console.error("Get messages error:", error);
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+
+  app.patch("/api/chat/messages/:messageId/read", requireNonVisitor, async (req, res) => {
+    try {
+      const message = await storage.markMessageAsRead(req.params.messageId);
+      if (!message) {
+        return res.status(404).json({ message: "Message not found" });
+      }
+      res.json(message);
+    } catch (error) {
+      console.error("Mark message as read error:", error);
+      res.status(500).json({ message: "Failed to mark message as read" });
+    }
+  });
+
+  app.get("/api/chat/unread-count", requireNonVisitor, async (req, res) => {
+    try {
+      const count = await storage.getUnreadMessageCount(req.session.userId!);
+      res.json({ count });
+    } catch (error) {
+      console.error("Get unread count error:", error);
+      res.status(500).json({ message: "Failed to fetch unread count" });
+    }
+  });
 
   // ==================== FILE UPLOADS ====================
   

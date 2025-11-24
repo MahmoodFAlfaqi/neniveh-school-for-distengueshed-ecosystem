@@ -9,6 +9,11 @@ export const userRoleEnum = pgEnum("user_role", ["student", "admin", "visitor"])
 export const accountStatusEnum = pgEnum("account_status", ["active", "threatened", "suspended"]);
 export const scopeTypeEnum = pgEnum("scope_type", ["grade", "section", "public"]);
 export const eventTypeEnum = pgEnum("event_type", ["curricular", "extracurricular"]);
+export const friendStatusEnum = pgEnum("friend_status", ["pending", "accepted", "rejected"]);
+export const violationTypeEnum = pgEnum("violation_type", ["spam", "offensive", "hate_speech", "harassment", "inappropriate"]);
+export const violationSeverityEnum = pgEnum("violation_severity", ["low", "medium", "high", "critical"]);
+export const detectionSourceEnum = pgEnum("detection_source", ["ai", "user_report", "admin"]);
+export const punishmentTypeEnum = pgEnum("punishment_type", ["warning", "credibility_reduction", "temp_ban", "permanent_ban"]);
 
 // Users table with reputation and credibility
 export const users = pgTable("users", {
@@ -308,6 +313,64 @@ export const profileComments = pgTable("profile_comments", {
   
   content: text("content").notNull(),
   rating: integer("rating"), // Optional 1-5 stars
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Friendships - user-to-user friend connections
+export const friendships = pgTable("friendships", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  user1Id: varchar("user1_id").notNull().references(() => users.id, { onDelete: "cascade" }), // Lower ID always goes here
+  user2Id: varchar("user2_id").notNull().references(() => users.id, { onDelete: "cascade" }), // Higher ID always goes here
+  initiatorId: varchar("initiator_id").notNull().references(() => users.id, { onDelete: "cascade" }), // Who sent the request
+  status: friendStatusEnum("status").notNull().default("pending"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueFriendship: unique().on(table.user1Id, table.user2Id),
+}));
+
+// Chat Messages - direct messages between friends
+export const chatMessages = pgTable("chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  senderId: varchar("sender_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  receiverId: varchar("receiver_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  content: text("content").notNull(),
+  isRead: boolean("is_read").notNull().default(false),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Content Violations - AI-detected or user-reported violations
+export const contentViolations = pgTable("content_violations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contentType: text("content_type").notNull(), // 'post', 'chat_message', 'profile_comment', etc.
+  contentId: varchar("content_id").notNull(), // ID of the violating content
+  authorId: varchar("author_id").notNull().references(() => users.id, { onDelete: "cascade" }), // Who created the violating content
+  
+  violationType: violationTypeEnum("violation_type").notNull(),
+  severity: violationSeverityEnum("severity").notNull(),
+  detectedBy: detectionSourceEnum("detected_by").notNull(),
+  aiConfidence: real("ai_confidence"), // 0-1 scale, null if not AI-detected
+  aiReasoning: text("ai_reasoning"), // AI explanation of why it's a violation
+  
+  reportedById: varchar("reported_by_id").references(() => users.id), // If user-reported
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// User Punishments - automatic punishments based on violations
+export const userPunishments = pgTable("user_punishments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  violationId: varchar("violation_id").references(() => contentViolations.id, { onDelete: "set null" }),
+  
+  punishmentType: punishmentTypeEnum("punishment_type").notNull(),
+  credibilityPenalty: real("credibility_penalty").notNull().default(0), // Amount credibility reduced
+  banUntil: timestamp("ban_until"), // Null if not a ban, otherwise when ban expires
+  notes: text("notes"), // Admin notes or automated reasoning
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -657,3 +720,39 @@ export const insertRememberMeTokenSchema = createInsertSchema(rememberMeTokens).
 
 export type InsertRememberMeToken = z.infer<typeof insertRememberMeTokenSchema>;
 export type RememberMeToken = typeof rememberMeTokens.$inferSelect;
+
+export const insertFriendshipSchema = createInsertSchema(friendships).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFriendship = z.infer<typeof insertFriendshipSchema>;
+export type Friendship = typeof friendships.$inferSelect;
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+  id: true,
+  createdAt: true,
+  isRead: true,
+}).extend({
+  content: z.string().trim().min(1, "Message cannot be empty").max(2000, "Message must not exceed 2000 characters"),
+});
+
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+
+export const insertContentViolationSchema = createInsertSchema(contentViolations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertContentViolation = z.infer<typeof insertContentViolationSchema>;
+export type ContentViolation = typeof contentViolations.$inferSelect;
+
+export const insertUserPunishmentSchema = createInsertSchema(userPunishments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertUserPunishment = z.infer<typeof insertUserPunishmentSchema>;
+export type UserPunishment = typeof userPunishments.$inferSelect;
