@@ -181,7 +181,7 @@ export default function SchedulePage() {
     },
   });
 
-  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
   const periods = [1, 2, 3, 4, 5, 6, 7];
 
   const getScheduleForSlot = (dayIndex: number, periodNum: number): Schedule | undefined => {
