@@ -45,20 +45,25 @@ type Post = {
 export default function NewsPage() {
   const { toast } = useToast();
   const [newPost, setNewPost] = useState("");
-  const [selectedScope, setSelectedScope] = useState<string | null>(null);
+  
+  // Fetch scopes to find public scope for default selection
+  const { data: scopes = [] } = useQuery<Array<{ id: string; type: string; name: string }>>({
+    queryKey: ["/api/scopes"],
+  });
+
+  // Find public scope
+  const publicScope = scopes.find((s) => s.type === "public");
+  
+  // Initialize selected scope to public scope by default
+  const [selectedScope, setSelectedScope] = useState<string | null>(() => publicScope?.id || null);
+  
   const [showCommentsForPostId, setShowCommentsForPostId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState<{ [postId: string]: string }>({});
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
 
-  // Fetch scopes to find public scope for default selection
-  const { data: scopes = [] } = useQuery<Array<{ id: string; type: string; name: string }>>({
-    queryKey: ["/api/scopes"],
-  });
-
-  // Set default scope to public scope on mount
-  const publicScope = scopes.find((s) => s.type === "public");
+  // Update selected scope when public scope loads (in case it wasn't available on mount)
   useEffect(() => {
     if (publicScope && selectedScope === null) {
       setSelectedScope(publicScope.id);
