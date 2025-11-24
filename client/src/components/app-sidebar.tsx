@@ -1,4 +1,4 @@
-import { Home, Calendar, Users, Settings, BookOpen, User, LogOut, Shield, GraduationCap, Newspaper, Heart } from "lucide-react";
+import { Home, Calendar, Users, Settings, BookOpen, User, LogOut, Shield, GraduationCap, Newspaper, Heart, Square } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -34,6 +34,11 @@ const mainNavItems = [
     title: "Home",
     url: "/",
     icon: Home,
+  },
+  {
+    title: "Public Square",
+    url: "/public-square",
+    icon: Square,
   },
   {
     title: "News",

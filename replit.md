@@ -8,6 +8,10 @@ This project is a social platform designed for students, teachers, and administr
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Updates
+
+- Added Public Square page: A community gathering space showing all public/global announcements and posts accessible to all authenticated users
+
 ## System Architecture
 
 ### UI/UX Decisions

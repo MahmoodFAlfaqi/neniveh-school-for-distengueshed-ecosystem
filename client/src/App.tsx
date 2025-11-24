@@ -10,6 +10,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import Home from "@/pages/home";
 import AuthPage from "@/pages/auth";
 import ForgotPasswordPage from "@/pages/forgot-password";
+import PublicSquarePage from "@/pages/public-square";
 import NewsPage from "@/pages/news";
 import EventsPage from "@/pages/events";
 import EventDetailPage from "@/pages/event-detail";
@@ -120,6 +121,13 @@ function Router() {
         {() => (
           <AuthenticatedLayout>
             <Home />
+          </AuthenticatedLayout>
+        )}
+      </Route>
+      <Route path="/public-square">
+        {() => (
+          <AuthenticatedLayout>
+            <PublicSquarePage />
           </AuthenticatedLayout>
         )}
       </Route>
