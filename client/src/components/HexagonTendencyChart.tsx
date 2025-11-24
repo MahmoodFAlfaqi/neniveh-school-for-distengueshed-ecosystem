@@ -28,7 +28,7 @@ export function HexagonTendencyChart({
   onEdit,
 }: HexagonTendencyChartProps) {
   const totalPoints = metrics.reduce((sum, m) => sum + m.value, 0);
-  const maxTotalPoints = 24;
+  const maxTotalPoints = 33;
 
   const chartData = metrics.map((m) => ({
     metric: m.arabicLabel,

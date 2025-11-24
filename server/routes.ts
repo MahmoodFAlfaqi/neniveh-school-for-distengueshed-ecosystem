@@ -690,9 +690,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate total points for the detected hexagon (must be exactly 24)
       const total = Object.values(updates).reduce((sum, v) => sum + v, 0);
       
-      if (total !== 24) {
+      if (total !== 33) {
         return res.status(400).json({ 
-          message: `Invalid point distribution. The ${detectedGroup} hexagon must have exactly 24 total points (received ${total}).`
+          message: `Invalid point distribution. The ${detectedGroup} hexagon must have exactly 33 total points (received ${total}).`
         });
       }
       

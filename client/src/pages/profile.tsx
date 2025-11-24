@@ -276,10 +276,10 @@ export default function ProfilePage() {
     const total = Object.values(filteredValues).reduce((sum, v) => sum + v, 0);
     const hasInvalid = Object.values(filteredValues).some((v) => v < 0 || v > 10);
     
-    if (total !== 24) {
+    if (total !== 33) {
       toast({
         title: "Invalid distribution",
-        description: `You must distribute exactly 24 points. Current total: ${total}`,
+        description: `You must distribute exactly 33 points. Current total: ${total}`,
         variant: "destructive",
       });
       return;
@@ -672,7 +672,7 @@ export default function ProfilePage() {
               Edit {editingHexagon === "social" ? "Social Personality" : editingHexagon === "skills" ? "Skills & Abilities" : "Interests"} Hexagon
             </DialogTitle>
             <DialogDescription>
-              Distribute 24 points across the 6 metrics. Each metric can have a maximum of 10 points.
+              Distribute 33 points across the 6 metrics. Each metric can have a maximum of 10 points.
             </DialogDescription>
           </DialogHeader>
           
