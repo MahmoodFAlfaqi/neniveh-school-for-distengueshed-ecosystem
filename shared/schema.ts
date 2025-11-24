@@ -142,6 +142,7 @@ export const events = pgTable("events", {
   title: text("title").notNull(),
   description: text("description"),
   eventType: eventTypeEnum("event_type").notNull(),
+  eventCategory: text("event_category"), // Subject for curricular, category for extracurricular
   scopeId: varchar("scope_id").references(() => scopes.id),
   
   startTime: timestamp("start_time").notNull(),
@@ -526,7 +527,8 @@ export const insertEventSchema = createInsertSchema(events)
     createdAt: true,
   })
   .extend({
-    description: z.string().trim().min(1, "Description is required").max(4000, "Description must not exceed 4000 characters"),
+    description: z.string().trim().optional().default(""),
+    eventCategory: z.string().min(1, "Category is required"),
   });
 
 export const insertEventRsvpSchema = createInsertSchema(eventRsvps).omit({
