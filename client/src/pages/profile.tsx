@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { Star, Award, TrendingUp, User as UserIcon, Calendar, MessageSquare, Edit2, Trash2 } from "lucide-react";
+import { Star, Award, TrendingUp, User as UserIcon, Calendar, MessageSquare, Edit2, Trash2, Plus, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -78,9 +78,11 @@ export default function ProfilePage() {
   const [editClassName, setEditClassName] = useState("");
   const [editingHexagon, setEditingHexagon] = useState<"social" | "skills" | "interests" | null>(null);
   const [hexagonValues, setHexagonValues] = useState<Record<string, number>>({});
+  const [addingHobby, setAddingHobby] = useState(false);
+  const [newHobby, setNewHobby] = useState("");
   const { toast } = useToast();
 
-  const { data: user, isLoading } = useQuery<User>({
+  const { data: user, isLoading, isFetching } = useQuery<User>({
     queryKey: userId ? [`/api/users/${userId}`] : ["/api/auth/me"],
   });
 
@@ -199,6 +201,64 @@ export default function ProfilePage() {
       });
     },
   });
+
+  const updateHobbiesMutation = useMutation({
+    mutationFn: async (hobbies: string[]) => {
+      return await apiRequest("PATCH", `/api/users/${currentUser?.id}/hobbies`, { hobbies });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Hobbies updated",
+        description: "Your hobbies have been updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${currentUser?.id}`] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update hobbies",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAddHobby = () => {
+    if (!user || !currentUser || !newHobby.trim() || updateHobbiesMutation.isPending || isFetching) return;
+    
+    const currentHobbies = user.hobbies || [];
+    
+    if (currentHobbies.length >= 5) {
+      toast({
+        title: "Maximum hobbies reached",
+        description: "You can only add up to 5 hobbies",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (newHobby.trim().length > 50) {
+      toast({
+        title: "Hobby too long",
+        description: "Each hobby must be 50 characters or less",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const updatedHobbies = [...currentHobbies, newHobby.trim()];
+    updateHobbiesMutation.mutate(updatedHobbies);
+    setNewHobby("");
+    setAddingHobby(false);
+  };
+
+  const handleDeleteHobby = (index: number) => {
+    if (!user || !currentUser || updateHobbiesMutation.isPending || isFetching) return;
+    
+    const currentHobbies = user.hobbies || [];
+    const updatedHobbies = currentHobbies.filter((_, i) => i !== index);
+    updateHobbiesMutation.mutate(updatedHobbies);
+  };
 
   const handleSaveHexagon = () => {
     if (!editingHexagon) return;
@@ -477,6 +537,61 @@ export default function ProfilePage() {
           </div>
         )}
 
+        {user.role === "student" && (
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">Hobbies & Interests</h3>
+                <p className="text-sm text-muted-foreground">
+                  Share up to 5 hobbies or activities you enjoy
+                </p>
+              </div>
+              {isOwnProfile && (user.hobbies?.length || 0) < 5 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAddingHobby(true)}
+                  disabled={updateHobbiesMutation.isPending || isFetching}
+                  data-testid="button-add-hobby"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Hobby
+                </Button>
+              )}
+            </div>
+
+            {(!user.hobbies || user.hobbies.length === 0) ? (
+              <div className="text-center py-8 text-muted-foreground">
+                {isOwnProfile 
+                  ? "You haven't added any hobbies yet. Click 'Add Hobby' to get started!"
+                  : "No hobbies added yet."}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {user.hobbies.map((hobby, index) => (
+                  <div
+                    key={index}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-accent/50 rounded-full text-sm"
+                    data-testid={`hobby-${index}`}
+                  >
+                    <span>{hobby}</span>
+                    {isOwnProfile && (
+                      <button
+                        onClick={() => handleDeleteHobby(index)}
+                        disabled={updateHobbiesMutation.isPending || isFetching}
+                        className="text-destructive hover:text-destructive/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        data-testid={`button-delete-hobby-${index}`}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
         <ProfileCommentsSection userId={user.id} currentUserId={currentUser?.id} />
       </div>
 
@@ -617,6 +732,52 @@ export default function ProfilePage() {
               data-testid="button-save-hexagon"
             >
               {updateHexagonMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addingHobby} onOpenChange={setAddingHobby}>
+        <DialogContent data-testid="dialog-add-hobby">
+          <DialogHeader>
+            <DialogTitle>Add New Hobby</DialogTitle>
+            <DialogDescription>
+              Share an activity or interest you enjoy (max 50 characters)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="hobby" className="text-sm font-medium">Hobby</label>
+              <Input
+                id="hobby"
+                placeholder="e.g., Playing guitar, Reading sci-fi, Cooking"
+                value={newHobby}
+                onChange={(e) => setNewHobby(e.target.value)}
+                maxLength={50}
+                data-testid="input-new-hobby"
+              />
+              <p className="text-xs text-muted-foreground">
+                {newHobby.length}/50 characters
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAddingHobby(false);
+                setNewHobby("");
+              }}
+              data-testid="button-cancel-hobby"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddHobby}
+              disabled={updateHobbiesMutation.isPending || !newHobby.trim()}
+              data-testid="button-save-hobby"
+            >
+              {updateHobbiesMutation.isPending ? "Adding..." : "Add Hobby"}
             </Button>
           </DialogFooter>
         </DialogContent>

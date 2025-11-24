@@ -711,6 +711,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update user hobbies (own profile only)
+  app.patch("/api/users/:userId/hobbies", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const currentUserId = req.session.userId!;
+      
+      if (userId !== currentUserId) {
+        return res.status(403).json({ message: "You can only edit your own hobbies" });
+      }
+      
+      // Validate hobbies using Zod schema (allow empty array to delete all hobbies)
+      const hobbiesSchema = z.object({
+        hobbies: z.array(z.string().trim().min(1).max(50)).max(5)
+      });
+      
+      const parseResult = hobbiesSchema.safeParse(req.body);
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid hobbies format. Must be an array of 1-5 strings, each 1-50 characters.",
+          errors: parseResult.error.errors
+        });
+      }
+      
+      const { hobbies } = parseResult.data;
+      
+      // Update user hobbies
+      const updated = await storage.updateUserProfile(userId, { hobbies });
+      
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { password, ...userWithoutPassword } = updated;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Failed to update hobbies:", error);
+      res.status(500).json({ message: "Failed to update hobbies" });
+    }
+  });
+
   // ==================== ADMIN STUDENT ID MANAGEMENT ====================
   
   // Generate new student ID (admin only)
