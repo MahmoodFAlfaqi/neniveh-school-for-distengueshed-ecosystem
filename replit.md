@@ -54,7 +54,14 @@ The frontend is built with React, TypeScript, and Vite, utilizing Shadcn UI (bas
 
 ### Database Schema
 
-Includes tables for `Users` (roles, gamification scores, peer-ratable metrics), `Scopes`, `DigitalKeys`, `Posts`, `Events` (with eventCategory field), `Schedules`, `Teachers` (with review system), `PeerRatings`, `ProfileComments`, `PostReactions`, `Settings`, `failed_login_attempts`, `remember_me_tokens`, `Friendships` (with pending/accepted status), and `Messages` (for direct messaging).
+Includes tables for `Users` (roles, gamification scores, self-rating metrics), `Scopes`, `DigitalKeys`, `Posts`, `Events` (with eventCategory field), `Schedules`, `Teachers` (with review system), `ProfileComments`, `PostReactions`, `Settings`, `failed_login_attempts`, `remember_me_tokens`, `Friendships` (with pending/accepted status), `Messages` (for direct messaging), `Degrees` (student certificates/achievements), `Hobbies` (student interests), and `ProfilePhotos` (student photo gallery).
+
+**Recent Updates:**
+- Removed peer rating system (table and endpoints)
+- Added self-rating support via user's 15 scoring fields (students rate themselves)
+- Added three new tables: Degrees, Hobbies, ProfilePhotos
+- Added API endpoints for CRUD operations on all new tables
+- Self-ratings endpoint for students to update their own scores
 
 **Scopes System:** Three-tier hierarchy with public square scope (always accessible), grade scopes (grades 1-6), and class section scopes (format: grade-section, e.g., "1-A"). Each non-public scope has a unique access code. Admin UI provides full CRUD capabilities with comprehensive validation:
 - Public square: Always accessible scope with no access code required
