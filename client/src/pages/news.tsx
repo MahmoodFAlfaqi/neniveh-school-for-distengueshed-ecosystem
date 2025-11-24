@@ -45,8 +45,6 @@ type Post = {
 export default function NewsPage() {
   const { toast } = useToast();
   const [newPost, setNewPost] = useState("");
-  const [sortBy, setSortBy] = useState("newest");
-  const [filterByRole, setFilterByRole] = useState("all");
   
   // Fetch scopes to find public scope for default selection
   const { data: scopes = [] } = useQuery<Array<{ id: string; type: string; name: string }>>({
@@ -302,7 +300,7 @@ export default function NewsPage() {
                     value={selectedScope}
                     onChange={setSelectedScope}
                     label="Post to"
-                    placeholder="Public Square"
+                    placeholder="Select where to post"
                   />
                 </CardContent>
                 <CardFooter className="justify-end animate-in fade-in duration-300">
@@ -341,7 +339,7 @@ export default function NewsPage() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-              {posts.sort((a, b) => sortBy === "newest" ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : a.credibilityRating - b.credibilityRating).filter(p => filterByRole === "all" || p.authorRole === filterByRole).map((post) => (
+              {posts.map((post) => (
               <Card key={post.id} className="hover-elevate" data-testid={`card-post-${post.id}`}>
                 <CardHeader>
                   <div className="flex items-start justify-between">

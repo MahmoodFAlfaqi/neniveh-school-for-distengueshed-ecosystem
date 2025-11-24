@@ -26,22 +26,9 @@ The frontend is built with React, TypeScript, and Vite, utilizing Shadcn UI (bas
 -   **Cards & Containers**: Rounded corners, colored shadows, hover elevation, gradient fills on stat cards.
 -   **Buttons & Interactive Elements**: Gradient backgrounds, smooth hover effects, badge styling, accessible focus rings.
 -   **Forms & Inputs**: Clean design, rounded corners, proper label hierarchy, validation states.
--   **News & Posts**: Public square posts visible to all users on news page; scope-specific posts only visible to users with access to that scope. Scope selector allows filtering by public square, grade scopes, or class section scopes. Public square is the default scope on news page. **NEW:** Filter by author role and sort by newest or credibility.
--   **Events**: Events can be created with dual type/category selectors (curricular/extracurricular with subject or activity category). **FIXED:** Public square events now display correctly. **NEW:** Filter by event type and sort by upcoming/past.
--   **Friends & Chat**: Users can send friend requests, accept/decline, view friends list, and send direct messages to friends.
+-   **News & Posts**: Public square posts visible to all users on news page; scope-specific posts only visible to users with access to that scope. Scope selector allows filtering by public square, grade scopes, or class section scopes. Public square is the default scope on news page.
 -   **Teacher Management**: Teachers can be assigned to multiple subjects and sections. Admin interface allows selecting which subjects and sections each teacher teaches.
 -   **Schedule Auto-Population**: In the schedule page (Sunday-Thursday school week), when a subject is selected, the teacher dropdown auto-populates with only teachers who teach that subject in the user's class section. Teacher is automatically cleared when subject changes.
--   **Hexagon Rating System**: **NEW:** 4-quarter rating interface with 3 interactive hexagon charts:
-      - **الشخصية الاجتماعية (Social Personality)**: 6 metrics - Empathy, Anger Management, Cooperation, Self-Confidence, Criticism Acceptance, Listening
-      - **المهارات والقدرات (Skills & Abilities)**: 6 metrics - Problem Solving, Creativity, Memory & Focus, Planning & Organization, Communication & Expression, Leadership & Initiative
-      - **الاهتمامات والهوايات (Interests & Hobbies)**: 6 metrics - Artistic/Creative, Sports/Physical, Technical/Technology, Linguistic/Reading, Social/Humanitarian, Natural/Environmental
-      - Each hexagon has relative scoring (total 24 points per hexagon distributed among 6 metrics, 0-10 scale per metric)
-      - Fourth quarter contains hobbies input box (up to 5 user-entered hobbies)
--   **Content Moderation**: **NEW:** AI-powered content moderation system with:
-      - Post flagging/reporting system
-      - Automatic profanity and spam detection infrastructure
-      - User violation tracking and muting system (violations increase, features get suspended)
-      - Admin warning/mute endpoints for content policy enforcement
 -   **Authentication System**: Three-tier system for Admins, Students, and Visitors.
     -   **Admin Auth**: Requires one-time invitation code, unique credentials, auto-generated student IDs, separate UI flow, 7-day persistent login.
     -   **Student Auth**: Standard username/password, 7-day persistent login, full account creation.
@@ -65,26 +52,7 @@ The frontend is built with React, TypeScript, and Vite, utilizing Shadcn UI (bas
 
 ### Database Schema
 
-Includes tables for `Users` (roles, gamification scores, self-rating metrics), `Scopes`, `DigitalKeys`, `Posts`, `Events` (with eventCategory field), `Schedules`, `Teachers` (with review system), `ProfileComments`, `PostReactions`, `Settings`, `failed_login_attempts`, `remember_me_tokens`, `Friendships` (with pending/accepted status), `Messages` (for direct messaging), `Degrees` (student certificates/achievements), `Hobbies` (student interests), and `ProfilePhotos` (student photo gallery).
-
-**Recent Updates:**
-- Removed peer rating system (table and endpoints)
-- Added self-rating support via user's 15 scoring fields (students rate themselves)
-- Added three new tables: Degrees, Hobbies, ProfilePhotos
-- Added API endpoints for CRUD operations on all new tables
-- Self-ratings endpoint for students to update their own scores
-- **NEW:** Added 18 hexagon rating system fields to users table (3 hexagons × 6 metrics each)
-- **NEW:** Added moderation fields to posts (moderationStatus, isFlagged, flagReason)
-- **NEW:** Added user moderation fields (violationCount, isMuted, muteUntil)
-- **NEW:** Created HexagonRatingChart component with 4-quarter layout (3 hexagons + hobbies box)
-- **NEW:** Added content moderation API endpoints (flag post, warn user, track violations)
-
-**⚠️ Database Migration Required:**
-The new hexagon fields and moderation fields require a database migration. Run the following command in the terminal to sync the schema:
-```bash
-npm run db:push --force
-```
-After running this command, restart the application for changes to take effect.
+Includes tables for `Users` (roles, gamification scores, peer-ratable metrics), `Scopes`, `DigitalKeys`, `Posts`, `Events`, `Schedules`, `Teachers` (with review system), `PeerRatings`, `ProfileComments`, `PostReactions`, `Settings`, `failed_login_attempts`, and `remember_me_tokens`.
 
 **Scopes System:** Three-tier hierarchy with public square scope (always accessible), grade scopes (grades 1-6), and class section scopes (format: grade-section, e.g., "1-A"). Each non-public scope has a unique access code. Admin UI provides full CRUD capabilities with comprehensive validation:
 - Public square: Always accessible scope with no access code required

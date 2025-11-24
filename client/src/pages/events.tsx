@@ -23,44 +23,11 @@ import { useHasAccessToScope } from "@/hooks/use-digital-keys";
 import { UserProfileLink } from "@/components/UserProfileLink";
 import { Link } from "wouter";
 
-// Subjects for curricular events
-const SUBJECTS = [
-  "Math",
-  "R.E.",
-  "P.E.",
-  "Social Studies",
-  "Biology",
-  "Chemistry",
-  "Physics",
-  "Arabic",
-  "English",
-  "French",
-  "B.P.C.",
-  "Finance",
-  "Geology",
-  "Computer Science",
-  "Arts",
-  "Moralism",
-  "Library",
-] as const;
-
-// Categories for extracurricular events
-const EXTRACURRICULAR_CATEGORIES = [
-  "Workshop",
-  "Science",
-  "Sports",
-  "Art",
-  "Social",
-  "Religious",
-  "Charity",
-] as const;
-
 type Event = {
   id: string;
   title: string;
   description: string | null;
   eventType: "curricular" | "extracurricular";
-  eventCategory: string | null;
   scopeId: string | null;
   startTime: string;
   endTime: string | null;
@@ -171,18 +138,13 @@ function EventCard({ event, globalScopeId }: { event: Event; globalScopeId: stri
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <div className="flex items-center gap-2 mb-2">
               <CardTitle data-testid={`text-event-title-${event.id}`}>
                 {event.title}
               </CardTitle>
-              <Badge variant={event.eventType === "curricular" ? "default" : "secondary"} data-testid={`badge-event-type-${event.id}`}>
+              <Badge variant={event.eventType === "curricular" ? "default" : "secondary"}>
                 {event.eventType}
               </Badge>
-              {event.eventCategory && (
-                <Badge variant="outline" data-testid={`badge-event-category-${event.id}`}>
-                  {event.eventCategory}
-                </Badge>
-              )}
             </div>
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <UserProfileLink 
@@ -338,13 +300,10 @@ export default function EventsPage() {
   const { toast } = useToast();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedScope, setSelectedScope] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState("upcoming");
-  const [filterType, setFilterType] = useState<"curricular" | "extracurricular" | "all">("all");
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     eventType: "extracurricular" as "curricular" | "extracurricular",
-    eventCategory: "",
     startTime: "",
     endTime: "",
     location: "",
@@ -405,7 +364,6 @@ export default function EventsPage() {
         title: "",
         description: "",
         eventType: "extracurricular",
-        eventCategory: "",
         startTime: "",
         endTime: "",
         location: "",
@@ -429,11 +387,6 @@ export default function EventsPage() {
       createEventMutation.mutate(formData);
     }
   };
-
-  // Filter and sort events
-  const filteredEvents = events
-    .filter(e => filterType === "all" || e.eventType === filterType)
-    .sort((a, b) => sortBy === "upcoming" ? new Date(a.startTime).getTime() - new Date(b.startTime).getTime() : new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
   return (
     <div className="min-h-screen bg-background">
@@ -497,9 +450,9 @@ export default function EventsPage() {
                     <Label htmlFor="eventType">Event Type *</Label>
                     <Select
                       value={formData.eventType}
-                      onValueChange={(value: "curricular" | "extracurricular") => {
-                        setFormData({ ...formData, eventType: value, eventCategory: "" });
-                      }}
+                      onValueChange={(value: "curricular" | "extracurricular") =>
+                        setFormData({ ...formData, eventType: value })
+                      }
                     >
                       <SelectTrigger data-testid="select-event-type">
                         <SelectValue />
@@ -512,42 +465,15 @@ export default function EventsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="eventCategory">Category *</Label>
-                    <Select
-                      value={formData.eventCategory}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, eventCategory: value })
-                      }
-                    >
-                      <SelectTrigger data-testid="select-event-category">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {formData.eventType === "curricular"
-                          ? SUBJECTS.map((subject) => (
-                              <SelectItem key={subject} value={subject}>
-                                {subject}
-                              </SelectItem>
-                            ))
-                          : EXTRACURRICULAR_CATEGORIES.map((category) => (
-                              <SelectItem key={category} value={category}>
-                                {category}
-                              </SelectItem>
-                            ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="location">Location</Label>
+                    <Input
+                      id="location"
+                      placeholder="School Auditorium"
+                      value={formData.location}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      data-testid="input-event-location"
+                    />
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="location">Location</Label>
-                  <Input
-                    id="location"
-                    placeholder="School Auditorium"
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    data-testid="input-event-location"
-                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -595,7 +521,7 @@ export default function EventsPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!formData.title.trim() || !formData.startTime || !formData.eventCategory || createEventMutation.isPending || (selectedScope !== null && !hasAccess)}
+                  disabled={!formData.title.trim() || !formData.startTime || createEventMutation.isPending || (selectedScope !== null && !hasAccess)}
                   data-testid="button-submit-event"
                 >
                   {createEventMutation.isPending ? "Creating..." : "Create Event"}
@@ -626,7 +552,7 @@ export default function EventsPage() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-              {filteredEvents.map((event) => (
+              {events.map((event) => (
                 <EventCard 
                   key={event.id} 
                   event={event} 

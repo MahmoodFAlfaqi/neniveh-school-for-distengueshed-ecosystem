@@ -40,7 +40,7 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   bio: text("bio"),
   
-  // Student Stats (15 metrics, 1-5 stars) - self-ratings
+  // Student Stats (15 metrics, 1-5 stars) - averages from peer ratings
   initiativeScore: real("initiative_score"),
   communicationScore: real("communication_score"),
   cooperationScore: real("cooperation_score"),
@@ -56,36 +56,6 @@ export const users = pgTable("users", {
   confidenceScore: real("confidence_score"),
   temperScore: real("temper_score"), // Inverse score
   cheerfulnessScore: real("cheerfulness_score"),
-  
-  // New Hexagon Rating System (18 metrics across 3 hexagons, 0-10 scale, relative to each other)
-  // Social Personality Hexagon (الشخصية الاجتماعية)
-  empathyScore: real("empathy_score"), // التعاطف
-  angerManagementScore: real("anger_management_score"), // إدارة الغضب
-  cooperationHexScore: real("cooperation_hex_score"), // التعاون
-  selfConfidenceScore: real("self_confidence_score"), // الثقة بالنفس
-  criticismAcceptanceScore: real("criticism_acceptance_score"), // تقبل النقد
-  listeningScore: real("listening_score"), // الإنصات
-  
-  // Skills & Abilities Hexagon (المهارات والقدرات)
-  problemSolvingScore: real("problem_solving_score"), // حل المشكلات
-  creativityScore: real("creativity_score"), // الإبداع
-  memoryFocusScore: real("memory_focus_score"), // الذاكرة والتركيز
-  planningOrganizationScore: real("planning_organization_score"), // التخطيط والتنظيم
-  communicationExpressScore: real("communication_express_score"), // الاتصال والتعبير
-  leadershipInitiativeScore: real("leadership_initiative_score"), // القيادة والمبادرة
-  
-  // Interests & Hobbies Hexagon (الاهتمامات والهوايات)
-  artisticScore: real("artistic_score"), // فني/إبداعي
-  sportsScore: real("sports_score"), // رياضي/حركي
-  technicalScore: real("technical_score"), // تقني/تكنولوجي
-  linguisticScore: real("linguistic_score"), // لغوي/قراءة
-  socialHumanitarianScore: real("social_humanitarian_score"), // اجتماعي/إنساني
-  naturalEnvironmentalScore: real("natural_environmental_score"), // طبيعي/بيئي
-  
-  // Moderation fields
-  violationCount: integer("violation_count").notNull().default(0),
-  isMuted: boolean("is_muted").notNull().default(false),
-  muteUntil: timestamp("mute_until"), // When mute expires, null if not muted
   
   // Metadata
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -152,11 +122,6 @@ export const posts = pgTable("posts", {
   likesCount: integer("likes_count").notNull().default(0),
   commentsCount: integer("comments_count").notNull().default(0),
   
-  // Moderation
-  moderationStatus: text("moderation_status").notNull().default("approved"), // approved, rejected, flagged
-  isFlagged: boolean("is_flagged").notNull().default(false),
-  flagReason: text("flag_reason"), // e.g., "spam", "profanity", "inappropriate"
-  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -177,7 +142,6 @@ export const events = pgTable("events", {
   title: text("title").notNull(),
   description: text("description"),
   eventType: eventTypeEnum("event_type").notNull(),
-  eventCategory: text("event_category"), // Subject for curricular, category for extracurricular
   scopeId: varchar("scope_id").references(() => scopes.id),
   
   startTime: timestamp("start_time").notNull(),
@@ -335,42 +299,34 @@ export const profileComments = pgTable("profile_comments", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// Degrees - Student certificates, diplomas, achievements
-export const degrees = pgTable("degrees", {
+// Peer Ratings - students rate each other on 15 metrics
+export const peerRatings = pgTable("peer_ratings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  ratedUserId: varchar("rated_user_id").notNull().references(() => users.id, { onDelete: "cascade" }), // Who is being rated
+  raterUserId: varchar("rater_user_id").notNull().references(() => users.id, { onDelete: "cascade" }), // Who is rating
   
-  title: text("title").notNull(), // e.g., "Certificate in Mathematics"
-  issuer: text("issuer"), // e.g., "Cambridge University"
-  description: text("description"),
-  imageUrl: text("image_url"), // Certificate image
+  // 15 metrics (1-5 stars each)
+  initiativeScore: integer("initiative_score").notNull(),
+  communicationScore: integer("communication_score").notNull(),
+  cooperationScore: integer("cooperation_score").notNull(),
+  kindnessScore: integer("kindness_score").notNull(),
+  perseveranceScore: integer("perseverance_score").notNull(),
+  fitnessScore: integer("fitness_score").notNull(),
+  playingSkillsScore: integer("playing_skills_score").notNull(),
+  inClassMisconductScore: integer("in_class_misconduct_score").notNull(),
+  outClassMisconductScore: integer("out_class_misconduct_score").notNull(),
+  literaryScienceScore: integer("literary_science_score").notNull(),
+  naturalScienceScore: integer("natural_science_score").notNull(),
+  electronicScienceScore: integer("electronic_science_score").notNull(),
+  confidenceScore: integer("confidence_score").notNull(),
+  temperScore: integer("temper_score").notNull(),
+  cheerfulnessScore: integer("cheerfulness_score").notNull(),
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-// Hobbies - Student interests and hobbies
-export const hobbies = pgTable("hobbies", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  
-  title: text("title").notNull(), // e.g., "Photography", "Soccer"
-  description: text("description"), // Optional description
-  category: text("category"), // e.g., "Sports", "Arts", "Music"
-  
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-// Profile Photos - Student photo gallery
-export const profilePhotos = pgTable("profile_photos", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  
-  imageUrl: text("image_url").notNull(), // Photo URL
-  caption: text("caption"), // Optional photo description
-  displayOrder: integer("display_order").notNull().default(0), // For ordering photos in gallery
-  
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueRaterRated: unique().on(table.ratedUserId, table.raterUserId),
+}));
 
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
@@ -490,28 +446,6 @@ export const profileCommentsRelations = relations(profileComments, ({ one }) => 
   }),
 }));
 
-// Relations for degrees, hobbies, profile photos
-export const degreesRelations = relations(degrees, ({ one }) => ({
-  user: one(users, {
-    fields: [degrees.userId],
-    references: [users.id],
-  }),
-}));
-
-export const hobbiesRelations = relations(hobbies, ({ one }) => ({
-  user: one(users, {
-    fields: [hobbies.userId],
-    references: [users.id],
-  }),
-}));
-
-export const profilePhotosRelations = relations(profilePhotos, ({ one }) => ({
-  user: one(users, {
-    fields: [profilePhotos.userId],
-    references: [users.id],
-  }),
-}));
-
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users)
   .omit({
@@ -592,8 +526,7 @@ export const insertEventSchema = createInsertSchema(events)
     createdAt: true,
   })
   .extend({
-    description: z.string().trim().optional().default(""),
-    eventCategory: z.string().min(1, "Category is required"),
+    description: z.string().trim().min(1, "Description is required").max(4000, "Description must not exceed 4000 characters"),
   });
 
 export const insertEventRsvpSchema = createInsertSchema(eventRsvps).omit({
@@ -644,6 +577,30 @@ export const insertProfileCommentSchema = createInsertSchema(profileComments).om
   createdAt: true,
 });
 
+export const insertPeerRatingSchema = createInsertSchema(peerRatings)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    // Validate all scores are 1-5
+    initiativeScore: z.number().int().min(1).max(5),
+    communicationScore: z.number().int().min(1).max(5),
+    cooperationScore: z.number().int().min(1).max(5),
+    kindnessScore: z.number().int().min(1).max(5),
+    perseveranceScore: z.number().int().min(1).max(5),
+    fitnessScore: z.number().int().min(1).max(5),
+    playingSkillsScore: z.number().int().min(1).max(5),
+    inClassMisconductScore: z.number().int().min(1).max(5),
+    outClassMisconductScore: z.number().int().min(1).max(5),
+    literaryScienceScore: z.number().int().min(1).max(5),
+    naturalScienceScore: z.number().int().min(1).max(5),
+    electronicScienceScore: z.number().int().min(1).max(5),
+    confidenceScore: z.number().int().min(1).max(5),
+    temperScore: z.number().int().min(1).max(5),
+    cheerfulnessScore: z.number().int().min(1).max(5),
+  });
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -707,32 +664,8 @@ export type EventComment = typeof eventComments.$inferSelect;
 export type InsertProfileComment = z.infer<typeof insertProfileCommentSchema>;
 export type ProfileComment = typeof profileComments.$inferSelect;
 
-// Degrees schemas
-export const insertDegreeSchema = createInsertSchema(degrees).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertDegree = z.infer<typeof insertDegreeSchema>;
-export type Degree = typeof degrees.$inferSelect;
-
-// Hobbies schemas
-export const insertHobbySchema = createInsertSchema(hobbies).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertHobby = z.infer<typeof insertHobbySchema>;
-export type Hobby = typeof hobbies.$inferSelect;
-
-// Profile Photos schemas
-export const insertProfilePhotoSchema = createInsertSchema(profilePhotos).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertProfilePhoto = z.infer<typeof insertProfilePhotoSchema>;
-export type ProfilePhoto = typeof profilePhotos.$inferSelect;
+export type InsertPeerRating = z.infer<typeof insertPeerRatingSchema>;
+export type PeerRating = typeof peerRatings.$inferSelect;
 
 export const insertSettingSchema = createInsertSchema(settings).omit({
   id: true,
@@ -766,52 +699,3 @@ export const insertRememberMeTokenSchema = createInsertSchema(rememberMeTokens).
 
 export type InsertRememberMeToken = z.infer<typeof insertRememberMeTokenSchema>;
 export type RememberMeToken = typeof rememberMeTokens.$inferSelect;
-
-// Friends system
-export const friendships = pgTable("friendships", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  friendId: varchar("friend_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  status: text("status").notNull().default("pending"), // pending, accepted, blocked
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-}, (table) => ({
-  uniqueFriendship: unique().on(table.userId, table.friendId),
-}));
-
-// Messages/Chat
-export const messages = pgTable("messages", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  senderId: varchar("sender_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  recipientId: varchar("recipient_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  content: text("content").notNull(),
-  isRead: boolean("is_read").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export const friendshipsRelations = relations(friendships, ({ one }) => ({
-  user: one(users, { fields: [friendships.userId], references: [users.id] }),
-  friend: one(users, { fields: [friendships.friendId], references: [users.id] }),
-}));
-
-export const messagesRelations = relations(messages, ({ one }) => ({
-  sender: one(users, { fields: [messages.senderId], references: [users.id] }),
-  recipient: one(users, { fields: [messages.recipientId], references: [users.id] }),
-}));
-
-export const insertFriendshipSchema = createInsertSchema(friendships).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type InsertFriendship = z.infer<typeof insertFriendshipSchema>;
-export type Friendship = typeof friendships.$inferSelect;
-
-export const insertMessageSchema = createInsertSchema(messages).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertMessage = z.infer<typeof insertMessageSchema>;
-export type Message = typeof messages.$inferSelect;
