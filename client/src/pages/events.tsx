@@ -65,7 +65,7 @@ type Attendee = {
   credibilityScore: number;
 };
 
-function EventCard({ event, publicScopeId }: { event: Event; publicScopeId: string }) {
+function EventCard({ event }: { event: Event }) {
   const { toast } = useToast();
   const [showAttendees, setShowAttendees] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -107,7 +107,7 @@ function EventCard({ event, publicScopeId }: { event: Event; publicScopeId: stri
           description: "You've been added to the event attendance list",
         });
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/events", publicScopeId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
       queryClient.invalidateQueries({ queryKey: ["/api/events", event.id, "attendees"] });
     },
     onError: (error: Error) => {
@@ -327,12 +327,11 @@ export default function EventsPage() {
   // Get the global scope ID
   const publicScope = scopes.find(s => s.type === "public");
 
-  // Fetch public events (using public scope ID)
+  // Fetch all events the user has access to
   const { data: rawEvents = [], isLoading } = useQuery<Event[]>({
-    queryKey: ["/api/events", publicScope?.id],
-    enabled: !!publicScope,
+    queryKey: ["/api/events"],
     queryFn: async () => {
-      const response = await fetch(`/api/events?scopeId=${publicScope!.id}`);
+      const response = await fetch("/api/events");
       if (!response.ok) throw new Error("Failed to fetch events");
       return response.json();
     },
@@ -403,7 +402,7 @@ export default function EventsPage() {
       });
       setSelectedScope(null);
       setShowCreateForm(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/events", publicScope?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
     },
     onError: (error: Error) => {
       toast({
@@ -626,7 +625,6 @@ export default function EventsPage() {
                 <EventCard 
                   key={event.id} 
                   event={event} 
-                  publicScopeId={publicScope!.id} 
                 />
               ))}
             </div>
