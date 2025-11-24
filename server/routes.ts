@@ -6,8 +6,10 @@ import path from "path";
 import crypto from "crypto";
 import { storage } from "./storage";
 import { db } from "./db";
+import { eq } from "drizzle-orm";
 import { 
   users,
+  posts,
   insertUserSchema,
   insertPostSchema,
   insertEventSchema,
@@ -1803,30 +1805,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== SELF-RATINGS ====================
   
-  // Update user self-ratings
+  // Update user self-ratings (all rating fields)
   app.patch("/api/users/:userId/self-ratings", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       if (req.session.userId !== req.params.userId) {
         return res.status(403).json({ message: "Cannot update other user's ratings" });
       }
       
-      // Validate scores are 1-5
       const scores = req.body;
       const validatedScores: any = {};
-      const scoreFields = [
+      const allScoreFields = [
         'initiativeScore', 'communicationScore', 'cooperationScore', 'kindnessScore',
         'perseveranceScore', 'fitnessScore', 'playingSkillsScore', 'inClassMisconductScore',
         'outClassMisconductScore', 'literaryScienceScore', 'naturalScienceScore',
-        'electronicScienceScore', 'confidenceScore', 'temperScore', 'cheerfulnessScore'
+        'electronicScienceScore', 'confidenceScore', 'temperScore', 'cheerfulnessScore',
+        'empathyScore', 'angerManagementScore', 'cooperationHexScore', 'selfConfidenceScore',
+        'criticismAcceptanceScore', 'listeningScore', 'problemSolvingScore', 'creativityScore',
+        'memoryFocusScore', 'planningOrganizationScore', 'communicationExpressScore',
+        'leadershipInitiativeScore', 'artisticScore', 'sportsScore', 'technicalScore',
+        'linguisticScore', 'socialHumanitarianScore', 'naturalEnvironmentalScore'
       ];
       
-      for (const field of scoreFields) {
+      for (const field of allScoreFields) {
         if (field in scores) {
           const val = scores[field];
-          if (typeof val === 'number' && val >= 1 && val <= 5) {
+          if (typeof val === 'number' && val >= 0 && val <= 10) {
             validatedScores[field] = val;
           } else if (val !== null && val !== undefined) {
-            return res.status(400).json({ message: `${field} must be 1-5` });
+            return res.status(400).json({ message: `${field} must be 0-10` });
           }
         }
       }
@@ -1836,6 +1842,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(user);
     } catch (error) {
       res.status(500).json({ message: "Failed to update ratings" });
+    }
+  });
+
+  // ==================== CONTENT MODERATION ====================
+  
+  // Flag/report a post for moderation
+  app.post("/api/posts/:postId/flag", requireAuth, async (req, res) => {
+    try {
+      const { reason } = req.body;
+      if (!reason) {
+        return res.status(400).json({ message: "Reason is required" });
+      }
+      
+      // Update post moderation status
+      await db
+        .update(posts)
+        .set({
+          isFlagged: true,
+          flagReason: reason,
+          moderationStatus: "flagged",
+        })
+        .where(eq(posts.id, req.params.postId));
+      
+      res.json({ message: "Post flagged for review" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to flag post" });
+    }
+  });
+  
+  // Get user violation count
+  app.get("/api/users/:userId/violations", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      
+      res.json({
+        violationCount: user.violationCount,
+        isMuted: user.isMuted,
+        muteUntil: user.muteUntil,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch violations" });
+    }
+  });
+  
+  // Admin: Issue warning/mute to user
+  app.post("/api/admin/users/:userId/warn", requireAdmin, async (req, res) => {
+    try {
+      const { muteDurationHours } = req.body;
+      const user = await storage.getUser(req.params.userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      
+      const muteUntil = muteDurationHours 
+        ? new Date(Date.now() + muteDurationHours * 60 * 60 * 1000)
+        : null;
+      
+      const [updated] = await db
+        .update(users)
+        .set({
+          violationCount: (user.violationCount || 0) + 1,
+          isMuted: !!muteUntil,
+          muteUntil,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, req.params.userId))
+        .returning();
+      
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to issue warning" });
     }
   });
 

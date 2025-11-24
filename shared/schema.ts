@@ -40,7 +40,7 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   bio: text("bio"),
   
-  // Student Stats (15 metrics, 1-5 stars) - averages from peer ratings
+  // Student Stats (15 metrics, 1-5 stars) - self-ratings
   initiativeScore: real("initiative_score"),
   communicationScore: real("communication_score"),
   cooperationScore: real("cooperation_score"),
@@ -56,6 +56,36 @@ export const users = pgTable("users", {
   confidenceScore: real("confidence_score"),
   temperScore: real("temper_score"), // Inverse score
   cheerfulnessScore: real("cheerfulness_score"),
+  
+  // New Hexagon Rating System (18 metrics across 3 hexagons, 0-10 scale, relative to each other)
+  // Social Personality Hexagon (الشخصية الاجتماعية)
+  empathyScore: real("empathy_score"), // التعاطف
+  angerManagementScore: real("anger_management_score"), // إدارة الغضب
+  cooperationHexScore: real("cooperation_hex_score"), // التعاون
+  selfConfidenceScore: real("self_confidence_score"), // الثقة بالنفس
+  criticismAcceptanceScore: real("criticism_acceptance_score"), // تقبل النقد
+  listeningScore: real("listening_score"), // الإنصات
+  
+  // Skills & Abilities Hexagon (المهارات والقدرات)
+  problemSolvingScore: real("problem_solving_score"), // حل المشكلات
+  creativityScore: real("creativity_score"), // الإبداع
+  memoryFocusScore: real("memory_focus_score"), // الذاكرة والتركيز
+  planningOrganizationScore: real("planning_organization_score"), // التخطيط والتنظيم
+  communicationExpressScore: real("communication_express_score"), // الاتصال والتعبير
+  leadershipInitiativeScore: real("leadership_initiative_score"), // القيادة والمبادرة
+  
+  // Interests & Hobbies Hexagon (الاهتمامات والهوايات)
+  artisticScore: real("artistic_score"), // فني/إبداعي
+  sportsScore: real("sports_score"), // رياضي/حركي
+  technicalScore: real("technical_score"), // تقني/تكنولوجي
+  linguisticScore: real("linguistic_score"), // لغوي/قراءة
+  socialHumanitarianScore: real("social_humanitarian_score"), // اجتماعي/إنساني
+  naturalEnvironmentalScore: real("natural_environmental_score"), // طبيعي/بيئي
+  
+  // Moderation fields
+  violationCount: integer("violation_count").notNull().default(0),
+  isMuted: boolean("is_muted").notNull().default(false),
+  muteUntil: timestamp("mute_until"), // When mute expires, null if not muted
   
   // Metadata
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -121,6 +151,11 @@ export const posts = pgTable("posts", {
   // Engagement
   likesCount: integer("likes_count").notNull().default(0),
   commentsCount: integer("comments_count").notNull().default(0),
+  
+  // Moderation
+  moderationStatus: text("moderation_status").notNull().default("approved"), // approved, rejected, flagged
+  isFlagged: boolean("is_flagged").notNull().default(false),
+  flagReason: text("flag_reason"), // e.g., "spam", "profanity", "inappropriate"
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
