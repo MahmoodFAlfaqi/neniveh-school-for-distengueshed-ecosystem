@@ -338,6 +338,8 @@ export default function EventsPage() {
   const { toast } = useToast();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedScope, setSelectedScope] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState("upcoming");
+  const [filterType, setFilterType] = useState<"curricular" | "extracurricular" | "all">("all");
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -427,6 +429,11 @@ export default function EventsPage() {
       createEventMutation.mutate(formData);
     }
   };
+
+  // Filter and sort events
+  const filteredEvents = events
+    .filter(e => filterType === "all" || e.eventType === filterType)
+    .sort((a, b) => sortBy === "upcoming" ? new Date(a.startTime).getTime() - new Date(b.startTime).getTime() : new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
   return (
     <div className="min-h-screen bg-background">
@@ -619,7 +626,7 @@ export default function EventsPage() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-              {events.map((event) => (
+              {filteredEvents.map((event) => (
                 <EventCard 
                   key={event.id} 
                   event={event} 

@@ -19,8 +19,10 @@ import {
   insertPostCommentSchema,
   insertEventCommentSchema,
   insertAdminStudentIdSchema,
-  insertPeerRatingSchema,
   insertPostAccuracyRatingSchema,
+  insertDegreeSchema,
+  insertHobbySchema,
+  insertProfilePhotoSchema,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { z } from "zod";
@@ -1361,7 +1363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const scopeId = req.query.scopeId as string | undefined;
       const userId = req.session.userId;
-      const events = await storage.getEvents(scopeId, userId);
+      const events = await storage.getEvents(scopeId === "null" ? null : scopeId, userId);
       res.json(events);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch events" });
@@ -1668,60 +1670,243 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ==================== PEER RATINGS ====================
+  // ==================== DEGREES ====================
   
-  // Submit or update a peer rating
-  app.post("/api/users/:userId/rate", requireAuth, requireNonVisitor, async (req, res) => {
+  // Create degree
+  app.post("/api/degrees", requireAuth, requireNonVisitor, async (req, res) => {
     try {
-      const ratedUserId = req.params.userId;
-      const raterUserId = req.session.userId!;
-      
-      // Prevent self-rating (server-side validation)
-      if (ratedUserId === raterUserId) {
-        return res.status(400).json({ message: "You cannot rate yourself" });
-      }
-      
-      // Validate that the user being rated exists
-      const ratedUser = await storage.getUser(ratedUserId);
-      if (!ratedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      // Extract rating scores from request body (exclude ratedUserId and raterUserId)
-      const { ratedUserId: _, raterUserId: __, ...scores } = req.body;
-      
-      // Parse and validate the rating data - derive IDs from route/session only
-      const ratingData = insertPeerRatingSchema.parse({
-        ...scores,
-        ratedUserId,
-        raterUserId, // Always use session user ID, never trust client
+      const degreeData = insertDegreeSchema.parse({
+        ...req.body,
+        userId: req.session.userId!,
       });
-      
-      const rating = await storage.submitPeerRating(ratingData);
-      res.json(rating);
+      const degree = await storage.createDegree(degreeData);
+      res.json(degree);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to submit rating" });
+      res.status(500).json({ message: "Failed to create degree" });
     }
   });
   
-  // Get user's existing rating for another user
-  app.get("/api/users/:userId/rating", requireAuth, async (req, res) => {
+  // Get user's degrees
+  app.get("/api/degrees/:userId", requireAuth, async (req, res) => {
     try {
-      const ratedUserId = req.params.userId;
-      const raterUserId = req.session.userId!;
-      
-      const rating = await storage.getUserRating(ratedUserId, raterUserId);
-      res.json(rating || null);
+      const degrees = await storage.getDegrees(req.params.userId);
+      res.json(degrees);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch rating" });
+      res.status(500).json({ message: "Failed to fetch degrees" });
+    }
+  });
+  
+  // Delete degree
+  app.delete("/api/degrees/:degreeId", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const success = await storage.deleteDegree(req.params.degreeId);
+      if (!success) return res.status(404).json({ message: "Degree not found" });
+      res.json({ message: "Degree deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete degree" });
+    }
+  });
+
+  // ==================== HOBBIES ====================
+  
+  // Create hobby
+  app.post("/api/hobbies", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const hobbyData = insertHobbySchema.parse({
+        ...req.body,
+        userId: req.session.userId!,
+      });
+      const hobby = await storage.createHobby(hobbyData);
+      res.json(hobby);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create hobby" });
+    }
+  });
+  
+  // Get user's hobbies
+  app.get("/api/hobbies/:userId", requireAuth, async (req, res) => {
+    try {
+      const hobbies = await storage.getHobbies(req.params.userId);
+      res.json(hobbies);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch hobbies" });
+    }
+  });
+  
+  // Update hobby
+  app.patch("/api/hobbies/:hobbyId", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const hobby = await storage.updateHobby(req.params.hobbyId, req.body);
+      if (!hobby) return res.status(404).json({ message: "Hobby not found" });
+      res.json(hobby);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update hobby" });
+    }
+  });
+  
+  // Delete hobby
+  app.delete("/api/hobbies/:hobbyId", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const success = await storage.deleteHobby(req.params.hobbyId);
+      if (!success) return res.status(404).json({ message: "Hobby not found" });
+      res.json({ message: "Hobby deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete hobby" });
+    }
+  });
+
+  // ==================== PROFILE PHOTOS ====================
+  
+  // Create profile photo
+  app.post("/api/photos", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const photoData = insertProfilePhotoSchema.parse({
+        ...req.body,
+        userId: req.session.userId!,
+      });
+      const photo = await storage.createProfilePhoto(photoData);
+      res.json(photo);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create photo" });
+    }
+  });
+  
+  // Get user's photos
+  app.get("/api/photos/:userId", requireAuth, async (req, res) => {
+    try {
+      const photos = await storage.getProfilePhotos(req.params.userId);
+      res.json(photos);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch photos" });
+    }
+  });
+  
+  // Delete photo
+  app.delete("/api/photos/:photoId", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const success = await storage.deleteProfilePhoto(req.params.photoId);
+      if (!success) return res.status(404).json({ message: "Photo not found" });
+      res.json({ message: "Photo deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete photo" });
+    }
+  });
+
+  // ==================== SELF-RATINGS ====================
+  
+  // Update user self-ratings
+  app.patch("/api/users/:userId/self-ratings", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      if (req.session.userId !== req.params.userId) {
+        return res.status(403).json({ message: "Cannot update other user's ratings" });
+      }
+      
+      // Validate scores are 1-5
+      const scores = req.body;
+      const validatedScores: any = {};
+      const scoreFields = [
+        'initiativeScore', 'communicationScore', 'cooperationScore', 'kindnessScore',
+        'perseveranceScore', 'fitnessScore', 'playingSkillsScore', 'inClassMisconductScore',
+        'outClassMisconductScore', 'literaryScienceScore', 'naturalScienceScore',
+        'electronicScienceScore', 'confidenceScore', 'temperScore', 'cheerfulnessScore'
+      ];
+      
+      for (const field of scoreFields) {
+        if (field in scores) {
+          const val = scores[field];
+          if (typeof val === 'number' && val >= 1 && val <= 5) {
+            validatedScores[field] = val;
+          } else if (val !== null && val !== undefined) {
+            return res.status(400).json({ message: `${field} must be 1-5` });
+          }
+        }
+      }
+      
+      const user = await storage.updateUserSelfRatings(req.params.userId, validatedScores);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update ratings" });
     }
   });
 
   // ==================== FILE UPLOADS ====================
   
+  // ==================== FRIENDS & MESSAGES ====================
+  
+  // Send friend request
+  app.post("/api/friends/request/:friendId", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const friendship = await storage.sendFriendRequest(req.session.userId!, req.params.friendId);
+      res.json(friendship);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to send friend request" });
+    }
+  });
+
+  // Accept friend request
+  app.post("/api/friends/accept/:userId", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const friendship = await storage.acceptFriendRequest(req.session.userId!, req.params.userId);
+      res.json(friendship);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to accept friend request" });
+    }
+  });
+
+  // Get user's friends
+  app.get("/api/friends", requireAuth, async (req, res) => {
+    try {
+      const friends = await storage.getFriends(req.session.userId!);
+      res.json(friends);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch friends" });
+    }
+  });
+
+  // Get pending friend requests
+  app.get("/api/friends/pending", requireAuth, async (req, res) => {
+    try {
+      const requests = await storage.getPendingRequests(req.session.userId!);
+      res.json(requests);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch pending requests" });
+    }
+  });
+
+  // Get conversation with friend
+  app.get("/api/messages/:friendId", requireAuth, async (req, res) => {
+    try {
+      const messages = await storage.getConversation(req.session.userId!, req.params.friendId);
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch conversation" });
+    }
+  });
+
+  // Send message
+  app.post("/api/messages/:recipientId", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const { content } = req.body;
+      if (!content) {
+        return res.status(400).json({ message: "Message content is required" });
+      }
+      const message = await storage.sendMessage(req.session.userId!, req.params.recipientId, content);
+      res.json(message);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
   // Ensure uploads directory exists and serve uploaded files
   const UPLOAD_DIR = path.join(process.cwd(), "uploads");
   try {

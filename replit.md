@@ -26,7 +26,9 @@ The frontend is built with React, TypeScript, and Vite, utilizing Shadcn UI (bas
 -   **Cards & Containers**: Rounded corners, colored shadows, hover elevation, gradient fills on stat cards.
 -   **Buttons & Interactive Elements**: Gradient backgrounds, smooth hover effects, badge styling, accessible focus rings.
 -   **Forms & Inputs**: Clean design, rounded corners, proper label hierarchy, validation states.
--   **News & Posts**: Public square posts visible to all users on news page; scope-specific posts only visible to users with access to that scope. Scope selector allows filtering by public square, grade scopes, or class section scopes. Public square is the default scope on news page.
+-   **News & Posts**: Public square posts visible to all users on news page; scope-specific posts only visible to users with access to that scope. Scope selector allows filtering by public square, grade scopes, or class section scopes. Public square is the default scope on news page. **NEW:** Filter by author role and sort by newest or credibility.
+-   **Events**: Events can be created with dual type/category selectors (curricular/extracurricular with subject or activity category). **FIXED:** Public square events now display correctly. **NEW:** Filter by event type and sort by upcoming/past.
+-   **Friends & Chat**: Users can send friend requests, accept/decline, view friends list, and send direct messages to friends.
 -   **Teacher Management**: Teachers can be assigned to multiple subjects and sections. Admin interface allows selecting which subjects and sections each teacher teaches.
 -   **Schedule Auto-Population**: In the schedule page (Sunday-Thursday school week), when a subject is selected, the teacher dropdown auto-populates with only teachers who teach that subject in the user's class section. Teacher is automatically cleared when subject changes.
 -   **Authentication System**: Three-tier system for Admins, Students, and Visitors.
@@ -52,7 +54,7 @@ The frontend is built with React, TypeScript, and Vite, utilizing Shadcn UI (bas
 
 ### Database Schema
 
-Includes tables for `Users` (roles, gamification scores, peer-ratable metrics), `Scopes`, `DigitalKeys`, `Posts`, `Events`, `Schedules`, `Teachers` (with review system), `PeerRatings`, `ProfileComments`, `PostReactions`, `Settings`, `failed_login_attempts`, and `remember_me_tokens`.
+Includes tables for `Users` (roles, gamification scores, peer-ratable metrics), `Scopes`, `DigitalKeys`, `Posts`, `Events` (with eventCategory field), `Schedules`, `Teachers` (with review system), `PeerRatings`, `ProfileComments`, `PostReactions`, `Settings`, `failed_login_attempts`, `remember_me_tokens`, `Friendships` (with pending/accepted status), and `Messages` (for direct messaging).
 
 **Scopes System:** Three-tier hierarchy with public square scope (always accessible), grade scopes (grades 1-6), and class section scopes (format: grade-section, e.g., "1-A"). Each non-public scope has a unique access code. Admin UI provides full CRUD capabilities with comprehensive validation:
 - Public square: Always accessible scope with no access code required

@@ -15,11 +15,15 @@ import {
   teachers,
   teacherReviews,
   profileComments,
-  peerRatings,
+  degrees,
+  hobbies,
+  profilePhotos,
   settings,
   passwordResetTokens,
   failedLoginAttempts,
   rememberMeTokens,
+  friendships,
+  messages,
   type User,
   type InsertUser,
   type Scope,
@@ -52,8 +56,12 @@ import {
   type InsertTeacherReview,
   type ProfileComment,
   type InsertProfileComment,
-  type PeerRating,
-  type InsertPeerRating,
+  type Degree,
+  type InsertDegree,
+  type Hobby,
+  type InsertHobby,
+  type ProfilePhoto,
+  type InsertProfilePhoto,
   type Setting,
   type InsertSetting,
   type PasswordResetToken,
@@ -145,11 +153,19 @@ export interface IStorage {
   
   // Events
   createEvent(event: InsertEvent): Promise<Event>;
-  getEvents(scopeId?: string, userId?: string): Promise<any[]>;
+  getEvents(scopeId?: string | null, userId?: string): Promise<any[]>;
   rsvpToEvent(eventId: string, userId: string): Promise<EventRsvp | null>;
   getEventRsvps(eventId: string): Promise<EventRsvp[]>;
   getUserRsvps(userId: string): Promise<EventRsvp[]>;
   getEventAttendees(eventId: string): Promise<User[]>;
+
+  // Friends & Messages
+  sendFriendRequest(userId: string, friendId: string): Promise<any>;
+  acceptFriendRequest(userId: string, friendId: string): Promise<any>;
+  getFriends(userId: string): Promise<any[]>;
+  getPendingRequests(userId: string): Promise<any[]>;
+  getConversation(userId: string, friendId: string): Promise<any[]>;
+  sendMessage(senderId: string, recipientId: string, content: string): Promise<any>;
   
   // Schedules
   createSchedule(schedule: InsertSchedule): Promise<Schedule>;
@@ -165,11 +181,39 @@ export interface IStorage {
   deleteTeacher(id: string): Promise<boolean>;
   getTeacherWithReviews(id: string): Promise<{ teacher: Teacher; reviews: TeacherReview[]; averageRating: number } | undefined>;
   
-  // Peer Ratings
-  submitPeerRating(rating: InsertPeerRating): Promise<PeerRating>;
-  getUserRatings(userId: string): Promise<PeerRating[]>;
-  getUserRating(ratedUserId: string, raterUserId: string): Promise<PeerRating | undefined>;
-  calculateAndUpdateUserStats(userId: string): Promise<void>;
+  // Degrees, Hobbies, Profile Photos
+  createDegree(degree: InsertDegree): Promise<Degree>;
+  getDegrees(userId: string): Promise<Degree[]>;
+  deleteDegree(degreeId: string): Promise<boolean>;
+  
+  createHobby(hobby: InsertHobby): Promise<Hobby>;
+  getHobbies(userId: string): Promise<Hobby[]>;
+  updateHobby(hobbyId: string, updates: Partial<InsertHobby>): Promise<Hobby | undefined>;
+  deleteHobby(hobbyId: string): Promise<boolean>;
+  
+  createProfilePhoto(photo: InsertProfilePhoto): Promise<ProfilePhoto>;
+  getProfilePhotos(userId: string): Promise<ProfilePhoto[]>;
+  deleteProfilePhoto(photoId: string): Promise<boolean>;
+  
+  // Self-ratings endpoint
+  updateUserSelfRatings(userId: string, scores: Partial<{
+    initiativeScore: number;
+    communicationScore: number;
+    cooperationScore: number;
+    kindnessScore: number;
+    perseveranceScore: number;
+    fitnessScore: number;
+    playingSkillsScore: number;
+    inClassMisconductScore: number;
+    outClassMisconductScore: number;
+    literaryScienceScore: number;
+    naturalScienceScore: number;
+    electronicScienceScore: number;
+    confidenceScore: number;
+    temperScore: number;
+    cheerfulnessScore: number;
+  }>): Promise<User | undefined>;
+  
   createTeacherReview(review: InsertTeacherReview): Promise<TeacherReview>;
   getTeacherReviews(teacherId: string): Promise<TeacherReview[]>;
   
@@ -1414,13 +1458,14 @@ export class DatabaseStorage implements IStorage {
     return event;
   }
 
-  async getEvents(scopeId?: string, userId?: string): Promise<any[]> {
+  async getEvents(scopeId?: string | null, userId?: string): Promise<any[]> {
     const baseQuery = db
       .select({
         id: events.id,
         title: events.title,
         description: events.description,
         eventType: events.eventType,
+        eventCategory: events.eventCategory,
         scopeId: events.scopeId,
         startTime: events.startTime,
         endTime: events.endTime,
@@ -1837,111 +1882,91 @@ export class DatabaseStorage implements IStorage {
     return reaction;
   }
 
-  // ==================== PEER RATINGS ====================
-  async submitPeerRating(rating: InsertPeerRating): Promise<PeerRating> {
-    // Check if rating already exists from this rater for this user
-    const [existing] = await db
-      .select()
-      .from(peerRatings)
-      .where(
-        and(
-          eq(peerRatings.ratedUserId, rating.ratedUserId),
-          eq(peerRatings.raterUserId, rating.raterUserId)
-        )
-      );
-
-    let result: PeerRating;
-    if (existing) {
-      // Update existing rating
-      const [updated] = await db
-        .update(peerRatings)
-        .set({
-          ...rating,
-          updatedAt: new Date(),
-        })
-        .where(eq(peerRatings.id, existing.id))
-        .returning();
-      result = updated;
-    } else {
-      // Create new rating
-      const [created] = await db.insert(peerRatings).values(rating).returning();
-      result = created;
-    }
-
-    // Recalculate and update user stats
-    await this.calculateAndUpdateUserStats(rating.ratedUserId);
-
-    return result;
+  // ==================== DEGREES ====================
+  async createDegree(degree: InsertDegree): Promise<Degree> {
+    const [created] = await db.insert(degrees).values(degree).returning();
+    return created;
   }
 
-  async getUserRatings(userId: string): Promise<PeerRating[]> {
+  async getDegrees(userId: string): Promise<Degree[]> {
+    return await db.select().from(degrees).where(eq(degrees.userId, userId));
+  }
+
+  async deleteDegree(degreeId: string): Promise<boolean> {
+    const result = await db.delete(degrees).where(eq(degrees.id, degreeId));
+    return result.rowCount > 0;
+  }
+
+  // ==================== HOBBIES ====================
+  async createHobby(hobby: InsertHobby): Promise<Hobby> {
+    const [created] = await db.insert(hobbies).values(hobby).returning();
+    return created;
+  }
+
+  async getHobbies(userId: string): Promise<Hobby[]> {
+    return await db.select().from(hobbies).where(eq(hobbies.userId, userId));
+  }
+
+  async updateHobby(hobbyId: string, updates: Partial<InsertHobby>): Promise<Hobby | undefined> {
+    const [updated] = await db
+      .update(hobbies)
+      .set({ ...updates })
+      .where(eq(hobbies.id, hobbyId))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteHobby(hobbyId: string): Promise<boolean> {
+    const result = await db.delete(hobbies).where(eq(hobbies.id, hobbyId));
+    return result.rowCount > 0;
+  }
+
+  // ==================== PROFILE PHOTOS ====================
+  async createProfilePhoto(photo: InsertProfilePhoto): Promise<ProfilePhoto> {
+    const [created] = await db.insert(profilePhotos).values(photo).returning();
+    return created;
+  }
+
+  async getProfilePhotos(userId: string): Promise<ProfilePhoto[]> {
     return await db
       .select()
-      .from(peerRatings)
-      .where(eq(peerRatings.ratedUserId, userId));
+      .from(profilePhotos)
+      .where(eq(profilePhotos.userId, userId))
+      .orderBy(profilePhotos.displayOrder);
   }
 
-  async getUserRating(ratedUserId: string, raterUserId: string): Promise<PeerRating | undefined> {
-    const [rating] = await db
-      .select()
-      .from(peerRatings)
-      .where(
-        and(
-          eq(peerRatings.ratedUserId, ratedUserId),
-          eq(peerRatings.raterUserId, raterUserId)
-        )
-      );
-    return rating || undefined;
+  async deleteProfilePhoto(photoId: string): Promise<boolean> {
+    const result = await db.delete(profilePhotos).where(eq(profilePhotos.id, photoId));
+    return result.rowCount > 0;
   }
 
-  async calculateAndUpdateUserStats(userId: string): Promise<void> {
-    // Get all ratings for this user
-    const ratings = await this.getUserRatings(userId);
-
-    if (ratings.length === 0) {
-      // No ratings yet - keep stats as null
-      return;
-    }
-
-    // Calculate averages for each metric
-    const avgInitiative = ratings.reduce((sum, r) => sum + r.initiativeScore, 0) / ratings.length;
-    const avgCommunication = ratings.reduce((sum, r) => sum + r.communicationScore, 0) / ratings.length;
-    const avgCooperation = ratings.reduce((sum, r) => sum + r.cooperationScore, 0) / ratings.length;
-    const avgKindness = ratings.reduce((sum, r) => sum + r.kindnessScore, 0) / ratings.length;
-    const avgPerseverance = ratings.reduce((sum, r) => sum + r.perseveranceScore, 0) / ratings.length;
-    const avgFitness = ratings.reduce((sum, r) => sum + r.fitnessScore, 0) / ratings.length;
-    const avgPlayingSkills = ratings.reduce((sum, r) => sum + r.playingSkillsScore, 0) / ratings.length;
-    const avgInClassMisconduct = ratings.reduce((sum, r) => sum + r.inClassMisconductScore, 0) / ratings.length;
-    const avgOutClassMisconduct = ratings.reduce((sum, r) => sum + r.outClassMisconductScore, 0) / ratings.length;
-    const avgLiteraryScience = ratings.reduce((sum, r) => sum + r.literaryScienceScore, 0) / ratings.length;
-    const avgNaturalScience = ratings.reduce((sum, r) => sum + r.naturalScienceScore, 0) / ratings.length;
-    const avgElectronicScience = ratings.reduce((sum, r) => sum + r.electronicScienceScore, 0) / ratings.length;
-    const avgConfidence = ratings.reduce((sum, r) => sum + r.confidenceScore, 0) / ratings.length;
-    const avgTemper = ratings.reduce((sum, r) => sum + r.temperScore, 0) / ratings.length;
-    const avgCheerfulness = ratings.reduce((sum, r) => sum + r.cheerfulnessScore, 0) / ratings.length;
-
-    // Update user stats with calculated averages
-    await db
+  // ==================== SELF-RATINGS ====================
+  async updateUserSelfRatings(userId: string, scores: Partial<{
+    initiativeScore: number;
+    communicationScore: number;
+    cooperationScore: number;
+    kindnessScore: number;
+    perseveranceScore: number;
+    fitnessScore: number;
+    playingSkillsScore: number;
+    inClassMisconductScore: number;
+    outClassMisconductScore: number;
+    literaryScienceScore: number;
+    naturalScienceScore: number;
+    electronicScienceScore: number;
+    confidenceScore: number;
+    temperScore: number;
+    cheerfulnessScore: number;
+  }>): Promise<User | undefined> {
+    const [updated] = await db
       .update(users)
       .set({
-        initiativeScore: avgInitiative,
-        communicationScore: avgCommunication,
-        cooperationScore: avgCooperation,
-        kindnessScore: avgKindness,
-        perseveranceScore: avgPerseverance,
-        fitnessScore: avgFitness,
-        playingSkillsScore: avgPlayingSkills,
-        inClassMisconductScore: avgInClassMisconduct,
-        outClassMisconductScore: avgOutClassMisconduct,
-        literaryScienceScore: avgLiteraryScience,
-        naturalScienceScore: avgNaturalScience,
-        electronicScienceScore: avgElectronicScience,
-        confidenceScore: avgConfidence,
-        temperScore: avgTemper,
-        cheerfulnessScore: avgCheerfulness,
+        ...scores,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, userId));
+      .where(eq(users.id, userId))
+      .returning();
+    return updated || undefined;
   }
 
   // ==================== SETTINGS ====================
@@ -2040,6 +2065,60 @@ export class DatabaseStorage implements IStorage {
       console.error("Failed to reset password:", error);
       return false;
     }
+  }
+
+  // ==================== FRIENDS & MESSAGES ====================
+  async sendFriendRequest(userId: string, friendId: string): Promise<any> {
+    const [friendship] = await db.insert(friendships).values({
+      userId,
+      friendId,
+      status: "pending",
+    }).returning();
+    return friendship;
+  }
+
+  async acceptFriendRequest(userId: string, friendId: string): Promise<any> {
+    const [friendship] = await db
+      .update(friendships)
+      .set({ status: "accepted" })
+      .where(and(eq(friendships.userId, friendId), eq(friendships.friendId, userId)))
+      .returning();
+    return friendship;
+  }
+
+  async getFriends(userId: string): Promise<any[]> {
+    return await db
+      .select()
+      .from(friendships)
+      .leftJoin(users, eq(friendships.friendId, users.id))
+      .where(and(eq(friendships.userId, userId), eq(friendships.status, "accepted")));
+  }
+
+  async getPendingRequests(userId: string): Promise<any[]> {
+    return await db
+      .select()
+      .from(friendships)
+      .leftJoin(users, eq(friendships.userId, users.id))
+      .where(and(eq(friendships.friendId, userId), eq(friendships.status, "pending")));
+  }
+
+  async getConversation(userId: string, friendId: string): Promise<any[]> {
+    return await db
+      .select()
+      .from(messages)
+      .where(
+        sql`(${eq(messages.senderId, userId)} AND ${eq(messages.recipientId, friendId)}) OR (${eq(messages.senderId, friendId)} AND ${eq(messages.recipientId, userId)})`
+      )
+      .orderBy(desc(messages.createdAt));
+  }
+
+  async sendMessage(senderId: string, recipientId: string, content: string): Promise<any> {
+    const [message] = await db.insert(messages).values({
+      senderId,
+      recipientId,
+      content,
+    }).returning();
+    return message;
   }
 }
 
