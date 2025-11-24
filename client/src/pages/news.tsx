@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -51,6 +51,19 @@ export default function NewsPage() {
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
+
+  // Fetch scopes to find public scope for default selection
+  const { data: scopes = [] } = useQuery<Array<{ id: string; type: string; name: string }>>({
+    queryKey: ["/api/scopes"],
+  });
+
+  // Set default scope to public scope on mount
+  const publicScope = scopes.find((s) => s.type === "public");
+  useEffect(() => {
+    if (publicScope && selectedScope === null) {
+      setSelectedScope(publicScope.id);
+    }
+  }, [publicScope?.id]);
 
   // Check if user has access to selected scope
   const hasAccess = useHasAccessToScope(selectedScope);

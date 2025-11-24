@@ -16,8 +16,8 @@ import { useHasAccessToScope } from "@/hooks/use-digital-keys";
 type Scope = {
   id: string;
   name: string;
-  type: "global" | "stage" | "section";
-  stageLevel: number | null;
+  type: "public" | "grade" | "section";
+  gradeNumber: number | null;
   sectionName: string | null;
 };
 
@@ -38,14 +38,15 @@ export function ScopeSelector({ value, onChange, label = "Post to", placeholder 
 
   const hasAccess = useHasAccessToScope(value);
 
-  const globalScope = scopes.find((s) => s.type === "global");
-  const stageScopes = scopes.filter((s) => s.type === "stage").sort((a, b) => (a.stageLevel || 0) - (b.stageLevel || 0));
+  const publicScope = scopes.find((s) => s.type === "public");
+  const gradeScopes = scopes.filter((s) => s.type === "grade").sort((a, b) => (a.gradeNumber || 0) - (b.gradeNumber || 0));
   const sectionScopes = scopes.filter((s) => s.type === "section").sort((a, b) => (a.sectionName || "").localeCompare(b.sectionName || ""));
 
   const handleScopeChange = async (newScopeId: string) => {
-    const isGlobal = newScopeId === "global" || newScopeId === globalScope?.id;
-    if (isGlobal) {
-      onChange(null);
+    const isPublic = newScopeId === "public" || newScopeId === publicScope?.id;
+    if (isPublic && publicScope) {
+      // For public scope, we pass the actual scope ID so it's treated as a specific scope
+      onChange(publicScope.id);
       return;
     }
 
@@ -55,7 +56,7 @@ export function ScopeSelector({ value, onChange, label = "Post to", placeholder 
       return;
     }
 
-    if (scope.type === "stage" || scope.type === "section") {
+    if (scope.type === "grade" || scope.type === "section") {
       const response = await fetch(`/api/keys/check/${newScopeId}`);
       const hasKey = response.ok && (await response.json()).hasAccess;
       
@@ -84,38 +85,38 @@ export function ScopeSelector({ value, onChange, label = "Post to", placeholder 
   };
 
   const getScopeIcon = (type: string) => {
-    if (type === "global") return <Globe className="w-4 h-4" />;
-    if (type === "stage") return <GraduationCap className="w-4 h-4" />;
+    if (type === "public") return <Globe className="w-4 h-4" />;
+    if (type === "grade") return <GraduationCap className="w-4 h-4" />;
     return <Users className="w-4 h-4" />;
   };
 
-  const selectedScope = value ? scopes.find((s) => s.id === value) : globalScope;
+  const selectedScope = value ? scopes.find((s) => s.id === value) : publicScope;
 
   return (
     <div className="space-y-2">
       {label && <Label>{label}</Label>}
       <div className="flex items-center gap-2">
-        <Select value={value || "global"} onValueChange={handleScopeChange}>
+        <Select value={value || (publicScope?.id || "")} onValueChange={handleScopeChange}>
           <SelectTrigger data-testid="select-scope">
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
-            {/* Global Scope */}
-            {globalScope && (
-              <SelectItem value="global" data-testid="scope-option-global">
+            {/* Public Scope */}
+            {publicScope && (
+              <SelectItem value={publicScope.id} data-testid="scope-option-public">
                 <div className="flex items-center gap-2">
                   <Globe className="w-4 h-4" />
-                  <span>{globalScope.name}</span>
+                  <span>{publicScope.name}</span>
                 </div>
               </SelectItem>
             )}
 
             {/* Grade Scopes */}
-            {stageScopes.length > 0 && (
+            {gradeScopes.length > 0 && (
               <>
                 <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">Grades</div>
-                {stageScopes.map((scope) => (
-                  <SelectItem key={scope.id} value={scope.id} data-testid={`scope-option-grade-${scope.stageLevel}`}>
+                {gradeScopes.map((scope) => (
+                  <SelectItem key={scope.id} value={scope.id} data-testid={`scope-option-grade-${scope.gradeNumber}`}>
                     <div className="flex items-center gap-2">
                       <GraduationCap className="w-4 h-4" />
                       <span>{scope.name}</span>
