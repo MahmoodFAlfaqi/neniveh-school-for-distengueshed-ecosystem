@@ -15,6 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocation } from "wouter";
+import { HexagonTendencyChart } from "@/components/HexagonTendencyChart";
+import { Slider } from "@/components/ui/slider";
 
 type User = {
   id: string;
@@ -74,6 +76,8 @@ export default function ProfilePage() {
   const [editBio, setEditBio] = useState("");
   const [editGrade, setEditGrade] = useState("");
   const [editClassName, setEditClassName] = useState("");
+  const [editingHexagon, setEditingHexagon] = useState<"social" | "skills" | "interests" | null>(null);
+  const [hexagonValues, setHexagonValues] = useState<Record<string, number>>({});
   const { toast } = useToast();
 
   const { data: user, isLoading } = useQuery<User>({
@@ -153,6 +157,128 @@ export default function ProfilePage() {
       deleteAccountMutation.mutate(userId);
     }
   };
+
+  const handleEditHexagon = (type: "social" | "skills" | "interests") => {
+    if (!user) return;
+    
+    const metricKeys = {
+      social: ["empathy", "angerManagement", "cooperation", "selfConfidence", "acceptingCriticism", "listening"],
+      skills: ["problemSolving", "creativity", "memoryFocus", "planningOrganization", "communicationExpression", "leadershipInitiative"],
+      interests: ["artisticCreative", "athleticPhysical", "technicalTech", "linguisticReading", "socialHumanitarian", "naturalEnvironmental"],
+    };
+    
+    // IMPORTANT: Create fresh state with ONLY the 6 metrics for this hexagon type
+    // This prevents values from other hexagons bleeding into the submission
+    const initialValues: Record<string, number> = {};
+    metricKeys[type].forEach((key) => {
+      initialValues[key] = (user as any)[key] ?? 4;
+    });
+    
+    setHexagonValues(initialValues); // Fresh state, no previous hexagon data
+    setEditingHexagon(type);
+  };
+
+  const updateHexagonMutation = useMutation({
+    mutationFn: async (data: Record<string, number>) => {
+      return await apiRequest("PATCH", `/api/users/${currentUser?.id}/hexagon`, data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Tendency chart updated",
+        description: "Your hexagon tendency chart has been updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${currentUser?.id}`] });
+      setEditingHexagon(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update chart",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveHexagon = () => {
+    if (!editingHexagon) return;
+    
+    // Define the valid keys for the current hexagon type
+    const metricKeys = {
+      social: ["empathy", "angerManagement", "cooperation", "selfConfidence", "acceptingCriticism", "listening"],
+      skills: ["problemSolving", "creativity", "memoryFocus", "planningOrganization", "communicationExpression", "leadershipInitiative"],
+      interests: ["artisticCreative", "athleticPhysical", "technicalTech", "linguisticReading", "socialHumanitarian", "naturalEnvironmental"],
+    };
+    
+    // Filter to send ONLY the 6 metrics for the current hexagon type
+    // This prevents cross-hexagon contamination from state batching or stale values
+    const validKeys = metricKeys[editingHexagon];
+    const filteredValues: Record<string, number> = {};
+    validKeys.forEach(key => {
+      filteredValues[key] = hexagonValues[key] ?? 4;
+    });
+    
+    const total = Object.values(filteredValues).reduce((sum, v) => sum + v, 0);
+    const hasInvalid = Object.values(filteredValues).some((v) => v < 0 || v > 10);
+    
+    if (total !== 24) {
+      toast({
+        title: "Invalid distribution",
+        description: `You must distribute exactly 24 points. Current total: ${total}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (hasInvalid) {
+      toast({
+        title: "Invalid values",
+        description: "Each metric must be between 0 and 10",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    updateHexagonMutation.mutate(filteredValues);
+  };
+
+  const hexagonMetricLabels = {
+    social: {
+      empathy: "التعاطف (Empathy)",
+      angerManagement: "إدارة الغضب (Anger Management)",
+      cooperation: "التعاون (Cooperation)",
+      selfConfidence: "الثقة بالنفس (Self Confidence)",
+      acceptingCriticism: "تقبل النقد (Accepting Criticism)",
+      listening: "الاستماع (Listening)",
+    },
+    skills: {
+      problemSolving: "حل المشكلات (Problem Solving)",
+      creativity: "الإبداع (Creativity)",
+      memoryFocus: "الذاكرة والتركيز (Memory & Focus)",
+      planningOrganization: "التخطيط والتنظيم (Planning & Organization)",
+      communicationExpression: "التواصل والتعبير (Communication & Expression)",
+      leadershipInitiative: "القيادة والمبادرة (Leadership & Initiative)",
+    },
+    interests: {
+      artisticCreative: "الفن والإبداع (Artistic & Creative)",
+      athleticPhysical: "الرياضة واللياقة (Athletic & Physical)",
+      technicalTech: "التقنية والحاسوب (Technical & Tech)",
+      linguisticReading: "اللغة والقراءة (Linguistic & Reading)",
+      socialHumanitarian: "الاجتماعي والإنساني (Social & Humanitarian)",
+      naturalEnvironmental: "الطبيعة والبيئة (Natural & Environmental)",
+    },
+  };
+
+  const currentHexagonLabels = editingHexagon ? hexagonMetricLabels[editingHexagon] : {};
+  
+  // Calculate total using ONLY the keys for the current hexagon type (prevent stale key pollution)
+  const currentMetricKeys = editingHexagon ? {
+    social: ["empathy", "angerManagement", "cooperation", "selfConfidence", "acceptingCriticism", "listening"],
+    skills: ["problemSolving", "creativity", "memoryFocus", "planningOrganization", "communicationExpression", "leadershipInitiative"],
+    interests: ["artisticCreative", "athleticPhysical", "technicalTech", "linguisticReading", "socialHumanitarian", "naturalEnvironmental"],
+  }[editingHexagon] : [];
+  
+  const currentTotal = currentMetricKeys.reduce((sum, k) => sum + (hexagonValues[k] ?? 0), 0);
 
   if (isLoading) {
     return (
@@ -299,6 +425,58 @@ export default function ProfilePage() {
           </Card>
         </div>
 
+        {user.role === "student" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <HexagonTendencyChart
+              title="Social Personality"
+              description="Interpersonal traits and social skills"
+              metrics={[
+                { metric: "empathy", arabicLabel: "التعاطف", value: user.empathy || 4, max: 10 },
+                { metric: "angerManagement", arabicLabel: "إدارة الغضب", value: user.angerManagement || 4, max: 10 },
+                { metric: "cooperation", arabicLabel: "التعاون", value: user.cooperation || 4, max: 10 },
+                { metric: "selfConfidence", arabicLabel: "الثقة بالنفس", value: user.selfConfidence || 4, max: 10 },
+                { metric: "acceptingCriticism", arabicLabel: "تقبل النقد", value: user.acceptingCriticism || 4, max: 10 },
+                { metric: "listening", arabicLabel: "الاستماع", value: user.listening || 4, max: 10 },
+              ]}
+              color="hsl(var(--chart-1))"
+              isOwnProfile={isOwnProfile}
+              onEdit={() => handleEditHexagon("social")}
+            />
+            
+            <HexagonTendencyChart
+              title="Skills & Abilities"
+              description="Cognitive and practical capabilities"
+              metrics={[
+                { metric: "problemSolving", arabicLabel: "حل المشكلات", value: user.problemSolving || 4, max: 10 },
+                { metric: "creativity", arabicLabel: "الإبداع", value: user.creativity || 4, max: 10 },
+                { metric: "memoryFocus", arabicLabel: "الذاكرة والتركيز", value: user.memoryFocus || 4, max: 10 },
+                { metric: "planningOrganization", arabicLabel: "التخطيط والتنظيم", value: user.planningOrganization || 4, max: 10 },
+                { metric: "communicationExpression", arabicLabel: "التواصل والتعبير", value: user.communicationExpression || 4, max: 10 },
+                { metric: "leadershipInitiative", arabicLabel: "القيادة والمبادرة", value: user.leadershipInitiative || 4, max: 10 },
+              ]}
+              color="hsl(var(--chart-2))"
+              isOwnProfile={isOwnProfile}
+              onEdit={() => handleEditHexagon("skills")}
+            />
+            
+            <HexagonTendencyChart
+              title="Interests"
+              description="Hobbies and personal preferences"
+              metrics={[
+                { metric: "artisticCreative", arabicLabel: "الفن والإبداع", value: user.artisticCreative || 4, max: 10 },
+                { metric: "athleticPhysical", arabicLabel: "الرياضة واللياقة", value: user.athleticPhysical || 4, max: 10 },
+                { metric: "technicalTech", arabicLabel: "التقنية والحاسوب", value: user.technicalTech || 4, max: 10 },
+                { metric: "linguisticReading", arabicLabel: "اللغة والقراءة", value: user.linguisticReading || 4, max: 10 },
+                { metric: "socialHumanitarian", arabicLabel: "الاجتماعي والإنساني", value: user.socialHumanitarian || 4, max: 10 },
+                { metric: "naturalEnvironmental", arabicLabel: "الطبيعة والبيئة", value: user.naturalEnvironmental || 4, max: 10 },
+              ]}
+              color="hsl(var(--chart-3))"
+              isOwnProfile={isOwnProfile}
+              onEdit={() => handleEditHexagon("interests")}
+            />
+          </div>
+        )}
+
         <ProfileCommentsSection userId={user.id} currentUserId={currentUser?.id} />
       </div>
 
@@ -373,6 +551,72 @@ export default function ProfilePage() {
               data-testid="button-save-profile-edit"
             >
               {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editingHexagon !== null} onOpenChange={() => setEditingHexagon(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" data-testid="dialog-edit-hexagon">
+          <DialogHeader>
+            <DialogTitle>
+              Edit {editingHexagon === "social" ? "Social Personality" : editingHexagon === "skills" ? "Skills & Abilities" : "Interests"} Hexagon
+            </DialogTitle>
+            <DialogDescription>
+              Distribute 24 points across the 6 metrics. Each metric can have a maximum of 10 points.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {Object.entries(currentHexagonLabels).map(([key, label]) => (
+              <div key={key} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">{label}</label>
+                  <span className="text-sm font-bold text-primary">{hexagonValues[key] || 0}/10</span>
+                </div>
+                <Slider
+                  value={[hexagonValues[key] ?? 0]}
+                  onValueChange={(vals) => setHexagonValues({ ...hexagonValues, [key]: Math.floor(vals[0]) })}
+                  max={10}
+                  min={0}
+                  step={1}
+                  className="w-full"
+                  data-testid={`slider-${key}`}
+                />
+              </div>
+            ))}
+            
+            <div className="flex items-center justify-between pt-4 border-t">
+              <span className="font-medium">Total Points Used:</span>
+              <span className={`text-lg font-bold ${currentTotal !== 24 ? "text-destructive" : "text-green-600 dark:text-green-500"}`}>
+                {currentTotal}/24
+              </span>
+            </div>
+            
+            {currentTotal !== 24 && (
+              <div className={`p-3 rounded-md text-sm ${currentTotal > 24 ? "bg-destructive/10 text-destructive" : "bg-yellow-500/10 text-yellow-700 dark:text-yellow-500"}`}>
+                {currentTotal > 24 
+                  ? "⚠️ You have exceeded the limit. Please reduce some values."
+                  : `⚠️ You need to use exactly 24 points. Add ${24 - currentTotal} more point${24 - currentTotal === 1 ? "" : "s"}.`
+                }
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setEditingHexagon(null)}
+              data-testid="button-cancel-hexagon-edit"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveHexagon}
+              disabled={updateHexagonMutation.isPending || currentTotal !== 24}
+              data-testid="button-save-hexagon"
+            >
+              {updateHexagonMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

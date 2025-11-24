@@ -544,22 +544,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         reputationScore: user.reputationScore,
         accountStatus: user.accountStatus,
         createdAt: user.createdAt,
-        // Student stats
-        initiativeScore: user.initiativeScore,
-        communicationScore: user.communicationScore,
-        cooperationScore: user.cooperationScore,
-        kindnessScore: user.kindnessScore,
-        perseveranceScore: user.perseveranceScore,
-        fitnessScore: user.fitnessScore,
-        playingSkillsScore: user.playingSkillsScore,
-        inClassMisconductScore: user.inClassMisconductScore,
-        outClassMisconductScore: user.outClassMisconductScore,
-        literaryScienceScore: user.literaryScienceScore,
-        naturalScienceScore: user.naturalScienceScore,
-        electronicScienceScore: user.electronicScienceScore,
-        confidenceScore: user.confidenceScore,
-        temperScore: user.temperScore,
-        cheerfulnessScore: user.cheerfulnessScore,
+        // Hexagon tendency charts
+        empathy: user.empathy,
+        angerManagement: user.angerManagement,
+        cooperation: user.cooperation,
+        selfConfidence: user.selfConfidence,
+        acceptingCriticism: user.acceptingCriticism,
+        listening: user.listening,
+        problemSolving: user.problemSolving,
+        creativity: user.creativity,
+        memoryFocus: user.memoryFocus,
+        planningOrganization: user.planningOrganization,
+        communicationExpression: user.communicationExpression,
+        leadershipInitiative: user.leadershipInitiative,
+        artisticCreative: user.artisticCreative,
+        athleticPhysical: user.athleticPhysical,
+        technicalTech: user.technicalTech,
+        linguisticReading: user.linguisticReading,
+        socialHumanitarian: user.socialHumanitarian,
+        naturalEnvironmental: user.naturalEnvironmental,
+        hobbies: user.hobbies,
       };
       
       res.json(publicProfile);
@@ -598,6 +602,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: error.message });
       }
       res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  // Update hexagon tendency charts (own profile only)
+  app.patch("/api/users/:userId/hexagon", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const currentUserId = req.session.userId!;
+      
+      if (userId !== currentUserId) {
+        return res.status(403).json({ message: "You can only edit your own tendency charts" });
+      }
+      
+      // Sanitize payload to prevent prototype pollution attacks
+      // Create a clean object with only own properties (no inherited keys like __proto__)
+      const sanitized = Object.create(null);
+      for (const [key, value] of Object.entries(req.body)) {
+        // Only copy own enumerable properties
+        if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+          sanitized[key] = value;
+        }
+      }
+      
+      // Validate sanitized body using Zod schema to ensure integers 0-10
+      const hexagonUpdateSchema = z.record(z.string(), z.number().int().min(0).max(10));
+      const parseResult = hexagonUpdateSchema.safeParse(sanitized);
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid payload format. All values must be integers between 0 and 10.",
+          errors: parseResult.error.errors
+        });
+      }
+      
+      const hexagonData = parseResult.data;
+      
+      // Define hexagon field groups
+      const hexagonGroups = {
+        social: new Set(["empathy", "angerManagement", "cooperation", "selfConfidence", "acceptingCriticism", "listening"]),
+        skills: new Set(["problemSolving", "creativity", "memoryFocus", "planningOrganization", "communicationExpression", "leadershipInitiative"]),
+        interests: new Set(["artisticCreative", "athleticPhysical", "technicalTech", "linguisticReading", "socialHumanitarian", "naturalEnvironmental"]),
+      };
+      
+      const keys = Object.keys(hexagonData);
+      
+      // Validate that exactly 6 keys are present
+      if (keys.length !== 6) {
+        return res.status(400).json({ 
+          message: `Invalid payload. Must update exactly 6 metrics for one hexagon. Received ${keys.length} keys.`
+        });
+      }
+      
+      // Determine which hexagon group these keys belong to
+      // SECURITY: This prevents cross-hexagon contamination by ensuring all 6 keys
+      // belong to the SAME hexagon group (not a mix from multiple groups)
+      let detectedGroup: string | null = null;
+      let canonicalKeys: Set<string> | null = null;
+      for (const [groupName, groupKeys] of Object.entries(hexagonGroups)) {
+        if (keys.every(k => groupKeys.has(k))) {
+          detectedGroup = groupName;
+          canonicalKeys = groupKeys;
+          break;
+        }
+      }
+      
+      if (!detectedGroup || !canonicalKeys) {
+        return res.status(400).json({ 
+          message: "Invalid payload. All 6 metrics must belong to the same hexagon (social, skills, or interests)."
+        });
+      }
+      
+      // EXTRA SECURITY: Verify the 6 keys received are EXACTLY the 6 canonical keys
+      // for this hexagon group (no missing keys, no extra keys)
+      const receivedKeysSet = new Set(keys);
+      const canonicalKeysArray = Array.from(canonicalKeys);
+      
+      if (!canonicalKeysArray.every(k => receivedKeysSet.has(k))) {
+        return res.status(400).json({ 
+          message: `Invalid payload. Must include all 6 metrics for ${detectedGroup} hexagon.`
+        });
+      }
+      
+      // hexagonData is already validated by Zod schema (integers 0-10)
+      const updates: Record<string, number> = hexagonData;
+      
+      // Validate total points for the detected hexagon (must be exactly 24)
+      const total = Object.values(updates).reduce((sum, v) => sum + v, 0);
+      
+      if (total !== 24) {
+        return res.status(400).json({ 
+          message: `Invalid point distribution. The ${detectedGroup} hexagon must have exactly 24 total points (received ${total}).`
+        });
+      }
+      
+      // All validations passed - update the hexagon
+      const updated = await storage.updateUserProfile(userId, updates);
+      
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { password, ...userWithoutPassword } = updated;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Failed to update hexagon:", error);
+      res.status(500).json({ message: "Failed to update tendency charts" });
     }
   });
 
