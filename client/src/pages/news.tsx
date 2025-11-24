@@ -300,7 +300,7 @@ export default function NewsPage() {
                     value={selectedScope}
                     onChange={setSelectedScope}
                     label="Post to"
-                    placeholder="Select where to post"
+                    placeholder="Public Square"
                   />
                 </CardContent>
                 <CardFooter className="justify-end animate-in fade-in duration-300">
