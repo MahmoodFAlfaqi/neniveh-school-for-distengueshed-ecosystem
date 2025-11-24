@@ -697,16 +697,16 @@ export default function ProfilePage() {
             
             <div className="flex items-center justify-between pt-4 border-t">
               <span className="font-medium">Total Points Used:</span>
-              <span className={`text-lg font-bold ${currentTotal !== 24 ? "text-destructive" : "text-green-600 dark:text-green-500"}`}>
-                {currentTotal}/24
+              <span className={`text-lg font-bold ${currentTotal !== 33 ? "text-destructive" : "text-green-600 dark:text-green-500"}`}>
+                {currentTotal}/33
               </span>
             </div>
             
-            {currentTotal !== 24 && (
-              <div className={`p-3 rounded-md text-sm ${currentTotal > 24 ? "bg-destructive/10 text-destructive" : "bg-yellow-500/10 text-yellow-700 dark:text-yellow-500"}`}>
-                {currentTotal > 24 
+            {currentTotal !== 33 && (
+              <div className={`p-3 rounded-md text-sm ${currentTotal > 33 ? "bg-destructive/10 text-destructive" : "bg-yellow-500/10 text-yellow-700 dark:text-yellow-500"}`}>
+                {currentTotal > 33 
                   ? "⚠️ You have exceeded the limit. Please reduce some values."
-                  : `⚠️ You need to use exactly 24 points. Add ${24 - currentTotal} more point${24 - currentTotal === 1 ? "" : "s"}.`
+                  : `⚠️ You need to use exactly 33 points. Add ${33 - currentTotal} more point${33 - currentTotal === 1 ? "" : "s"}.`
                 }
               </div>
             )}
@@ -722,7 +722,7 @@ export default function ProfilePage() {
             </Button>
             <Button
               onClick={handleSaveHexagon}
-              disabled={updateHexagonMutation.isPending || currentTotal !== 24}
+              disabled={updateHexagonMutation.isPending || currentTotal !== 33}
               data-testid="button-save-hexagon"
             >
               {updateHexagonMutation.isPending ? "Saving..." : "Save Changes"}
