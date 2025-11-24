@@ -465,9 +465,12 @@ export default function SchedulePage() {
                                 <div className="space-y-1 p-1 sm:p-2">
                                   <Select
                                     value={currentSubject || "NONE"}
-                                    onValueChange={(value) =>
-                                      updateScheduleSlot(dayIndex, period, 'subject', value === "NONE" ? null : value)
-                                    }
+                                    onValueChange={(value) => {
+                                      const newSubject = value === "NONE" ? null : value;
+                                      updateScheduleSlot(dayIndex, period, 'subject', newSubject);
+                                      // Reset teacher when subject changes
+                                      updateScheduleSlot(dayIndex, period, 'teacherName', null);
+                                    }}
                                   >
                                     <SelectTrigger className="h-7 sm:h-8 text-xs">
                                       <SelectValue placeholder="Select subject" />
@@ -481,16 +484,27 @@ export default function SchedulePage() {
                                       ))}
                                     </SelectContent>
                                   </Select>
-                                  <input
-                                    type="text"
-                                    placeholder="Teacher"
-                                    className="w-full px-2 py-1 text-xs border rounded"
-                                    value={currentTeacher || ""}
-                                    onChange={(e) =>
-                                      updateScheduleSlot(dayIndex, period, 'teacherName', e.target.value || null)
-                                    }
-                                    data-testid={`input-teacher-${dayIndex + 1}-${period}`}
-                                  />
+                                  
+                                  {currentSubject && (
+                                    <Select
+                                      value={currentTeacher || "NONE"}
+                                      onValueChange={(value) =>
+                                        updateScheduleSlot(dayIndex, period, 'teacherName', value === "NONE" ? null : value)
+                                      }
+                                    >
+                                      <SelectTrigger className="h-7 sm:h-8 text-xs">
+                                        <SelectValue placeholder="Select teacher" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="NONE">None</SelectItem>
+                                        {getTeachersForSubjectAndSection(currentSubject).map((teacher) => (
+                                          <SelectItem key={teacher.id} value={teacher.name}>
+                                            {teacher.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  )}
                                 </div>
                               ) : currentSubject ? (
                                 <div className="space-y-0.5 p-1 sm:p-2 rounded-lg border bg-card hover-elevate">

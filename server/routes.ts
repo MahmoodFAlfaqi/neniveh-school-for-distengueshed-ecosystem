@@ -16,7 +16,6 @@ import {
   insertTeacherSchema,
   insertTeacherReviewSchema,
   insertScopeSchema,
-  insertProfileCommentSchema,
   insertPostCommentSchema,
   insertEventCommentSchema,
   insertAdminStudentIdSchema,
@@ -1610,50 +1609,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(reviews);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch reviews" });
-    }
-  });
-
-  // ==================== PROFILE COMMENTS ====================
-  
-  // Create profile comment
-  app.post("/api/users/:userId/comments", requireAuth, requireNonVisitor, async (req, res) => {
-    try {
-      // Prevent self-commenting (server-side validation)
-      if (req.params.userId === req.session.userId) {
-        return res.status(400).json({ message: "You cannot comment on your own profile" });
-      }
-      
-      // Moderate content before saving (only if content is provided)
-      if (req.body.content?.trim()) {
-        await requireModeration(req.body.content);
-      }
-      
-      const commentData = insertProfileCommentSchema.parse({
-        ...req.body,
-        profileUserId: req.params.userId,
-        authorId: req.session.userId!,
-      });
-      
-      const comment = await storage.createProfileComment(commentData);
-      res.json(comment);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
-      }
-      if (error instanceof Error && error.message.includes("community guidelines")) {
-        return res.status(400).json({ message: error.message });
-      }
-      res.status(500).json({ message: "Failed to create comment" });
-    }
-  });
-  
-  // Get profile comments
-  app.get("/api/users/:userId/comments", requireAuth, async (req, res) => {
-    try {
-      const comments = await storage.getProfileComments(req.params.userId);
-      res.json(comments);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch comments" });
     }
   });
 
