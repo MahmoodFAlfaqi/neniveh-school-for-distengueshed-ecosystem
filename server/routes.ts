@@ -1666,64 +1666,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create teacher profile (admin only)
   app.post("/api/teachers", requireAdmin, async (req, res) => {
     try {
+      console.log("[TEACHER CREATE] Received body:", JSON.stringify(req.body));
       const teacherData = insertTeacherSchema.parse(req.body);
+      console.log("[TEACHER CREATE] Validated data:", JSON.stringify(teacherData));
       const teacher = await storage.createTeacher(teacherData);
+      console.log("[TEACHER CREATE] Success:", teacher.id);
       res.json(teacher);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("[TEACHER CREATE] Validation error:", error.errors);
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create teacher" });
+      console.error("[TEACHER CREATE] Database error:", error instanceof Error ? error.message : String(error));
+      console.error("[TEACHER CREATE] Full error:", error);
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({ message: "Failed to create teacher", error: errorMsg });
     }
   });
   
   // Get all teachers
   app.get("/api/teachers", requireAuth, async (req, res) => {
     try {
+      console.log("[TEACHER GET] Fetching all teachers");
       const teachers = await storage.getTeachers();
+      console.log("[TEACHER GET] Success, found", teachers.length, "teachers");
       res.json(teachers);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch teachers" });
+      console.error("[TEACHER GET] Error:", error instanceof Error ? error.message : String(error));
+      console.error("[TEACHER GET] Full error:", error);
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({ message: "Failed to fetch teachers", error: errorMsg });
     }
   });
   
   // Get single teacher with reviews and average rating
   app.get("/api/teachers/:id", requireAuth, async (req, res) => {
     try {
+      console.log("[TEACHER GET BY ID] Fetching teacher:", req.params.id);
       const result = await storage.getTeacherWithReviews(req.params.id);
       if (!result) {
         return res.status(404).json({ message: "Teacher not found" });
       }
+      console.log("[TEACHER GET BY ID] Success");
       res.json(result);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch teacher" });
+      console.error("[TEACHER GET BY ID] Error:", error instanceof Error ? error.message : String(error));
+      console.error("[TEACHER GET BY ID] Full error:", error);
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({ message: "Failed to fetch teacher", error: errorMsg });
     }
   });
 
   // Update teacher (admin only)
   app.patch("/api/teachers/:id", requireAdmin, async (req, res) => {
     try {
+      console.log("[TEACHER UPDATE] Updating teacher:", req.params.id);
       const updates = req.body;
       const teacher = await storage.updateTeacher(req.params.id, updates);
       if (!teacher) {
         return res.status(404).json({ message: "Teacher not found" });
       }
+      console.log("[TEACHER UPDATE] Success");
       res.json(teacher);
     } catch (error) {
-      res.status(500).json({ message: "Failed to update teacher" });
+      console.error("[TEACHER UPDATE] Error:", error instanceof Error ? error.message : String(error));
+      console.error("[TEACHER UPDATE] Full error:", error);
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({ message: "Failed to update teacher", error: errorMsg });
     }
   });
 
   // Delete teacher (admin only)
   app.delete("/api/teachers/:id", requireAdmin, async (req, res) => {
     try {
+      console.log("[TEACHER DELETE] Deleting teacher:", req.params.id);
       const deleted = await storage.deleteTeacher(req.params.id);
       if (!deleted) {
         return res.status(404).json({ message: "Teacher not found" });
       }
+      console.log("[TEACHER DELETE] Success");
       res.json({ message: "Teacher deleted successfully" });
     } catch (error) {
-      res.status(500).json({ message: "Failed to delete teacher" });
+      console.error("[TEACHER DELETE] Error:", error instanceof Error ? error.message : String(error));
+      console.error("[TEACHER DELETE] Full error:", error);
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({ message: "Failed to delete teacher", error: errorMsg });
     }
   });
   
