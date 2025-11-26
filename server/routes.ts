@@ -1797,27 +1797,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create teacher feedback
   app.post("/api/teachers/:id/feedback", requireAuth, requireNonVisitor, async (req, res) => {
     try {
+      console.log("[FEEDBACK CREATE] Received body:", JSON.stringify(req.body));
       const feedbackData = insertTeacherFeedbackSchema.parse({
         ...req.body,
         teacherId: req.params.id,
         studentId: req.session.userId!,
       });
+      console.log("[FEEDBACK CREATE] Validated data:", JSON.stringify(feedbackData));
       const feedback = await storage.createTeacherFeedback(feedbackData);
+      console.log("[FEEDBACK CREATE] Success:", feedback.id);
       res.json(feedback);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("[FEEDBACK CREATE] Validation error:", error.errors);
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
       if (error instanceof Error && (error.message.includes("unique") || error.message.includes("duplicate"))) {
         return res.status(409).json({ message: "You have already submitted feedback for this teacher" });
       }
-      res.status(500).json({ message: "Failed to submit feedback" });
+      console.error("[FEEDBACK CREATE] Error:", error instanceof Error ? error.message : String(error));
+      console.error("[FEEDBACK CREATE] Full error:", error);
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({ message: "Failed to submit feedback", error: errorMsg });
     }
   });
 
   // Get teacher feedback statistics (admin only)
   app.get("/api/teachers/:id/feedback", requireAuth, async (req, res) => {
     try {
+      console.log("[FEEDBACK STATS] Fetching feedback for teacher:", req.params.id);
       // Only admins can view feedback statistics
       if (req.session.userId) {
         const user = await storage.getUser(req.session.userId);
@@ -1829,9 +1837,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const stats = await storage.getTeacherFeedbackStats(req.params.id);
+      console.log("[FEEDBACK STATS] Success");
       res.json(stats);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch feedback statistics" });
+      console.error("[FEEDBACK STATS] Error:", error instanceof Error ? error.message : String(error));
+      console.error("[FEEDBACK STATS] Full error:", error);
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({ message: "Failed to fetch feedback statistics", error: errorMsg });
     }
   });
 
