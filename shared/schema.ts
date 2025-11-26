@@ -214,6 +214,9 @@ export const teachers = pgTable("teachers", {
   // Dynamic data
   classroomRules: text("classroom_rules").array(),
   
+  // Admin-only notes (visible only to admins)
+  adminNotes: text("admin_notes"),
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

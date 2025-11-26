@@ -16,6 +16,9 @@ type Teacher = {
   photoUrl: string | null;
   description: string | null;
   academicAchievements: string[] | null;
+  subjects: string[] | null;
+  sections: string[] | null;
+  adminNotes: string | null;
 };
 
 type Review = {
@@ -148,9 +151,35 @@ export default function TeacherDetailPage() {
                 </span>
               </div>
 
+              {teacher.subjects && teacher.subjects.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">Subjects</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {teacher.subjects.map((subject, idx) => (
+                      <Badge key={idx} variant="default" data-testid={`badge-subject-${idx}`}>
+                        {subject}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {teacher.sections && teacher.sections.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">Classes</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {teacher.sections.map((section, idx) => (
+                      <Badge key={idx} variant="outline" data-testid={`badge-section-${idx}`}>
+                        {section}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {teacher.academicAchievements && teacher.academicAchievements.length > 0 && (
                 <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">Academic Achievements</h3>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">Certificates & Achievements</h3>
                   <div className="flex flex-wrap gap-2">
                     {teacher.academicAchievements.map((achievement, idx) => (
                       <Badge key={idx} variant="secondary" data-testid={`badge-achievement-${idx}`}>
@@ -162,10 +191,19 @@ export default function TeacherDetailPage() {
               )}
 
               {teacher.description && (
-                <div>
+                <div className="mb-4">
                   <h3 className="text-sm font-semibold text-muted-foreground mb-2">About</h3>
                   <p className="text-sm leading-relaxed" data-testid="text-description">
                     {teacher.description}
+                  </p>
+                </div>
+              )}
+
+              {user?.role === "admin" && teacher.adminNotes && (
+                <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900 rounded-md">
+                  <h3 className="text-sm font-semibold text-yellow-900 dark:text-yellow-200 mb-2">Admin Notes</h3>
+                  <p className="text-sm text-yellow-800 dark:text-yellow-300" data-testid="text-admin-notes">
+                    {teacher.adminNotes}
                   </p>
                 </div>
               )}
