@@ -12,6 +12,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   RadarChart,
   PolarGrid,
@@ -84,6 +85,7 @@ export default function TeacherDetailPage() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
 
   const { data, isLoading } = useQuery<TeacherWithReviews>({
     queryKey: ["/api/teachers", id],
@@ -139,6 +141,7 @@ export default function TeacherDetailPage() {
     setIsSubmitting(true);
     try {
       await submitFeedbackMutation.mutateAsync(feedback);
+      setFeedbackDialogOpen(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -304,12 +307,36 @@ export default function TeacherDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Teacher Feedback Form */}
+      {/* Student Feedback Hexagon or Rate Button */}
       <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Teacher Feedback</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Feedback</CardTitle>
+          <Button 
+            onClick={() => setFeedbackDialogOpen(true)}
+            data-testid="button-rate"
+          >
+            Rate
+          </Button>
         </CardHeader>
         <CardContent>
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground mb-4">
+              Students can provide detailed feedback about this teacher.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Click the "Rate" button to submit your feedback.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Feedback Dialog */}
+      <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-feedback">
+          <DialogHeader>
+            <DialogTitle>Submit Feedback for {teacher.name}</DialogTitle>
+          </DialogHeader>
+
           <form onSubmit={handleSubmitFeedback} className="space-y-6">
             {/* Rating Questions */}
             {[
@@ -355,12 +382,17 @@ export default function TeacherDetailPage() {
               />
             </div>
 
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Submit Feedback"}
-            </Button>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setFeedbackDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Submitting..." : "Submit Feedback"}
+              </Button>
+            </DialogFooter>
           </form>
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
 
       {/* Admin-only Feedback Statistics */}
       {user?.role === "admin" && feedbackStats && feedbackStats.count > 0 && (
