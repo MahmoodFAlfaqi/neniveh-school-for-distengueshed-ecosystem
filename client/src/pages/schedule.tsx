@@ -234,13 +234,13 @@ export default function SchedulePage() {
     });
   }, [events, rsvpedEventIds, classScope?.id, gradeScope?.id]);
 
-  // Generate calendar dates (yesterday + next 2 weeks = 15 days)
+  // Generate calendar dates (yesterday + next 13 days = 14 days = 2 rows)
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
   
   const calendarDates: Date[] = [];
-  for (let i = 0; i < 15; i++) {
+  for (let i = 0; i < 14; i++) {
     const date = new Date(yesterday);
     date.setDate(date.getDate() + i);
     calendarDates.push(date);
@@ -314,7 +314,7 @@ export default function SchedulePage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 gap-1 sm:gap-2">
+            <div className="grid grid-cols-7 gap-2">
               {calendarDates.map((date, idx) => {
                 const dateStr = date.toDateString();
                 const dayEvents = eventsByDate.get(dateStr) || [];
@@ -324,18 +324,22 @@ export default function SchedulePage() {
                 return (
                   <div
                     key={idx}
-                    className={`p-1 sm:p-2 md:p-3 rounded-lg border text-center transition-colors ${
-                      isToday ? 'bg-primary/10 border-primary' : isPast ? 'bg-muted/50' : 'bg-card'
+                    className={`p-2.5 sm:p-3 rounded-lg border-2 text-center transition-all ${
+                      isToday 
+                        ? 'bg-primary/15 border-primary shadow-sm' 
+                        : isPast 
+                          ? 'bg-muted/40 border-muted/60' 
+                          : 'bg-card border-border/50 hover:border-border hover:shadow-sm'
                     }`}
                     data-testid={`calendar-day-${idx}`}
                   >
-                    <div className="text-xs font-medium text-muted-foreground hidden sm:block">
+                    <div className="text-xs font-semibold text-muted-foreground mb-1">
                       {date.toLocaleDateString('en-US', { weekday: 'short' })}
                     </div>
-                    <div className={`text-lg sm:text-2xl font-bold ${isToday ? 'text-primary' : ''}`}>
+                    <div className={`text-xl sm:text-2xl font-bold ${isToday ? 'text-primary' : ''}`}>
                       {date.getDate()}
                     </div>
-                    <div className="mt-1 sm:mt-2 space-y-0.5">
+                    <div className="mt-2 space-y-1">
                       {dayEvents.slice(0, 1).map(event => {
                         const isRsvped = rsvpedEventIds.has(event.id);
                         return (
@@ -345,8 +349,8 @@ export default function SchedulePage() {
                             data-testid={`link-event-badge-${event.id}`}
                           >
                             <div
-                              className={`text-xs p-0.5 sm:p-1 rounded truncate cursor-pointer hover-elevate ${
-                                isRsvped ? 'bg-primary text-primary-foreground' : 'bg-accent text-accent-foreground'
+                              className={`text-xs p-1.5 rounded-md font-medium truncate cursor-pointer transition-all hover-elevate ${
+                                isRsvped ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-accent/80 text-accent-foreground shadow-xs'
                               }`}
                               title={event.title}
                             >
@@ -356,8 +360,8 @@ export default function SchedulePage() {
                         );
                       })}
                       {dayEvents.length > 1 && (
-                        <div className="text-xs text-muted-foreground">
-                          +{dayEvents.length - 1}
+                        <div className="text-xs font-semibold text-primary">
+                          +{dayEvents.length - 1} more
                         </div>
                       )}
                     </div>
