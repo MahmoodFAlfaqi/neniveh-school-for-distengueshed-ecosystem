@@ -12,6 +12,14 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import {
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  ResponsiveContainer,
+} from "recharts";
 
 type Teacher = {
   id: string;
@@ -361,34 +369,64 @@ export default function TeacherDetailPage() {
             <CardTitle>Feedback Statistics (Admin Only)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground mb-4">
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
                 Based on {feedbackStats.count} feedback submission{feedbackStats.count !== 1 ? "s" : ""}
               </p>
-              {Object.entries(feedbackStats.averages).map(([key, value]) => (
-                <div key={key} className="flex items-center justify-between">
-                  <span className="text-sm font-medium capitalize">
-                    {key.replace(/([A-Z])/g, " $1").trim()}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <Star
-                          key={i}
-                          className={`w-4 h-4 ${
-                            i <= Math.round(value)
-                              ? "fill-yellow-400 text-yellow-400"
-                              : "text-muted-foreground"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                      {value.toFixed(1)}
-                    </span>
-                  </div>
-                </div>
-              ))}
+              <div className="w-full h-96 flex justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart
+                    data={[
+                      {
+                        name: "Clarity",
+                        value: feedbackStats.averages.clarity,
+                      },
+                      {
+                        name: "Instruction",
+                        value: feedbackStats.averages.instruction,
+                      },
+                      {
+                        name: "Communication",
+                        value: feedbackStats.averages.communication,
+                      },
+                      {
+                        name: "Patience",
+                        value: feedbackStats.averages.patience,
+                      },
+                      {
+                        name: "Motivation",
+                        value: feedbackStats.averages.motivation,
+                      },
+                      {
+                        name: "Improvement",
+                        value: feedbackStats.averages.improvement,
+                      },
+                    ]}
+                    margin={{ top: 20, right: 30, bottom: 20, left: 30 }}
+                  >
+                    <PolarGrid stroke="currentColor" strokeOpacity={0.2} />
+                    <PolarAngleAxis
+                      dataKey="name"
+                      tick={{ fontSize: 12 }}
+                      stroke="currentColor"
+                      strokeOpacity={0.5}
+                    />
+                    <PolarRadiusAxis
+                      domain={[0, 5]}
+                      tick={{ fontSize: 12 }}
+                      stroke="currentColor"
+                      strokeOpacity={0.5}
+                    />
+                    <Radar
+                      name="Average Rating"
+                      dataKey="value"
+                      stroke="hsl(var(--primary))"
+                      fill="hsl(var(--primary))"
+                      fillOpacity={0.3}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </CardContent>
         </Card>
