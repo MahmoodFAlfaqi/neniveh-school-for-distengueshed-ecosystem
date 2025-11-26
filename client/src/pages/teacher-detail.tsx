@@ -4,9 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Star, ArrowLeft, Send } from "lucide-react";
+import { Star, ArrowLeft } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -37,43 +35,11 @@ type TeacherWithReviews = {
 export default function TeacherDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useUser();
-  const { toast } = useToast();
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState("");
-  const [hoveredStar, setHoveredStar] = useState<number | null>(null);
 
   const { data, isLoading } = useQuery<TeacherWithReviews>({
     queryKey: ["/api/teachers", id],
     enabled: !!id,
   });
-
-  const reviewMutation = useMutation({
-    mutationFn: async (reviewData: { rating: number; comment: string }) => {
-      const res = await apiRequest("POST", `/api/teachers/${id}/reviews`, reviewData);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/teachers", id] });
-      toast({
-        title: "Success",
-        description: "Your review has been submitted",
-      });
-      setComment("");
-      setRating(5);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to submit review",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleSubmitReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    reviewMutation.mutate({ rating, comment: comment.trim() || "" });
-  };
 
   const renderStars = (count: number, interactive = false) => {
     const stars = [];
@@ -208,77 +174,6 @@ export default function TeacherDetailPage() {
         </CardContent>
       </Card>
 
-      {user?.role !== "admin" && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle data-testid="text-write-review-title">Write a Review</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmitReview} className="space-y-4">
-              <div>
-                <Label>Your Rating</Label>
-                <div className="flex gap-1 mt-2" onMouseLeave={() => setHoveredStar(null)}>
-                  {renderStars(rating, true)}
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="comment">Comment (Optional)</Label>
-                <Textarea
-                  id="comment"
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="Share your experience with this teacher..."
-                  rows={4}
-                  data-testid="textarea-review-comment"
-                />
-              </div>
-
-              <Button type="submit" disabled={reviewMutation.isPending} data-testid="button-submit-review">
-                <Send className="w-4 h-4 mr-2" />
-                Submit Review
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle data-testid="text-reviews-title">Student Reviews</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {reviews.length > 0 ? (
-            <div className="space-y-4">
-              {reviews.map((review) => (
-                <div
-                  key={review.id}
-                  className="border-b last:border-0 pb-4 last:pb-0"
-                  data-testid={`review-${review.id}`}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="flex gap-1" data-testid={`review-rating-${review.id}`}>
-                      {renderStars(review.rating)}
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(review.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  {review.comment && (
-                    <p className="text-sm" data-testid={`review-comment-${review.id}`}>
-                      {review.comment}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-center py-8" data-testid="text-no-reviews">
-              No reviews yet. Be the first to review this teacher!
-            </p>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
