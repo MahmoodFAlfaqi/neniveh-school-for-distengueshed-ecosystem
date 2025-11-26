@@ -11,7 +11,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, MapPin, Clock, Users, Plus, ChevronDown, ChevronUp, Star, Send, MessageSquare, Filter } from "lucide-react";
+import { Calendar, MapPin, Clock, Users, Plus, ChevronDown, ChevronUp, Star, Send, MessageSquare, Filter, Check } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   Collapsible,
@@ -307,10 +308,15 @@ export default function EventsPage() {
     title: "",
     description: "",
     eventType: "extracurricular" as "curricular" | "extracurricular",
+    subject: "",
     extracurricularCategory: "",
     startTime: "",
     endTime: "",
     location: "",
+  });
+  const [typeFilterCheckboxes, setTypeFilterCheckboxes] = useState({
+    curricular: true,
+    extracurricular: true,
   });
 
   // Check if user has access to selected scope
@@ -350,9 +356,12 @@ export default function EventsPage() {
       filtered = filtered.filter(e => new Date(e.startTime) < now);
     }
     
-    // Filter by type
-    if (typeFilter !== "all") {
-      filtered = filtered.filter(e => e.eventType === typeFilter);
+    // Filter by type checkboxes
+    const selectedTypes = [];
+    if (typeFilterCheckboxes.curricular) selectedTypes.push("curricular");
+    if (typeFilterCheckboxes.extracurricular) selectedTypes.push("extracurricular");
+    if (selectedTypes.length > 0) {
+      filtered = filtered.filter(e => selectedTypes.includes(e.eventType));
     }
     
     // Sort
@@ -397,6 +406,7 @@ export default function EventsPage() {
         title: "",
         description: "",
         eventType: "extracurricular",
+        subject: "",
         extracurricularCategory: "",
         startTime: "",
         endTime: "",
@@ -418,7 +428,7 @@ export default function EventsPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const isValid = formData.title.trim() && formData.startTime && 
-      (formData.eventType === "curricular" || formData.extracurricularCategory);
+      (formData.eventType === "curricular" ? formData.subject.trim() : formData.extracurricularCategory);
     if (isValid) {
       createEventMutation.mutate(formData);
     }
@@ -513,9 +523,22 @@ export default function EventsPage() {
                     </div>
                   </div>
 
+                  {formData.eventType === "curricular" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="subject">Subject *</Label>
+                      <Input
+                        id="subject"
+                        placeholder="e.g., Mathematics, Biology, History..."
+                        value={formData.subject}
+                        onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                        data-testid="input-event-subject"
+                      />
+                    </div>
+                  )}
+
                   {formData.eventType === "extracurricular" && (
                     <div className="space-y-2">
-                      <Label htmlFor="extracurricularCategory">Which kind of extracurricular? *</Label>
+                      <Label htmlFor="extracurricularCategory">What kind of extracurricular? *</Label>
                       <Select
                         value={formData.extracurricularCategory}
                         onValueChange={(value) =>
@@ -586,7 +609,7 @@ export default function EventsPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!formData.title.trim() || !formData.startTime || (formData.eventType === "extracurricular" && !formData.extracurricularCategory) || createEventMutation.isPending || (selectedScope !== null && !hasAccess)}
+                  disabled={!formData.title.trim() || !formData.startTime || (formData.eventType === "curricular" ? !formData.subject.trim() : !formData.extracurricularCategory) || createEventMutation.isPending || (selectedScope !== null && !hasAccess)}
                   data-testid="button-submit-event"
                 >
                   {createEventMutation.isPending ? "Creating..." : "Create Event"}
@@ -617,16 +640,30 @@ export default function EventsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <Select value={typeFilter} onValueChange={(value: typeof typeFilter) => setTypeFilter(value)}>
-                <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-type-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="curricular">Curricular</SelectItem>
-                  <SelectItem value="extracurricular">Extracurricular</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-4 px-3 py-2 rounded-lg border bg-card">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="type-curricular"
+                    checked={typeFilterCheckboxes.curricular}
+                    onCheckedChange={(checked) =>
+                      setTypeFilterCheckboxes({ ...typeFilterCheckboxes, curricular: checked === true })
+                    }
+                    data-testid="checkbox-type-curricular"
+                  />
+                  <Label htmlFor="type-curricular" className="text-sm font-medium cursor-pointer">Curricular</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="type-extracurricular"
+                    checked={typeFilterCheckboxes.extracurricular}
+                    onCheckedChange={(checked) =>
+                      setTypeFilterCheckboxes({ ...typeFilterCheckboxes, extracurricular: checked === true })
+                    }
+                    data-testid="checkbox-type-extracurricular"
+                  />
+                  <Label htmlFor="type-extracurricular" className="text-sm font-medium cursor-pointer">Extracurricular</Label>
+                </div>
+              </div>
               <Select value={sortBy} onValueChange={(value: typeof sortBy) => setSortBy(value)}>
                 <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-sort-events">
                   <SelectValue />
