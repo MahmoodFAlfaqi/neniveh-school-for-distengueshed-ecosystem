@@ -108,6 +108,7 @@ export default function TeacherDetailPage() {
         description: "Thank you for your feedback!",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/teachers", id, "feedback"] });
+      setFeedbackDialogOpen(false);
       // Reset form
       setFeedback({
         clarity: 3,
@@ -120,10 +121,31 @@ export default function TeacherDetailPage() {
       });
     },
     onError: (error: Error) => {
+      setFeedbackDialogOpen(false);
+      // Extract message from error - could be "409: {...}" or "400: {...}" format
+      let errorMsg = "Failed to submit feedback";
+      let isInfo = false;
+      
+      try {
+        const match = error.message.match(/(\d+):\s*(.+)$/);
+        if (match) {
+          const status = match[1];
+          const jsonStr = match[2];
+          const parsed = JSON.parse(jsonStr);
+          errorMsg = parsed.message || errorMsg;
+          // 409 is conflict (already submitted) - show as info instead of error
+          isInfo = status === "409";
+        } else {
+          errorMsg = error.message;
+        }
+      } catch {
+        errorMsg = error.message || errorMsg;
+      }
+      
       toast({
-        title: "Error",
-        description: error.message || "Failed to submit feedback",
-        variant: "destructive",
+        title: isInfo ? "Feedback" : "Error",
+        description: errorMsg,
+        variant: isInfo ? "default" : "destructive",
       });
     },
   });
@@ -141,7 +163,6 @@ export default function TeacherDetailPage() {
     setIsSubmitting(true);
     try {
       await submitFeedbackMutation.mutateAsync(feedback);
-      setFeedbackDialogOpen(false);
     } finally {
       setIsSubmitting(false);
     }
