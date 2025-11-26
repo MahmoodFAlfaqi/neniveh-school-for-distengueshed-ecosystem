@@ -9,6 +9,9 @@ import { useUser } from "@/hooks/use-user";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 type Teacher = {
   id: string;
@@ -35,14 +38,103 @@ type TeacherWithReviews = {
   averageRating: number;
 };
 
+type TeacherFeedback = {
+  clarity: number;
+  instruction: number;
+  communication: number;
+  patience: number;
+  motivation: number;
+  improvement: number;
+  notes?: string;
+};
+
+type FeedbackStats = {
+  averages: {
+    clarity: number;
+    instruction: number;
+    communication: number;
+    patience: number;
+    motivation: number;
+    improvement: number;
+  };
+  count: number;
+};
+
 export default function TeacherDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useUser();
+  const { toast } = useToast();
+
+  const [feedback, setFeedback] = useState<TeacherFeedback>({
+    clarity: 3,
+    instruction: 3,
+    communication: 3,
+    patience: 3,
+    motivation: 3,
+    improvement: 3,
+    notes: "",
+  });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data, isLoading } = useQuery<TeacherWithReviews>({
     queryKey: ["/api/teachers", id],
     enabled: !!id,
   });
+
+  const { data: feedbackStats } = useQuery<FeedbackStats>({
+    queryKey: ["/api/teachers", id, "feedback"],
+    enabled: !!id && user?.role === "admin",
+  });
+
+  const submitFeedbackMutation = useMutation({
+    mutationFn: async (feedbackData: TeacherFeedback) => {
+      const result = await apiRequest("POST", `/api/teachers/${id}/feedback`, feedbackData);
+      return result;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Feedback submitted",
+        description: "Thank you for your feedback!",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/teachers", id, "feedback"] });
+      // Reset form
+      setFeedback({
+        clarity: 3,
+        instruction: 3,
+        communication: 3,
+        patience: 3,
+        motivation: 3,
+        improvement: 3,
+        notes: "",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit feedback",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmitFeedback = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || user.role === "visitor") {
+      toast({
+        title: "Login required",
+        description: "Please log in to submit feedback",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await submitFeedbackMutation.mutateAsync(feedback);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const renderStars = (count: number, interactive = false) => {
     const stars = [];
@@ -141,15 +233,7 @@ export default function TeacherDetailPage() {
             </Avatar>
             <div className="flex-1">
               <h1 className="text-3xl font-bold mb-2" data-testid="text-teacher-name">{teacher.name}</h1>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex items-center gap-1" data-testid="rating-display">
-                  {renderStars(averageRating)}
-                </div>
-                <span className="text-sm text-muted-foreground" data-testid="text-average-rating">
-                  {averageRating > 0 ? averageRating.toFixed(1) : "No ratings yet"} 
-                  {reviews.length > 0 && ` (${reviews.length} ${reviews.length === 1 ? "review" : "reviews"})`}
-                </span>
-              </div>
+              
 
               {teacher.subjects && teacher.subjects.length > 0 && (
                 <div className="mb-4">
@@ -211,6 +295,104 @@ export default function TeacherDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Teacher Feedback Form */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Teacher Feedback</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmitFeedback} className="space-y-6">
+            {/* Rating Questions */}
+            {[
+              { key: "clarity", label: "Clarity of Instruction" },
+              { key: "instruction", label: "Quality of Instruction" },
+              { key: "communication", label: "Communication Skills" },
+              { key: "patience", label: "Patience & Understanding" },
+              { key: "motivation", label: "Student Motivation" },
+              { key: "improvement", label: "Encourages Improvement" },
+            ].map(({ key, label }) => (
+              <div key={key} className="space-y-2">
+                <Label className="text-sm font-medium">{label}</Label>
+                <RadioGroup
+                  value={feedback[key as keyof TeacherFeedback]?.toString()}
+                  onValueChange={(value) =>
+                    setFeedback({ ...feedback, [key]: parseInt(value) })
+                  }
+                  className="flex gap-4"
+                >
+                  {[1, 2, 3, 4, 5].map((rating) => (
+                    <div key={rating} className="flex items-center space-x-2">
+                      <RadioGroupItem value={rating.toString()} id={`${key}-${rating}`} />
+                      <Label htmlFor={`${key}-${rating}`} className="cursor-pointer">
+                        {rating}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+            ))}
+
+            {/* Optional Notes */}
+            <div className="space-y-2">
+              <Label htmlFor="notes" className="text-sm font-medium">
+                Additional Notes (Optional)
+              </Label>
+              <Textarea
+                id="notes"
+                placeholder="Share any additional thoughts..."
+                value={feedback.notes}
+                onChange={(e) => setFeedback({ ...feedback, notes: e.target.value })}
+                rows={4}
+              />
+            </div>
+
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Submitting..." : "Submit Feedback"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Admin-only Feedback Statistics */}
+      {user?.role === "admin" && feedbackStats && feedbackStats.count > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Feedback Statistics (Admin Only)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground mb-4">
+                Based on {feedbackStats.count} feedback submission{feedbackStats.count !== 1 ? "s" : ""}
+              </p>
+              {Object.entries(feedbackStats.averages).map(([key, value]) => (
+                <div key={key} className="flex items-center justify-between">
+                  <span className="text-sm font-medium capitalize">
+                    {key.replace(/([A-Z])/g, " $1").trim()}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <Star
+                          key={i}
+                          className={`w-4 h-4 ${
+                            i <= Math.round(value)
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-muted-foreground"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {value.toFixed(1)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
     </div>
   );

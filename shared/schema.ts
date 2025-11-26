@@ -275,6 +275,27 @@ export const teacherReviews = pgTable("teacher_reviews", {
   uniqueTeacherStudent: unique().on(table.teacherId, table.studentId),
 }));
 
+// Teacher Feedback - detailed rating system
+export const teacherFeedback = pgTable("teacher_feedback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: "cascade" }),
+  studentId: varchar("student_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  // 6 rating questions (1-5 scale each)
+  clarity: integer("clarity").notNull(), // Clarity of Instruction
+  instruction: integer("instruction").notNull(), // Quality of Instruction
+  communication: integer("communication").notNull(), // Communication Skills
+  patience: integer("patience").notNull(), // Patience & Understanding
+  motivation: integer("motivation").notNull(), // Student Motivation
+  improvement: integer("improvement").notNull(), // Encourages Improvement
+  
+  notes: text("notes"), // Optional additional notes
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueTeacherStudent: unique().on(table.teacherId, table.studentId),
+}));
+
 // Post Accuracy Ratings - users rate post accuracy (1-5 stars)
 export const postAccuracyRatings = pgTable("post_accuracy_ratings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -609,6 +630,21 @@ export const insertTeacherReviewSchema = createInsertSchema(teacherReviews)
     comment: z.string().trim().optional(),
   });
 
+export const insertTeacherFeedbackSchema = createInsertSchema(teacherFeedback)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .extend({
+    clarity: z.number().int().min(1).max(5),
+    instruction: z.number().int().min(1).max(5),
+    communication: z.number().int().min(1).max(5),
+    patience: z.number().int().min(1).max(5),
+    motivation: z.number().int().min(1).max(5),
+    improvement: z.number().int().min(1).max(5),
+    notes: z.string().trim().optional(),
+  });
+
 export const insertPostCommentSchema = createInsertSchema(postComments).omit({
   id: true,
   createdAt: true,
@@ -681,6 +717,9 @@ export type Teacher = typeof teachers.$inferSelect;
 
 export type InsertTeacherReview = z.infer<typeof insertTeacherReviewSchema>;
 export type TeacherReview = typeof teacherReviews.$inferSelect;
+
+export type InsertTeacherFeedback = z.infer<typeof insertTeacherFeedbackSchema>;
+export type TeacherFeedback = typeof teacherFeedback.$inferSelect;
 
 export type InsertPostComment = z.infer<typeof insertPostCommentSchema>;
 export type PostComment = typeof postComments.$inferSelect;

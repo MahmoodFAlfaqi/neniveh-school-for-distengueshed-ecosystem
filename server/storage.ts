@@ -14,6 +14,7 @@ import {
   schedules,
   teachers,
   teacherReviews,
+  teacherFeedback,
   profileComments,
   settings,
   passwordResetTokens,
@@ -53,6 +54,8 @@ import {
   type InsertTeacher,
   type TeacherReview,
   type InsertTeacherReview,
+  type TeacherFeedback,
+  type InsertTeacherFeedback,
   type ProfileComment,
   type InsertProfileComment,
   type Setting,
@@ -158,6 +161,11 @@ export interface IStorage {
   // Teacher Reviews
   createTeacherReview(review: InsertTeacherReview): Promise<TeacherReview>;
   getTeacherReviews(teacherId: string): Promise<TeacherReview[]>;
+  
+  // Teacher Feedback
+  createTeacherFeedback(feedback: InsertTeacherFeedback): Promise<TeacherFeedback>;
+  getTeacherFeedback(teacherId: string): Promise<TeacherFeedback[]>;
+  getTeacherFeedbackStats(teacherId: string): Promise<{ averages: Record<string, number>; count: number }>;
   
   // Post Comments
   createPostComment(comment: InsertPostComment): Promise<PostComment>;
@@ -1605,6 +1613,63 @@ export class DatabaseStorage implements IStorage {
       .from(teacherReviews)
       .where(eq(teacherReviews.teacherId, teacherId))
       .orderBy(desc(teacherReviews.createdAt));
+  }
+
+  async createTeacherFeedback(insertFeedback: InsertTeacherFeedback): Promise<TeacherFeedback> {
+    const [feedback] = await db.insert(teacherFeedback).values(insertFeedback).returning();
+    return feedback;
+  }
+
+  async getTeacherFeedback(teacherId: string): Promise<TeacherFeedback[]> {
+    return await db
+      .select()
+      .from(teacherFeedback)
+      .where(eq(teacherFeedback.teacherId, teacherId))
+      .orderBy(desc(teacherFeedback.createdAt));
+  }
+
+  async getTeacherFeedbackStats(teacherId: string): Promise<{ averages: Record<string, number>; count: number }> {
+    const feedbacks = await this.getTeacherFeedback(teacherId);
+    
+    if (feedbacks.length === 0) {
+      return {
+        averages: {
+          clarity: 0,
+          instruction: 0,
+          communication: 0,
+          patience: 0,
+          motivation: 0,
+          improvement: 0,
+        },
+        count: 0,
+      };
+    }
+
+    const totals = feedbacks.reduce(
+      (acc, f) => ({
+        clarity: acc.clarity + f.clarity,
+        instruction: acc.instruction + f.instruction,
+        communication: acc.communication + f.communication,
+        patience: acc.patience + f.patience,
+        motivation: acc.motivation + f.motivation,
+        improvement: acc.improvement + f.improvement,
+      }),
+      { clarity: 0, instruction: 0, communication: 0, patience: 0, motivation: 0, improvement: 0 }
+    );
+
+    const count = feedbacks.length;
+
+    return {
+      averages: {
+        clarity: totals.clarity / count,
+        instruction: totals.instruction / count,
+        communication: totals.communication / count,
+        patience: totals.patience / count,
+        motivation: totals.motivation / count,
+        improvement: totals.improvement / count,
+      },
+      count,
+    };
   }
 
   // ==================== POST COMMENTS ====================

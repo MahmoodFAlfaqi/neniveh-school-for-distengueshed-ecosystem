@@ -15,6 +15,7 @@ import {
   insertScheduleSchema,
   insertTeacherSchema,
   insertTeacherReviewSchema,
+  insertTeacherFeedbackSchema,
   insertScopeSchema,
   insertPostCommentSchema,
   insertEventCommentSchema,
@@ -1763,6 +1764,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(reviews);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch reviews" });
+    }
+  });
+
+  // Create teacher feedback
+  app.post("/api/teachers/:id/feedback", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const feedbackData = insertTeacherFeedbackSchema.parse({
+        ...req.body,
+        teacherId: req.params.id,
+        studentId: req.session.userId!,
+      });
+      const feedback = await storage.createTeacherFeedback(feedbackData);
+      res.json(feedback);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      if (error instanceof Error && (error.message.includes("unique") || error.message.includes("duplicate"))) {
+        return res.status(409).json({ message: "You have already submitted feedback for this teacher" });
+      }
+      res.status(500).json({ message: "Failed to submit feedback" });
+    }
+  });
+
+  // Get teacher feedback statistics (admin only)
+  app.get("/api/teachers/:id/feedback", requireAuth, async (req, res) => {
+    try {
+      // Only admins can view feedback statistics
+      if (req.session.userId) {
+        const user = await storage.getUser(req.session.userId);
+        if (!user || user.role !== "admin") {
+          return res.status(403).json({ message: "Admin privileges required" });
+        }
+      } else {
+        return res.status(403).json({ message: "Admin privileges required" });
+      }
+
+      const stats = await storage.getTeacherFeedbackStats(req.params.id);
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch feedback statistics" });
     }
   });
 
