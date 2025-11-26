@@ -104,19 +104,25 @@ export default function TeacherDetailPage() {
 
   const submitFeedbackMutation = useMutation({
     mutationFn: async (feedbackData: TeacherFeedback) => {
-      // Check if we have existing feedback to update
-      if (existingFeedback) {
+      // Try to update existing feedback first
+      try {
         const result = await apiRequest("PATCH", `/api/teachers/${id}/feedback`, feedbackData);
-        return result;
-      } else {
-        const result = await apiRequest("POST", `/api/teachers/${id}/feedback`, feedbackData);
-        return result;
+        return { result, isUpdate: true };
+      } catch (error) {
+        // If 404, feedback doesn't exist yet, so create it
+        if (error instanceof Error && error.message.includes("404")) {
+          const result = await apiRequest("POST", `/api/teachers/${id}/feedback`, feedbackData);
+          return { result, isUpdate: false };
+        }
+        // Re-throw any other error
+        throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      const isUpdate = data?.isUpdate || false;
       toast({
-        title: existingFeedback ? "Feedback updated" : "Feedback submitted",
-        description: existingFeedback ? "Your feedback has been updated!" : "Thank you for your feedback!",
+        title: isUpdate ? "Feedback updated" : "Feedback submitted",
+        description: isUpdate ? "Your feedback has been updated!" : "Thank you for your feedback!",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/teachers", id, "feedback"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teachers", id, "my-feedback"] });
