@@ -97,17 +97,29 @@ export default function TeacherDetailPage() {
     enabled: !!id && user?.role === "admin",
   });
 
+  const { data: existingFeedback } = useQuery<TeacherFeedback | null>({
+    queryKey: ["/api/teachers", id, "my-feedback"],
+    enabled: !!id && user && user.role !== "visitor",
+  });
+
   const submitFeedbackMutation = useMutation({
     mutationFn: async (feedbackData: TeacherFeedback) => {
-      const result = await apiRequest("POST", `/api/teachers/${id}/feedback`, feedbackData);
-      return result;
+      // Check if we have existing feedback to update
+      if (existingFeedback) {
+        const result = await apiRequest("PATCH", `/api/teachers/${id}/feedback`, feedbackData);
+        return result;
+      } else {
+        const result = await apiRequest("POST", `/api/teachers/${id}/feedback`, feedbackData);
+        return result;
+      }
     },
     onSuccess: () => {
       toast({
-        title: "Feedback submitted",
-        description: "Thank you for your feedback!",
+        title: existingFeedback ? "Feedback updated" : "Feedback submitted",
+        description: existingFeedback ? "Your feedback has been updated!" : "Thank you for your feedback!",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/teachers", id, "feedback"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teachers", id, "my-feedback"] });
       setFeedbackDialogOpen(false);
       // Reset form
       setFeedback({
@@ -149,6 +161,22 @@ export default function TeacherDetailPage() {
       });
     },
   });
+
+  // Load existing feedback into form when dialog opens
+  const handleOpenFeedbackDialog = () => {
+    if (existingFeedback) {
+      setFeedback({
+        clarity: existingFeedback.clarity,
+        instruction: existingFeedback.instruction,
+        communication: existingFeedback.communication,
+        patience: existingFeedback.patience,
+        motivation: existingFeedback.motivation,
+        improvement: existingFeedback.improvement,
+        notes: existingFeedback.notes || "",
+      });
+    }
+    setFeedbackDialogOpen(true);
+  };
 
   const handleSubmitFeedback = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -332,12 +360,15 @@ export default function TeacherDetailPage() {
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Feedback</CardTitle>
-          <Button 
-            onClick={() => setFeedbackDialogOpen(true)}
-            data-testid="button-rate"
-          >
-            Rate
-          </Button>
+          {user && user.role !== "visitor" && (
+            <Button 
+              onClick={handleOpenFeedbackDialog}
+              variant={existingFeedback ? "default" : "outline"}
+              data-testid="button-rate"
+            >
+              {existingFeedback ? "Edit Feedback" : "Rate"}
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">

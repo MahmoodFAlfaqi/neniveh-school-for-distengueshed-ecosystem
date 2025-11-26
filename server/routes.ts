@@ -1794,7 +1794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create teacher feedback
+  // Create or update teacher feedback
   app.post("/api/teachers/:id/feedback", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       console.log("[FEEDBACK CREATE] Received body:", JSON.stringify(req.body));
@@ -1819,6 +1819,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[FEEDBACK CREATE] Full error:", error);
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
       res.status(500).json({ message: "Failed to submit feedback", error: errorMsg });
+    }
+  });
+
+  // Update teacher feedback
+  app.patch("/api/teachers/:id/feedback", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      console.log("[FEEDBACK UPDATE] Received body:", JSON.stringify(req.body));
+      const teacherId = req.params.id;
+      const studentId = req.session.userId!;
+
+      // Check if feedback exists
+      const existing = await storage.getTeacherFeedbackByStudent(teacherId, studentId);
+      if (!existing) {
+        return res.status(404).json({ message: "No feedback found to update. Please submit new feedback first." });
+      }
+
+      // Validate update data (allow partial updates)
+      const updateData = req.body;
+      const updated = await storage.updateTeacherFeedback(teacherId, studentId, updateData);
+      
+      if (!updated) {
+        return res.status(500).json({ message: "Failed to update feedback" });
+      }
+
+      console.log("[FEEDBACK UPDATE] Success:", updated.id);
+      res.json(updated);
+    } catch (error) {
+      console.error("[FEEDBACK UPDATE] Error:", error instanceof Error ? error.message : String(error));
+      console.error("[FEEDBACK UPDATE] Full error:", error);
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({ message: "Failed to update feedback", error: errorMsg });
+    }
+  });
+
+  // Get user's feedback for a teacher
+  app.get("/api/teachers/:id/feedback/my-feedback", requireAuth, async (req, res) => {
+    try {
+      const teacherId = req.params.id;
+      const studentId = req.session.userId;
+
+      if (!studentId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const feedback = await storage.getTeacherFeedbackByStudent(teacherId, studentId);
+      res.json(feedback || null);
+    } catch (error) {
+      console.error("[FEEDBACK GET USER] Error:", error instanceof Error ? error.message : String(error));
+      res.status(500).json({ message: "Failed to fetch feedback" });
     }
   });
 

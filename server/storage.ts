@@ -1620,6 +1620,33 @@ export class DatabaseStorage implements IStorage {
     return feedback;
   }
 
+  async getTeacherFeedbackByStudent(teacherId: string, studentId: string): Promise<TeacherFeedback | undefined> {
+    const [feedback] = await db
+      .select()
+      .from(teacherFeedback)
+      .where(
+        and(
+          eq(teacherFeedback.teacherId, teacherId),
+          eq(teacherFeedback.studentId, studentId)
+        )
+      );
+    return feedback || undefined;
+  }
+
+  async updateTeacherFeedback(teacherId: string, studentId: string, updates: Partial<InsertTeacherFeedback>): Promise<TeacherFeedback | undefined> {
+    const [feedback] = await db
+      .update(teacherFeedback)
+      .set(updates)
+      .where(
+        and(
+          eq(teacherFeedback.teacherId, teacherId),
+          eq(teacherFeedback.studentId, studentId)
+        )
+      )
+      .returning();
+    return feedback || undefined;
+  }
+
   async getTeacherFeedback(teacherId: string): Promise<TeacherFeedback[]> {
     return await db
       .select()
