@@ -66,6 +66,26 @@ type Attendee = {
   credibilityScore: number;
 };
 
+const SUBJECTS = [
+  "Math",
+  "R.E.",
+  "P.E.",
+  "Social Studies",
+  "Biology",
+  "Chemistry",
+  "Physics",
+  "Arabic",
+  "English",
+  "French",
+  "B.P.C.",
+  "Finance",
+  "Geology",
+  "Computer Science",
+  "Arts",
+  "Moralism",
+  "Library",
+] as const;
+
 function EventCard({ event }: { event: Event }) {
   const { toast } = useToast();
   const [showAttendees, setShowAttendees] = useState(false);
@@ -526,13 +546,23 @@ export default function EventsPage() {
                   {formData.eventType === "curricular" && (
                     <div className="space-y-2">
                       <Label htmlFor="subject">Subject *</Label>
-                      <Input
-                        id="subject"
-                        placeholder="e.g., Mathematics, Biology, History..."
+                      <Select
                         value={formData.subject}
-                        onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                        data-testid="input-event-subject"
-                      />
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, subject: value })
+                        }
+                      >
+                        <SelectTrigger data-testid="select-event-subject">
+                          <SelectValue placeholder="Select subject" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SUBJECTS.map((subject) => (
+                            <SelectItem key={subject} value={subject}>
+                              {subject}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   )}
 
