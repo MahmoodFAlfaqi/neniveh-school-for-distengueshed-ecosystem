@@ -326,14 +326,14 @@ export default function SchedulePage() {
                     key={idx}
                     className={`p-2.5 sm:p-3 rounded-lg border-2 text-center transition-all ${
                       isToday 
-                        ? 'bg-primary/15 border-primary shadow-sm' 
+                        ? 'bg-gradient-to-b from-primary/20 to-primary/10 border-primary shadow-md' 
                         : isPast 
-                          ? 'bg-muted/40 border-muted/60' 
-                          : 'bg-card border-border/50 hover:border-border hover:shadow-sm'
+                          ? 'bg-muted/30 border-muted/40 opacity-75' 
+                          : 'bg-card border-border hover:border-primary/50 hover:shadow-md hover:bg-accent/5'
                     }`}
                     data-testid={`calendar-day-${idx}`}
                   >
-                    <div className="text-xs font-semibold text-muted-foreground mb-1">
+                    <div className={`text-xs font-semibold mb-1 ${isToday ? 'text-primary font-bold' : 'text-muted-foreground'}`}>
                       {date.toLocaleDateString('en-US', { weekday: 'short' })}
                     </div>
                     <div className={`text-xl sm:text-2xl font-bold ${isToday ? 'text-primary' : ''}`}>
@@ -350,7 +350,7 @@ export default function SchedulePage() {
                           >
                             <div
                               className={`text-xs p-1.5 rounded-md font-medium truncate cursor-pointer transition-all hover-elevate ${
-                                isRsvped ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-accent/80 text-accent-foreground shadow-xs'
+                                isRsvped ? 'bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-md font-semibold' : 'bg-gradient-to-r from-accent/90 to-accent/70 text-accent-foreground shadow-sm'
                               }`}
                               title={event.title}
                             >
@@ -360,7 +360,7 @@ export default function SchedulePage() {
                         );
                       })}
                       {dayEvents.length > 1 && (
-                        <div className="text-xs font-semibold text-primary">
+                        <div className="text-xs font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded inline-block">
                           +{dayEvents.length - 1} more
                         </div>
                       )}
@@ -435,10 +435,10 @@ export default function SchedulePage() {
               <div className="overflow-x-auto scrollbar-thin -mx-6 sm:mx-0">
                 <table className="w-full border-collapse text-sm sm:text-base">
                   <thead>
-                    <tr className="border-b">
-                      <th className="p-2 sm:p-3 text-left text-xs sm:text-sm font-semibold bg-muted sticky left-0 z-10">Period</th>
+                    <tr className="border-b-2 border-border">
+                      <th className="p-2 sm:p-3 text-left text-xs sm:text-sm font-semibold bg-gradient-to-r from-primary/15 to-primary/10 text-primary sticky left-0 z-10 border-r">Period</th>
                       {days.map((day) => (
-                        <th key={day} className="p-2 sm:p-3 text-center text-xs sm:text-sm font-semibold bg-muted whitespace-nowrap">
+                        <th key={day} className="p-2 sm:p-3 text-center text-xs sm:text-sm font-semibold bg-gradient-to-b from-accent/10 to-accent/5 text-accent-foreground whitespace-nowrap">
                           <span className="hidden sm:inline">{day}</span>
                           <span className="sm:hidden">{day.substring(0, 3)}</span>
                         </th>
@@ -447,8 +447,8 @@ export default function SchedulePage() {
                   </thead>
                   <tbody>
                     {periods.map((period) => (
-                      <tr key={period} className="border-b">
-                        <td className="p-2 sm:p-3 text-xs sm:text-sm font-medium bg-muted/50 sticky left-0 z-10">
+                      <tr key={period} className="border-b hover:bg-accent/5 transition-colors">
+                        <td className="p-2 sm:p-3 text-xs sm:text-sm font-medium bg-gradient-to-r from-primary/10 to-primary/5 sticky left-0 z-10 border-r text-primary">
                           <div className="flex items-center gap-1 sm:gap-2">
                             <Clock className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                             <span className="hidden sm:inline">Period {period}</span>
@@ -511,15 +511,15 @@ export default function SchedulePage() {
                                   )}
                                 </div>
                               ) : currentSubject ? (
-                                <div className="space-y-0.5 p-1 sm:p-2 rounded-lg border bg-card hover-elevate">
-                                  <div className="flex items-center gap-1 font-semibold line-clamp-1">
+                                <div className="space-y-0.5 p-1 sm:p-2 rounded-lg border-2 border-accent/50 bg-gradient-to-br from-accent/15 to-accent/5 hover-elevate">
+                                  <div className="flex items-center gap-1 font-semibold line-clamp-1 text-accent-foreground">
                                     <BookOpen className="w-3 h-3 flex-shrink-0" />
                                     <span className="truncate text-xs sm:text-sm">{currentSubject}</span>
                                   </div>
                                   {currentTeacher && (
-                                    <div className="flex items-center gap-1 text-muted-foreground line-clamp-1">
+                                    <div className="flex items-center gap-1 text-accent-foreground/70 line-clamp-1 text-xs">
                                       <UserIcon className="w-3 h-3 flex-shrink-0" />
-                                      <span className="truncate text-xs">{currentTeacher}</span>
+                                      <span className="truncate">{currentTeacher}</span>
                                     </div>
                                   )}
                                 </div>
