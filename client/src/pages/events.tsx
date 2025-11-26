@@ -307,6 +307,7 @@ export default function EventsPage() {
     title: "",
     description: "",
     eventType: "extracurricular" as "curricular" | "extracurricular",
+    extracurricularCategory: "",
     startTime: "",
     endTime: "",
     location: "",
@@ -396,6 +397,7 @@ export default function EventsPage() {
         title: "",
         description: "",
         eventType: "extracurricular",
+        extracurricularCategory: "",
         startTime: "",
         endTime: "",
         location: "",
@@ -415,7 +417,9 @@ export default function EventsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.title.trim() && formData.startTime) {
+    const isValid = formData.title.trim() && formData.startTime && 
+      (formData.eventType === "curricular" || formData.extracurricularCategory);
+    if (isValid) {
       createEventMutation.mutate(formData);
     }
   };
@@ -477,35 +481,64 @@ export default function EventsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="eventType">Event Type *</Label>
-                    <Select
-                      value={formData.eventType}
-                      onValueChange={(value: "curricular" | "extracurricular") =>
-                        setFormData({ ...formData, eventType: value })
-                      }
-                    >
-                      <SelectTrigger data-testid="select-event-type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="curricular">Curricular</SelectItem>
-                        <SelectItem value="extracurricular">Extracurricular</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="eventType">Event Type *</Label>
+                      <Select
+                        value={formData.eventType}
+                        onValueChange={(value: "curricular" | "extracurricular") =>
+                          setFormData({ ...formData, eventType: value, extracurricularCategory: "" })
+                        }
+                      >
+                        <SelectTrigger data-testid="select-event-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="curricular">Curricular</SelectItem>
+                          <SelectItem value="extracurricular">Extracurricular</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="location">Location</Label>
+                      <Input
+                        id="location"
+                        placeholder="School Auditorium"
+                        value={formData.location}
+                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                        data-testid="input-event-location"
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="location">Location</Label>
-                    <Input
-                      id="location"
-                      placeholder="School Auditorium"
-                      value={formData.location}
-                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                      data-testid="input-event-location"
-                    />
-                  </div>
+                  {formData.eventType === "extracurricular" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="extracurricularCategory">Which kind of extracurricular? *</Label>
+                      <Select
+                        value={formData.extracurricularCategory}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, extracurricularCategory: value })
+                        }
+                      >
+                        <SelectTrigger data-testid="select-extracurricular-category">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sports">Sports & Athletics</SelectItem>
+                          <SelectItem value="arts">Arts & Design</SelectItem>
+                          <SelectItem value="music">Music & Performing Arts</SelectItem>
+                          <SelectItem value="technology">Technology & Innovation</SelectItem>
+                          <SelectItem value="debate">Debate & Public Speaking</SelectItem>
+                          <SelectItem value="science">Science & Research</SelectItem>
+                          <SelectItem value="community">Community Service</SelectItem>
+                          <SelectItem value="cultural">Cultural & Heritage</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -553,7 +586,7 @@ export default function EventsPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!formData.title.trim() || !formData.startTime || createEventMutation.isPending || (selectedScope !== null && !hasAccess)}
+                  disabled={!formData.title.trim() || !formData.startTime || (formData.eventType === "extracurricular" && !formData.extracurricularCategory) || createEventMutation.isPending || (selectedScope !== null && !hasAccess)}
                   data-testid="button-submit-event"
                 >
                   {createEventMutation.isPending ? "Creating..." : "Create Event"}
