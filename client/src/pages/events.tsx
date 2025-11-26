@@ -323,7 +323,7 @@ export default function EventsPage() {
   const [selectedScope, setSelectedScope] = useState<string | null>(null);
   const [filterBy, setFilterBy] = useState<"all" | "upcoming" | "past">("upcoming");
   const [sortBy, setSortBy] = useState<"dateAsc" | "dateDesc" | "popular">("dateAsc");
-  const [typeFilter, setTypeFilter] = useState<"all" | "curricular" | "extracurricular">("all");
+  const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -334,10 +334,30 @@ export default function EventsPage() {
     endTime: "",
     location: "",
   });
-  const [typeFilterCheckboxes, setTypeFilterCheckboxes] = useState({
-    curricular: true,
-    extracurricular: true,
-  });
+
+  const extracurricularCategories = [
+    "sports",
+    "arts",
+    "music",
+    "technology",
+    "debate",
+    "science",
+    "community",
+    "cultural",
+    "other",
+  ];
+
+  const categoryLabels: Record<string, string> = {
+    sports: "Sports & Athletics",
+    arts: "Arts & Design",
+    music: "Music & Performing Arts",
+    technology: "Technology & Innovation",
+    debate: "Debate & Public Speaking",
+    science: "Science & Research",
+    community: "Community Service",
+    cultural: "Cultural & Heritage",
+    other: "Other",
+  };
 
   // Check if user has access to selected scope
   const hasAccess = useHasAccessToScope(selectedScope);
@@ -376,12 +396,15 @@ export default function EventsPage() {
       filtered = filtered.filter(e => new Date(e.startTime) < now);
     }
     
-    // Filter by type checkboxes
-    const selectedTypes = [];
-    if (typeFilterCheckboxes.curricular) selectedTypes.push("curricular");
-    if (typeFilterCheckboxes.extracurricular) selectedTypes.push("extracurricular");
-    if (selectedTypes.length > 0) {
-      filtered = filtered.filter(e => selectedTypes.includes(e.eventType));
+    // Filter by type/subject/category
+    if (typeFilter.length > 0) {
+      filtered = filtered.filter(e => {
+        if (e.eventType === "curricular") {
+          return typeFilter.some(t => SUBJECTS.includes(t as any) && e.subject === t);
+        } else {
+          return typeFilter.some(t => extracurricularCategories.includes(t) && e.extracurricularCategory === t);
+        }
+      });
     }
     
     // Sort
@@ -670,30 +693,47 @@ export default function EventsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center gap-4 px-3 py-2 rounded-lg border bg-card">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="type-curricular"
-                    checked={typeFilterCheckboxes.curricular}
-                    onCheckedChange={(checked) =>
-                      setTypeFilterCheckboxes({ ...typeFilterCheckboxes, curricular: checked === true })
-                    }
-                    data-testid="checkbox-type-curricular"
-                  />
-                  <Label htmlFor="type-curricular" className="text-sm font-medium cursor-pointer">Curricular</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="type-extracurricular"
-                    checked={typeFilterCheckboxes.extracurricular}
-                    onCheckedChange={(checked) =>
-                      setTypeFilterCheckboxes({ ...typeFilterCheckboxes, extracurricular: checked === true })
-                    }
-                    data-testid="checkbox-type-extracurricular"
-                  />
-                  <Label htmlFor="type-extracurricular" className="text-sm font-medium cursor-pointer">Extracurricular</Label>
-                </div>
-              </div>
+              <Select value={typeFilter[0] || ""} onValueChange={(value) => {
+                if (value === "") {
+                  setTypeFilter([]);
+                } else {
+                  setTypeFilter([value]);
+                }
+              }}>
+                <SelectTrigger className="w-full sm:w-[280px]" data-testid="select-type-subject-filter">
+                  <SelectValue placeholder="Filter by type & subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-1.5">
+                    <button
+                      onClick={() => setTypeFilter([])}
+                      className="w-full text-left px-2 py-1 text-sm hover:bg-accent rounded"
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
+                  
+                  {/* Curricular Subjects */}
+                  <div className="px-2 py-1.5">
+                    <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Curricular Subjects</div>
+                    {SUBJECTS.map((subject) => (
+                      <SelectItem key={subject} value={subject}>
+                        {subject}
+                      </SelectItem>
+                    ))}
+                  </div>
+
+                  {/* Extracurricular Categories */}
+                  <div className="px-2 py-1.5">
+                    <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Extracurricular</div>
+                    {extracurricularCategories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {categoryLabels[category]}
+                      </SelectItem>
+                    ))}
+                  </div>
+                </SelectContent>
+              </Select>
               <Select value={sortBy} onValueChange={(value: typeof sortBy) => setSortBy(value)}>
                 <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-sort-events">
                   <SelectValue />
