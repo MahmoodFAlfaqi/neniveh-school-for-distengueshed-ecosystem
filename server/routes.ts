@@ -443,10 +443,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const token = await storage.createPasswordResetToken(user.id);
       
       const { sendPasswordResetEmail } = await import("./email");
+      console.log(`[PASSWORD_RESET] Attempting to send reset email to ${email} for user ${user.name}`);
       const emailSent = await sendPasswordResetEmail(email, token, user.name);
       
       if (emailSent) {
         // Email sent successfully - don't expose the token
+        console.log(`[PASSWORD_RESET] Email successfully sent to ${email}`);
         res.json({ 
           message: "Password reset email sent! Check your inbox.",
           emailSent: true

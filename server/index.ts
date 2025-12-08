@@ -8,6 +8,7 @@ import { seedAdminAccounts } from "./seed-admins";
 import { seedScopes } from "./seed-scopes";
 import { storage } from "./storage";
 import { pool } from "./db";
+import { testEmailConnection } from "./email";
 
 const app = express();
 
@@ -153,6 +154,12 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Test email configuration on startup
+  const emailConfigured = await testEmailConnection();
+  if (!emailConfigured) {
+    console.warn("[STARTUP] Email functionality is disabled - password reset emails will not be sent");
+  }
+
   const server = await registerRoutes(app);
 
   // Automatically seed admin accounts and scopes on startup
