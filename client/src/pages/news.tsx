@@ -80,9 +80,7 @@ export default function NewsPage() {
     queryKey: ["/api/posts", selectedScope],
     queryFn: async () => {
       const scopeParam = selectedScope === null ? "null" : selectedScope;
-      const response = await fetch(`/api/posts?scopeId=${scopeParam}`);
-      if (!response.ok) throw new Error("Failed to fetch posts");
-      return response.json();
+      return await apiRequest("GET", `/api/posts?scopeId=${scopeParam}`);
     },
   });
 
