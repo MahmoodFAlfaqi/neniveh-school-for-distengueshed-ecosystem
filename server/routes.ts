@@ -433,7 +433,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUserByEmail(email);
 
       if (!user) {
-        return res.json({ message: "If an account exists with this email, a password reset link will be sent" });
+        // Security: Don't reveal whether email exists - always show success message
+        return res.json({ 
+          message: "If an account exists with this email, a password reset link will be sent.",
+          emailSent: true
+        });
       }
 
       const token = await storage.createPasswordResetToken(user.id);
@@ -442,14 +446,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const emailSent = await sendPasswordResetEmail(email, token, user.name);
       
       if (emailSent) {
+        // Email sent successfully - don't expose the token
         res.json({ 
           message: "Password reset email sent! Check your inbox.",
           emailSent: true
         });
       } else {
-        res.json({ 
-          message: "Password reset token created. Email sending is not configured - please use the token below.",
-          token: token,
+        // Email failed to send - return error so user knows to try again
+        console.error("[PASSWORD_RESET] Failed to send email to:", email);
+        res.status(500).json({ 
+          message: "Unable to send password reset email. Please try again later or contact support.",
           emailSent: false
         });
       }

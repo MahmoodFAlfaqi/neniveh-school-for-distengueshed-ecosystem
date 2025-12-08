@@ -34,30 +34,17 @@ export default function ForgotPasswordPage() {
       return await apiRequest("POST", "/api/auth/forgot-password", { email });
     },
     onSuccess: (data: any) => {
-      if (data.emailSent) {
-        setStep("emailSent");
-        toast({
-          title: "Email sent!",
-          description: "Check your inbox for the password reset link",
-        });
-      } else if (data.token) {
-        setToken(data.token);
-        setStep("reset");
-        toast({
-          title: "Token generated",
-          description: "Use the token shown to reset your password",
-        });
-      } else {
-        toast({
-          title: "Request received",
-          description: data.message || "If your email exists, you will receive a reset link",
-        });
-      }
+      // Always show email sent confirmation - server handles security
+      setStep("emailSent");
+      toast({
+        title: "Check your email",
+        description: data.message || "If an account exists, you will receive a reset link",
+      });
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to send reset email. Please try again.",
         variant: "destructive",
       });
     },

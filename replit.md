@@ -36,7 +36,7 @@ The frontend is built with React, TypeScript, and Vite, utilizing Shadcn UI (bas
         -   **Hidden from Visitors**: Profile card, Schedule/Calendar card, Community Highlights section on home page; Profile and Schedule links in sidebar.
         -   **Visible to Visitors**: Activity Status card, Quick Access card, all other navigation (Home, News, Grades, Events, Teachers, Settings, Support).
     -   **Security**: Failed login tracking (3 attempts, 15-min lockout), `remember-me` tokens with sliding expiration, HttpOnly cookies, PostgreSQL-backed sessions (30-day expiration, persists across server restarts).
-    -   **Password Recovery**: Includes `password_reset_tokens` table, backend endpoints for forgot/reset password, token validation, and a frontend page.
+    -   **Password Recovery**: Gmail-based email recovery system using nodemailer with SMTP. Three-step flow: request email → email sent confirmation → reset password. Token sent via email link, never exposed to frontend. Requires GMAIL_USER and GMAIL_APP_PASSWORD environment secrets. Token expiration: 1 hour.
 -   **Admin Account Seeding**: Automatic creation of 2 admin accounts on server startup, configured via environment variables. Passwords are set only during initial creation and are NOT reset on subsequent server restarts (preserving admin password changes).
 
 ### System Design Choices
@@ -71,3 +71,4 @@ Includes tables for `Users` (roles, gamification scores, peer-ratable metrics), 
 -   **Development Tools**: TypeScript, Drizzle Kit, ESBuild, Vite plugins.
 -   **Fonts**: Google Fonts (Inter, Outfit) via CDN.
 -   **Session Storage**: `express-session` with `connect-pg-simple`.
+-   **Email Service**: nodemailer with Gmail SMTP for password recovery emails.
