@@ -76,12 +76,9 @@ export default function NewsPage() {
   const hasAccess = useHasAccessToScope(selectedScope);
 
   // Fetch news posts for the selected scope (or all global posts if no scope selected)
+  const scopeParam = selectedScope === null ? "null" : selectedScope;
   const { data: rawPosts = [], isLoading } = useQuery<Post[]>({
-    queryKey: ["/api/posts", selectedScope],
-    queryFn: async () => {
-      const scopeParam = selectedScope === null ? "null" : selectedScope;
-      return await apiRequest("GET", `/api/posts?scopeId=${scopeParam}`);
-    },
+    queryKey: [`/api/posts?scopeId=${scopeParam}`],
   });
 
   // Sort posts based on selected criteria
