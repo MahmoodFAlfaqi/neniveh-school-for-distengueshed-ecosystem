@@ -1,11 +1,13 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import cookieParser from "cookie-parser";
+import connectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedAdminAccounts } from "./seed-admins";
 import { seedScopes } from "./seed-scopes";
 import { storage } from "./storage";
+import { pool } from "./db";
 
 const app = express();
 
@@ -15,16 +17,24 @@ app.set('trust proxy', 1);
 // Cookie parser middleware (for remember-me tokens)
 app.use(cookieParser());
 
-// Session configuration
+// PostgreSQL session store for persistent sessions across server restarts
+const PgSession = connectPgSimple(session);
+
+// Session configuration with PostgreSQL store
 app.use(
   session({
+    store: new PgSession({
+      pool: pool,
+      tableName: "session",
+      createTableIfMissing: true,
+    }),
     secret: process.env.SESSION_SECRET || "school-community-secret-key",
     resave: false,
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days (extended from 7)
     },
   })
 );

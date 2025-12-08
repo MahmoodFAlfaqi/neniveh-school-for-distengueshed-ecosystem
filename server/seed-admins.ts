@@ -44,16 +44,6 @@ export async function seedAdminAccounts() {
 
         if (existingUser.length > 0) {
           console.log(`[SEED] Admin account already exists: ${adminData.username}`);
-          
-          // Optional: Update password if hash has changed
-          const passwordMatch = await bcrypt.compare(adminPassword, existingUser[0].password);
-          if (!passwordMatch) {
-            await db
-              .update(users)
-              .set({ password: hashedPassword })
-              .where(eq(users.username, adminData.username));
-            console.log(`[SEED] Updated password for: ${adminData.username}`);
-          }
           continue;
         }
 

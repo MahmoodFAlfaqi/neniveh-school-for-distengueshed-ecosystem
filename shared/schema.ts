@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, real, pgEnum, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, real, pgEnum, unique, json } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -798,3 +798,10 @@ export const insertUserPunishmentSchema = createInsertSchema(userPunishments).om
 
 export type InsertUserPunishment = z.infer<typeof insertUserPunishmentSchema>;
 export type UserPunishment = typeof userPunishments.$inferSelect;
+
+// Session table for connect-pg-simple (persistent sessions)
+export const sessions = pgTable("session", {
+  sid: varchar("sid").primaryKey(),
+  sess: json("sess").notNull(),
+  expire: timestamp("expire", { precision: 6 }).notNull(),
+});
