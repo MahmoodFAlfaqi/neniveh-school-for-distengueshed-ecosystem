@@ -810,7 +810,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async hasAccessToScope(userId: string, scopeId: string): Promise<boolean> {
-    // Check if user has the digital key
+    // Public scope is always accessible to everyone
+    const scope = await this.getScope(scopeId);
+    if (scope && scope.type === "public") {
+      return true;
+    }
+
+    // For restricted scopes, check if user has the digital key
     const keys = await db
       .select()
       .from(digitalKeys)
