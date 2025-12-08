@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, MapPin, Clock, Users, Plus, ChevronDown, ChevronUp, Star, Send, MessageSquare, Filter, Check } from "lucide-react";
+import { Calendar, MapPin, Clock, Users, Plus, ChevronDown, ChevronUp, Star, Send, MessageSquare, Filter, Check, Pencil, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format, formatDistanceToNow } from "date-fns";
 import {
@@ -23,12 +23,17 @@ import { ScopeSelector } from "@/components/ScopeSelector";
 import { useHasAccessToScope } from "@/hooks/use-digital-keys";
 import { UserProfileLink } from "@/components/UserProfileLink";
 import { Link } from "wouter";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useUser } from "@/hooks/use-user";
 
 type Event = {
   id: string;
   title: string;
   description: string | null;
   eventType: "curricular" | "extracurricular";
+  subject?: string | null;
+  extracurricularCategory?: string | null;
   scopeId: string | null;
   startTime: string;
   endTime: string | null;
@@ -86,11 +91,36 @@ const SUBJECTS = [
   "Library",
 ] as const;
 
-function EventCard({ event }: { event: Event }) {
+function EventCard({ event, currentUser, onEdit }: { event: Event; currentUser: { id: string; role: string } | null; onEdit: (event: Event) => void }) {
   const { toast } = useToast();
   const [showAttendees, setShowAttendees] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
+
+  const isCreator = currentUser?.id === event.createdById;
+  const isAdmin = currentUser?.role === "admin";
+  const canEdit = isCreator;
+  const canDelete = isCreator || isAdmin;
+
+  const deleteEventMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("DELETE", `/api/events/${event.id}`, {});
+    },
+    onSuccess: () => {
+      toast({
+        title: "Event deleted",
+        description: "The event has been removed successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete event",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const { data: attendees = [], isLoading: loadingAttendees } = useQuery<Attendee[]>({
     queryKey: ["/api/events", event.id, "attendees"],
@@ -189,6 +219,52 @@ function EventCard({ event }: { event: Event }) {
               )}
             </div>
           </div>
+          {/* Edit/Delete buttons for creator or admin */}
+          {(canEdit || canDelete) && (
+            <div className="flex items-center gap-1">
+              {canEdit && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => onEdit(event)}
+                  data-testid={`button-edit-event-${event.id}`}
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+              )}
+              {canDelete && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      data-testid={`button-delete-event-${event.id}`}
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Event</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete this event? This action cannot be undone.
+                        All RSVPs and comments will also be deleted.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => deleteEventMutation.mutate()}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -319,11 +395,23 @@ function EventCard({ event }: { event: Event }) {
 
 export default function EventsPage() {
   const { toast } = useToast();
+  const { user: currentUser } = useUser();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedScope, setSelectedScope] = useState<string | null>(null);
   const [filterBy, setFilterBy] = useState<"all" | "upcoming" | "past">("upcoming");
   const [sortBy, setSortBy] = useState<"dateAsc" | "dateDesc" | "popular">("dateAsc");
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    title: "",
+    description: "",
+    eventType: "extracurricular" as "curricular" | "extracurricular",
+    subject: "",
+    extracurricularCategory: "",
+    startTime: "",
+    endTime: "",
+    location: "",
+  });
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -420,16 +508,6 @@ export default function EventsPage() {
     }
   }, [rawEvents, filterBy, sortBy, typeFilter]);
 
-  // Get current user info
-  const { data: user } = useQuery<{
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-  }>({
-    queryKey: ["/api/auth/me"],
-  });
-
   const createEventMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const scopeId = selectedScope || publicScope?.id || null;
@@ -474,6 +552,56 @@ export default function EventsPage() {
       (formData.eventType === "curricular" ? formData.subject.trim() : formData.extracurricularCategory);
     if (isValid) {
       createEventMutation.mutate(formData);
+    }
+  };
+
+  // Edit event mutation
+  const updateEventMutation = useMutation({
+    mutationFn: async (data: typeof editFormData) => {
+      if (!editingEvent) throw new Error("No event selected");
+      return await apiRequest("PATCH", `/api/events/${editingEvent.id}`, {
+        ...data,
+        startTime: new Date(data.startTime),
+        endTime: data.endTime ? new Date(data.endTime) : null,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Event updated",
+        description: "Your event has been updated successfully",
+      });
+      setEditingEvent(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update event",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleOpenEdit = (event: Event) => {
+    setEditFormData({
+      title: event.title,
+      description: event.description || "",
+      eventType: event.eventType,
+      subject: (event as any).subject || "",
+      extracurricularCategory: (event as any).extracurricularCategory || "",
+      startTime: new Date(event.startTime).toISOString().slice(0, 16),
+      endTime: event.endTime ? new Date(event.endTime).toISOString().slice(0, 16) : "",
+      location: event.location || "",
+    });
+    setEditingEvent(event);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const isValid = editFormData.title.trim() && editFormData.startTime && 
+      (editFormData.eventType === "curricular" ? editFormData.subject.trim() : editFormData.extracurricularCategory);
+    if (isValid) {
+      updateEventMutation.mutate(editFormData);
     }
   };
 
@@ -764,13 +892,92 @@ export default function EventsPage() {
               {events.map((event) => (
                 <EventCard 
                   key={event.id} 
-                  event={event} 
+                  event={event}
+                  currentUser={currentUser ? { id: currentUser.id, role: currentUser.role } : null}
+                  onEdit={handleOpenEdit}
                 />
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* Edit Event Dialog */}
+      <Dialog open={!!editingEvent} onOpenChange={(open) => !open && setEditingEvent(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-edit-event">
+          <DialogHeader>
+            <DialogTitle>Edit Event</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">Event Title *</Label>
+              <Input
+                id="edit-title"
+                placeholder="Science Fair 2024"
+                value={editFormData.title}
+                onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                required
+                data-testid="input-edit-event-title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                placeholder="Tell us about the event..."
+                value={editFormData.description}
+                onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                data-testid="input-edit-event-description"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-startTime">Start Time *</Label>
+                <Input
+                  id="edit-startTime"
+                  type="datetime-local"
+                  value={editFormData.startTime}
+                  onChange={(e) => setEditFormData({ ...editFormData, startTime: e.target.value })}
+                  required
+                  data-testid="input-edit-event-start-time"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-endTime">End Time</Label>
+                <Input
+                  id="edit-endTime"
+                  type="datetime-local"
+                  value={editFormData.endTime}
+                  onChange={(e) => setEditFormData({ ...editFormData, endTime: e.target.value })}
+                  data-testid="input-edit-event-end-time"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-location">Location</Label>
+              <Input
+                id="edit-location"
+                placeholder="Room 101, Main Building"
+                value={editFormData.location}
+                onChange={(e) => setEditFormData({ ...editFormData, location: e.target.value })}
+                data-testid="input-edit-event-location"
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingEvent(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={updateEventMutation.isPending} data-testid="button-submit-edit-event">
+                {updateEventMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

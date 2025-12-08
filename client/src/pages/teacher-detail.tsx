@@ -94,7 +94,7 @@ export default function TeacherDetailPage() {
 
   const { data: feedbackStats } = useQuery<FeedbackStats>({
     queryKey: ["/api/teachers", id, "feedback"],
-    enabled: !!id && user?.role === "admin",
+    enabled: !!id,
   });
 
   const { data: existingFeedback } = useQuery<TeacherFeedback | null>({
@@ -362,31 +362,18 @@ export default function TeacherDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Student Feedback Hexagon or Rate Button */}
-      <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Feedback</CardTitle>
-          {user && user.role !== "visitor" && (
-            <Button 
-              onClick={handleOpenFeedbackDialog}
-              variant={existingFeedback ? "default" : "outline"}
-              data-testid="button-rate"
-            >
-              {existingFeedback ? "Edit Feedback" : "Rate"}
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <p className="text-sm text-muted-foreground mb-4">
-              Students can provide detailed feedback about this teacher.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Click the "Rate" button to submit your feedback.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Rate Button - Only for logged in non-visitor users */}
+      {user && user.role !== "visitor" && (
+        <div className="mb-6 flex justify-end">
+          <Button 
+            onClick={handleOpenFeedbackDialog}
+            variant={existingFeedback ? "default" : "outline"}
+            data-testid="button-rate"
+          >
+            {existingFeedback ? "Edit Feedback" : "Rate"}
+          </Button>
+        </div>
+      )}
 
       {/* Feedback Dialog */}
       <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
@@ -452,11 +439,11 @@ export default function TeacherDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Admin-only Feedback Statistics */}
-      {user?.role === "admin" && feedbackStats && feedbackStats.count > 0 && (
+      {/* Feedback Statistics - Visible to all users */}
+      {feedbackStats && feedbackStats.count > 0 && (
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Feedback Statistics (Admin Only)</CardTitle>
+            <CardTitle>Feedback Statistics</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">

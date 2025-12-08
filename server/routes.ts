@@ -421,34 +421,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Request password reset (by email or phone)
+  // Request password reset (by email)
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
-      const { email, phone } = req.body;
+      const { email } = req.body;
 
-      if (!email && !phone) {
-        return res.status(400).json({ message: "Email or phone number required" });
+      if (!email) {
+        return res.status(400).json({ message: "Email address required" });
       }
 
-      let user: any;
-      if (email) {
-        user = await storage.getUserByEmail(email);
-      } else if (phone) {
-        // For phone, we would search through users but for now just handle email
-        return res.json({ message: "Phone-based recovery coming soon. Please use email." });
-      }
+      const user = await storage.getUserByEmail(email);
 
       if (!user) {
-        // Don't reveal whether email/phone exists (security best practice)
-        return res.json({ message: "If an account exists, a password reset link will be sent" });
+        return res.json({ message: "If an account exists with this email, a password reset link will be sent" });
       }
 
       const token = await storage.createPasswordResetToken(user.id);
       
-      res.json({ 
-        message: "Password reset token created",
-        token: token // In production, send this via email/SMS instead
-      });
+      const { sendPasswordResetEmail } = await import("./email");
+      const emailSent = await sendPasswordResetEmail(email, token, user.name);
+      
+      if (emailSent) {
+        res.json({ 
+          message: "Password reset email sent! Check your inbox.",
+          emailSent: true
+        });
+      } else {
+        res.json({ 
+          message: "Password reset token created. Email sending is not configured - please use the token below.",
+          token: token,
+          emailSent: false
+        });
+      }
     } catch (error) {
       console.error("Forgot password error:", error);
       res.status(500).json({ message: "Failed to process password reset request" });
@@ -1536,6 +1540,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch event" });
     }
   });
+
+  // Update event (only by creator)
+  app.patch("/api/events/:id", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const eventId = req.params.id;
+      const userId = req.session.userId!;
+      
+      // Get the event to check ownership
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      // Only the creator can edit the event
+      if (event.createdById !== userId) {
+        return res.status(403).json({ message: "Only the event creator can edit this event" });
+      }
+      
+      // Moderate description if changed
+      if (req.body.description?.trim()) {
+        await requireModeration(req.body.description);
+      }
+      
+      // Parse dates if provided
+      const updates: any = { ...req.body };
+      if (updates.startTime) {
+        updates.startTime = new Date(updates.startTime);
+      }
+      if (updates.endTime) {
+        updates.endTime = new Date(updates.endTime);
+      }
+      
+      const updated = await storage.updateEvent(eventId, updates);
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("community guidelines")) {
+        return res.status(400).json({ message: error.message });
+      }
+      console.error("Failed to update event:", error);
+      res.status(500).json({ message: "Failed to update event" });
+    }
+  });
+
+  // Delete event (by creator or admin)
+  app.delete("/api/events/:id", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const eventId = req.params.id;
+      const userId = req.session.userId!;
+      
+      // Get the event to check ownership
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      
+      // Get user to check if admin
+      const user = await storage.getUser(userId);
+      
+      // Only the creator or an admin can delete the event
+      if (event.createdById !== userId && user?.role !== "admin") {
+        return res.status(403).json({ message: "Only the event creator or an admin can delete this event" });
+      }
+      
+      const deleted = await storage.deleteEvent(eventId);
+      if (deleted) {
+        res.json({ message: "Event deleted successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to delete event" });
+      }
+    } catch (error) {
+      console.error("Failed to delete event:", error);
+      res.status(500).json({ message: "Failed to delete event" });
+    }
+  });
   
   // RSVP to event
   app.post("/api/events/:id/rsvp", requireAuth, requireNonVisitor, async (req, res) => {
@@ -1871,20 +1949,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get teacher feedback statistics (admin only)
+  // Get teacher feedback statistics (visible to all users)
   app.get("/api/teachers/:id/feedback", requireAuth, async (req, res) => {
     try {
       console.log("[FEEDBACK STATS] Fetching feedback for teacher:", req.params.id);
-      // Only admins can view feedback statistics
-      if (req.session.userId) {
-        const user = await storage.getUser(req.session.userId);
-        if (!user || user.role !== "admin") {
-          return res.status(403).json({ message: "Admin privileges required" });
-        }
-      } else {
-        return res.status(403).json({ message: "Admin privileges required" });
-      }
-
       const stats = await storage.getTeacherFeedbackStats(req.params.id);
       console.log("[FEEDBACK STATS] Success");
       res.json(stats);

@@ -139,6 +139,9 @@ export interface IStorage {
   // Events
   createEvent(event: InsertEvent): Promise<Event>;
   getEvents(scopeId?: string, userId?: string): Promise<any[]>;
+  getEvent(eventId: string): Promise<Event | undefined>;
+  updateEvent(eventId: string, updates: Partial<InsertEvent>): Promise<Event | undefined>;
+  deleteEvent(eventId: string): Promise<boolean>;
   rsvpToEvent(eventId: string, userId: string): Promise<EventRsvp | null>;
   getEventRsvps(eventId: string): Promise<EventRsvp[]>;
   getUserRsvps(userId: string): Promise<EventRsvp[]>;
@@ -1446,6 +1449,30 @@ export class DatabaseStorage implements IStorage {
       })
     );
     return eventsWithRsvps;
+  }
+
+  async getEvent(eventId: string): Promise<Event | undefined> {
+    const [event] = await db.select().from(events).where(eq(events.id, eventId));
+    return event || undefined;
+  }
+
+  async updateEvent(eventId: string, updates: Partial<InsertEvent>): Promise<Event | undefined> {
+    const [event] = await db
+      .update(events)
+      .set(updates)
+      .where(eq(events.id, eventId))
+      .returning();
+    return event || undefined;
+  }
+
+  async deleteEvent(eventId: string): Promise<boolean> {
+    // First delete all RSVPs for this event
+    await db.delete(eventRsvps).where(eq(eventRsvps.eventId, eventId));
+    // Then delete all comments for this event
+    await db.delete(eventComments).where(eq(eventComments.eventId, eventId));
+    // Finally delete the event
+    const result = await db.delete(events).where(eq(events.id, eventId)).returning();
+    return result.length > 0;
   }
 
   async rsvpToEvent(eventId: string, userId: string): Promise<EventRsvp | null> {

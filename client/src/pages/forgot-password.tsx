@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -7,30 +7,51 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, ArrowLeft } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle, Mail } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function ForgotPasswordPage() {
   const [, navigate] = useLocation();
+  const searchString = useSearch();
   const { toast } = useToast();
-  const [step, setStep] = useState<"request" | "reset">("request");
+  const [step, setStep] = useState<"request" | "emailSent" | "reset">("request");
   const [email, setEmail] = useState("");
   const [token, setToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const urlToken = params.get("token");
+    if (urlToken) {
+      setToken(urlToken);
+      setStep("reset");
+    }
+  }, [searchString]);
 
   const requestResetMutation = useMutation({
     mutationFn: async (email: string) => {
       return await apiRequest("POST", "/api/auth/forgot-password", { email });
     },
     onSuccess: (data: any) => {
-      toast({
-        title: "Password reset token sent",
-        description: "Check your email for the reset link",
-      });
-      if (data.token) {
+      if (data.emailSent) {
+        setStep("emailSent");
+        toast({
+          title: "Email sent!",
+          description: "Check your inbox for the password reset link",
+        });
+      } else if (data.token) {
         setToken(data.token);
         setStep("reset");
+        toast({
+          title: "Token generated",
+          description: "Use the token shown to reset your password",
+        });
+      } else {
+        toast({
+          title: "Request received",
+          description: data.message || "If your email exists, you will receive a reset link",
+        });
       }
     },
     onError: (error: Error) => {
@@ -112,9 +133,9 @@ export default function ForgotPasswordPage() {
             <div>
               <CardTitle>Reset Password</CardTitle>
               <CardDescription>
-                {step === "request"
-                  ? "Enter your email to receive a reset token"
-                  : "Enter your reset token and new password"}
+                {step === "request" && "Enter your email to receive a reset link"}
+                {step === "emailSent" && "A reset link has been sent to your email"}
+                {step === "reset" && "Enter your reset token and new password"}
               </CardDescription>
             </div>
             <Button
@@ -128,7 +149,7 @@ export default function ForgotPasswordPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {step === "request" ? (
+          {step === "request" && (
             <form onSubmit={handleRequestReset} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
@@ -152,12 +173,57 @@ export default function ForgotPasswordPage() {
                   : "Send Reset Link"}
               </Button>
             </form>
-          ) : (
+          )}
+
+          {step === "emailSent" && (
+            <div className="space-y-4 text-center">
+              <div className="flex justify-center">
+                <div className="rounded-full bg-green-100 dark:bg-green-900/30 p-4">
+                  <Mail className="w-8 h-8 text-green-600 dark:text-green-400" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-semibold text-lg">Check your email</h3>
+                <p className="text-sm text-muted-foreground">
+                  We've sent a password reset link to <strong>{email}</strong>
+                </p>
+              </div>
+              <Alert>
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Click the link in your email to reset your password. The link expires in 1 hour.
+                </AlertDescription>
+              </Alert>
+              <div className="pt-4 space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setStep("reset")}
+                  data-testid="button-enter-token-manually"
+                >
+                  Enter token manually
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => {
+                    setStep("request");
+                    setEmail("");
+                  }}
+                  data-testid="button-try-different-email"
+                >
+                  Try a different email
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === "reset" && (
             <form onSubmit={handleResetPassword} className="space-y-4">
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  A reset token has been generated. If you don't see it above, check your email.
+                  Enter the reset token from your email and choose a new password.
                 </AlertDescription>
               </Alert>
 
