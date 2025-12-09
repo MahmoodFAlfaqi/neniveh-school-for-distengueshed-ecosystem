@@ -5,7 +5,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userRoleEnum = pgEnum("user_role", ["student", "admin", "visitor"]);
+export const userRoleEnum = pgEnum("user_role", ["student", "admin", "visitor", "teacher"]);
 export const accountStatusEnum = pgEnum("account_status", ["active", "threatened", "suspended"]);
 export const scopeTypeEnum = pgEnum("scope_type", ["grade", "section", "public"]);
 export const eventTypeEnum = pgEnum("event_type", ["curricular", "extracurricular"]);
@@ -32,6 +32,9 @@ export const users = pgTable("users", {
   // Grade and Class assignment (for students)
   grade: integer("grade"), // 1-6 for grades 1-6, null for admins
   className: text("class_name"), // e.g., "A", "B", "C", "D", null for admins
+  
+  // Teacher profile link (for teacher role)
+  teacherProfileId: varchar("teacher_profile_id"), // Links to teachers.id when role is 'teacher'
   
   // Gamification fields
   credibilityScore: real("credibility_score").notNull().default(50.0), // 0-100 scale
@@ -133,6 +136,9 @@ export const posts = pgTable("posts", {
   mediaUrl: text("media_url"), // for images, audio, etc.
   mediaType: text("media_type"), // 'image', 'audio', 'gif', etc.
   
+  // Teacher post flag for special styling (lustered posts)
+  isTeacherPost: boolean("is_teacher_post").notNull().default(false),
+  
   // Credibility
   credibilityRating: real("credibility_rating").notNull().default(50.0), // 0-100 scale
   
@@ -201,6 +207,11 @@ export const schedules = pgTable("schedules", {
 export const teachers = pgTable("teachers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id),
+  
+  // Teacher claim system
+  teacherId: text("teacher_id").unique(), // Auto-generated ID for teacher registration (like student IDs)
+  claimedByUserId: varchar("claimed_by_user_id").references(() => users.id), // User who claimed this profile
+  isClaimed: boolean("is_claimed").notNull().default(false), // Whether a teacher account has claimed this profile
   
   name: text("name").notNull(),
   photoUrl: text("photo_url"),
@@ -339,6 +350,27 @@ export const profileComments = pgTable("profile_comments", {
   rating: integer("rating"), // Optional 1-5 stars
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Study Sources - file uploads for educational materials
+export const studySources = pgTable("study_sources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  authorId: varchar("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  scopeId: varchar("scope_id").references(() => scopes.id), // null for public scope
+  
+  // File information
+  fileName: text("file_name").notNull(), // Original filename
+  fileUrl: text("file_url").notNull(), // Storage URL
+  fileSize: integer("file_size"), // Size in bytes
+  fileType: text("file_type"), // MIME type
+  
+  // Metadata
+  subject: text("subject").notNull(), // e.g., "Math", "Physics"
+  title: text("title"), // Optional custom title
+  description: text("description"), // Optional description
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // Friendships - user-to-user friend connections
@@ -664,6 +696,18 @@ export const insertProfileCommentSchema = createInsertSchema(profileComments).om
   createdAt: true,
 });
 
+export const insertStudySourceSchema = createInsertSchema(studySources).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  fileName: z.string().trim().min(1, "File name is required"),
+  fileUrl: z.string().trim().min(1, "File URL is required"),
+  subject: z.string().trim().min(1, "Subject is required"),
+  title: z.string().trim().optional(),
+  description: z.string().trim().max(1000, "Description must not exceed 1000 characters").optional(),
+});
+
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -729,6 +773,9 @@ export type EventComment = typeof eventComments.$inferSelect;
 
 export type InsertProfileComment = z.infer<typeof insertProfileCommentSchema>;
 export type ProfileComment = typeof profileComments.$inferSelect;
+
+export type InsertStudySource = z.infer<typeof insertStudySourceSchema>;
+export type StudySource = typeof studySources.$inferSelect;
 
 export const insertSettingSchema = createInsertSchema(settings).omit({
   id: true,
