@@ -24,6 +24,7 @@ import GradesPage from "@/pages/grades";
 import GradeDetailPage from "@/pages/grade-detail";
 import ClassDetailPage from "@/pages/class-detail";
 import SupportPage from "@/pages/support";
+import StudySourcesPage from "@/pages/study-sources";
 import NotFound from "@/pages/not-found";
 
 type User = {
@@ -225,6 +226,13 @@ function Router() {
         {() => (
           <AuthenticatedLayout>
             <SupportPage />
+          </AuthenticatedLayout>
+        )}
+      </Route>
+      <Route path="/study-sources">
+        {() => (
+          <AuthenticatedLayout>
+            <StudySourcesPage />
           </AuthenticatedLayout>
         )}
       </Route>

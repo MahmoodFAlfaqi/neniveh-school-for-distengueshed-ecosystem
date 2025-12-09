@@ -1,4 +1,4 @@
-import { Home, Calendar, Users, Settings, BookOpen, User, LogOut, Shield, GraduationCap, Newspaper, Heart } from "lucide-react";
+import { Home, Calendar, Users, Settings, BookOpen, User, LogOut, Shield, GraduationCap, Newspaper, Heart, FileText } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -59,6 +59,11 @@ const mainNavItems = [
     title: "Schedule",
     url: "/schedule",
     icon: BookOpen,
+  },
+  {
+    title: "Study Sources",
+    url: "/study-sources",
+    icon: FileText,
   },
 ];
 

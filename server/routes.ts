@@ -1302,12 +1302,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await requireModeration(req.body.content);
       }
       
+      // Check if author is a teacher for special post styling
+      const user = await storage.getUser(req.session.userId!);
+      const isTeacherPost = user?.role === 'teacher';
+      
       // Prepare post data with media if uploaded
       const postData = insertPostSchema.parse({
         ...req.body,
         authorId: req.session.userId!, // Use authenticated user
         mediaUrl: req.file ? `/uploads/${req.file.filename}` : undefined,
         mediaType: req.file ? getMediaType(req.file.mimetype) : undefined,
+        isTeacherPost,
       });
       
       // If posting to a restricted scope, verify user has access

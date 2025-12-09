@@ -35,6 +35,7 @@ type Post = {
   authorAvatarUrl: string | null;
   isLikedByCurrentUser: boolean;
   currentUserAccuracyRating?: number | null;
+  isTeacherPost?: boolean;
   author: {
     name: string;
     role: string;
@@ -370,7 +371,11 @@ export default function NewsPage() {
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {posts.map((post) => (
-              <Card key={post.id} className="hover-elevate" data-testid={`card-post-${post.id}`}>
+              <Card 
+                key={post.id} 
+                className={`hover-elevate ${post.isTeacherPost || post.authorRole === 'teacher' ? 'ring-2 ring-amber-400/50 bg-gradient-to-br from-amber-50/30 to-yellow-50/20 dark:from-amber-900/20 dark:to-yellow-900/10 shadow-amber-200/30 dark:shadow-amber-700/20' : ''}`}
+                data-testid={`card-post-${post.id}`}
+              >
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex flex-col gap-2">
