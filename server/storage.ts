@@ -1408,33 +1408,38 @@ export class DatabaseStorage implements IStorage {
       .from(events)
       .leftJoin(users, eq(events.createdById, users.id));
 
+    let results;
+    
     if (scopeId) {
-      const results = await baseQuery
+      // Specific scope requested
+      results = await baseQuery
         .where(eq(events.scopeId, scopeId))
         .orderBy(desc(events.startTime));
+    } else {
+      // Get all events, then filter by user's scope access
+      results = await baseQuery.orderBy(desc(events.startTime));
       
-      // Add RSVP count and user's RSVP status for each event
-      const eventsWithRsvps = await Promise.all(
-        results.map(async (event) => {
-          const rsvps = await this.getEventRsvps(event.id);
-          const userHasRsvpd = userId ? rsvps.some(r => r.userId === userId) : false;
+      // Filter events based on user's scope access
+      if (userId) {
+        const filteredResults = [];
+        
+        for (const event of results) {
+          if (!event.scopeId) {
+            // Events with no scope ID are always accessible
+            filteredResults.push(event);
+            continue;
+          }
           
-          return { 
-            ...event, 
-            rsvpCount: rsvps.length, 
-            userHasRsvpd,
-            createdBy: {
-              name: event.createdByName || "Unknown User",
-              role: event.createdByRole || "student",
-              avatarUrl: event.createdByAvatarUrl,
-            }
-          };
-        })
-      );
-      return eventsWithRsvps;
+          // Check if scope is public or user has access
+          const hasAccess = await this.hasAccessToScope(userId, event.scopeId);
+          if (hasAccess) {
+            filteredResults.push(event);
+          }
+        }
+        
+        results = filteredResults;
+      }
     }
-    
-    const results = await baseQuery.orderBy(desc(events.startTime));
     
     // Add RSVP count and user's RSVP status for each event
     const eventsWithRsvps = await Promise.all(
