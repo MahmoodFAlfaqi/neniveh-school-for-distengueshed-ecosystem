@@ -4,12 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Star, ArrowLeft } from "lucide-react";
+import { Star, ArrowLeft, Shield, Edit, CheckCircle } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { X } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -31,6 +33,9 @@ type Teacher = {
   subjects: string[] | null;
   sections: string[] | null;
   adminNotes: string | null;
+  teacherId: string | null;
+  claimedByUserId: string | null;
+  isClaimed: boolean;
 };
 
 type Review = {
@@ -86,6 +91,12 @@ export default function TeacherDetailPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    description: "",
+    academicAchievements: [] as string[],
+  });
+  const [newAchievement, setNewAchievement] = useState("");
 
   const { data, isLoading } = useQuery<TeacherWithReviews>({
     queryKey: ["/api/teachers", id],
@@ -202,38 +213,86 @@ export default function TeacherDetailPage() {
     }
   };
 
-  const renderStars = (count: number, interactive = false) => {
-    const stars = [];
-    for (let i = 1; i <= 5; i++) {
-      const filled = interactive 
-        ? (hoveredStar !== null ? i <= hoveredStar : i <= count)
-        : i <= Math.floor(count);
-      const halfFilled = !interactive && i === Math.ceil(count) && count % 1 >= 0.5;
+  // Claim teacher profile mutation
+  const claimProfileMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/teachers/${id}/claim`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Profile claimed",
+        description: "You have successfully claimed this teacher profile.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/teachers", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to claim profile",
+        variant: "destructive",
+      });
+    },
+  });
 
-      stars.push(
-        <button
-          key={i}
-          type={interactive ? "button" : undefined}
-          onClick={interactive ? () => setRating(i) : undefined}
-          onMouseEnter={interactive ? () => setHoveredStar(i) : undefined}
-          onMouseLeave={interactive ? () => setHoveredStar(null) : undefined}
-          className={interactive ? "cursor-pointer hover:scale-110 transition-transform" : ""}
-          disabled={!interactive}
-          data-testid={`${interactive ? "button" : "icon"}-star-${i}`}
-        >
-          <Star
-            className={`w-5 h-5 ${
-              filled
-                ? "fill-yellow-400 text-yellow-400"
-                : halfFilled
-                ? "fill-yellow-400/50 text-yellow-400"
-                : "text-muted-foreground"
-            }`}
-          />
-        </button>
-      );
+  // Edit teacher profile mutation
+  const editProfileMutation = useMutation({
+    mutationFn: async (data: { description?: string; academicAchievements?: string[] }) => {
+      return await apiRequest("PATCH", `/api/teachers/${id}/self`, data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Profile updated",
+        description: "Your profile has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/teachers", id] });
+      setEditDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update profile",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Check if current user can claim this profile
+  const canClaimProfile = user && user.role === "teacher" && data?.teacher && !data.teacher.isClaimed;
+  
+  // Check if current user owns this profile
+  const isProfileOwner = user && data?.teacher && data.teacher.claimedByUserId === user.id;
+
+  const handleOpenEditDialog = () => {
+    if (data?.teacher) {
+      setEditForm({
+        description: data.teacher.description || "",
+        academicAchievements: data.teacher.academicAchievements || [],
+      });
     }
-    return stars;
+    setEditDialogOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await editProfileMutation.mutateAsync(editForm);
+  };
+
+  const addAchievement = () => {
+    if (newAchievement.trim()) {
+      setEditForm({
+        ...editForm,
+        academicAchievements: [...editForm.academicAchievements, newAchievement.trim()],
+      });
+      setNewAchievement("");
+    }
+  };
+
+  const removeAchievement = (index: number) => {
+    setEditForm({
+      ...editForm,
+      academicAchievements: editForm.academicAchievements.filter((_, i) => i !== index),
+    });
   };
 
   if (isLoading) {
@@ -298,8 +357,50 @@ export default function TeacherDetailPage() {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold mb-2" data-testid="text-teacher-name">{teacher.name}</h1>
+              <div className="flex items-center justify-between mb-2">
+                <h1 className="text-3xl font-bold" data-testid="text-teacher-name">{teacher.name}</h1>
+                <div className="flex items-center gap-2">
+                  {/* Claim status badge */}
+                  {teacher.isClaimed && (
+                    <Badge variant="outline" className="text-green-600 border-green-600" data-testid="badge-claimed">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Verified Teacher
+                    </Badge>
+                  )}
+                  
+                  {/* Claim button for unclaimed profiles */}
+                  {canClaimProfile && (
+                    <Button
+                      variant="default"
+                      onClick={() => claimProfileMutation.mutate()}
+                      disabled={claimProfileMutation.isPending}
+                      data-testid="button-claim-profile"
+                    >
+                      <Shield className="w-4 h-4 mr-2" />
+                      {claimProfileMutation.isPending ? "Claiming..." : "Claim Profile"}
+                    </Button>
+                  )}
+                  
+                  {/* Edit button for profile owner */}
+                  {isProfileOwner && (
+                    <Button
+                      variant="outline"
+                      onClick={handleOpenEditDialog}
+                      data-testid="button-edit-profile"
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Profile
+                    </Button>
+                  )}
+                </div>
+              </div>
               
+              {/* Teacher ID display */}
+              {teacher.teacherId && (
+                <p className="text-sm text-muted-foreground mb-4" data-testid="text-teacher-id">
+                  Teacher ID: {teacher.teacherId}
+                </p>
+              )}
 
               {teacher.subjects && teacher.subjects.length > 0 && (
                 <div className="mb-4">
@@ -433,6 +534,78 @@ export default function TeacherDetailPage() {
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Submitting..." : "Submit Feedback"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Profile Dialog - Only for profile owners */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-lg" data-testid="dialog-edit-profile">
+          <DialogHeader>
+            <DialogTitle>Edit Your Profile</DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleEditSubmit} className="space-y-6">
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-description" className="text-sm font-medium">
+                About Me
+              </Label>
+              <Textarea
+                id="edit-description"
+                placeholder="Tell students about yourself..."
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                rows={4}
+                data-testid="input-edit-description"
+              />
+            </div>
+
+            {/* Academic Achievements */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Certificates & Achievements</Label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {editForm.academicAchievements.map((achievement, idx) => (
+                  <Badge key={idx} variant="secondary" className="flex items-center gap-1">
+                    {achievement}
+                    <button
+                      type="button"
+                      onClick={() => removeAchievement(idx)}
+                      className="ml-1 hover:text-destructive"
+                      data-testid={`button-remove-achievement-${idx}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Add achievement..."
+                  value={newAchievement}
+                  onChange={(e) => setNewAchievement(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addAchievement();
+                    }
+                  }}
+                  data-testid="input-new-achievement"
+                />
+                <Button type="button" variant="outline" onClick={addAchievement} data-testid="button-add-achievement">
+                  Add
+                </Button>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={editProfileMutation.isPending} data-testid="button-save-profile">
+                {editProfileMutation.isPending ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
           </form>
