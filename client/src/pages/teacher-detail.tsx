@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Star, ArrowLeft, Shield, Edit, CheckCircle } from "lucide-react";
+import { Star, ArrowLeft, Shield, Edit, CheckCircle, Key } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -257,11 +257,35 @@ export default function TeacherDetailPage() {
     },
   });
 
+  // Generate teacher ID mutation (admin only)
+  const generateTeacherIdMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/teachers/${id}/generate-id`);
+    },
+    onSuccess: (result: { teacherId: string }) => {
+      toast({
+        title: "Teacher ID Generated",
+        description: `Teacher ID: ${result.teacherId}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/teachers", id] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate teacher ID",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Check if current user can claim this profile
   const canClaimProfile = user && user.role === "teacher" && data?.teacher && !data.teacher.isClaimed;
   
   // Check if current user owns this profile
   const isProfileOwner = user && data?.teacher && data.teacher.claimedByUserId === user.id;
+  
+  // Check if admin can generate teacher ID (only if teacher doesn't have one)
+  const canGenerateTeacherId = user?.role === "admin" && data?.teacher && !data.teacher.teacherId;
 
   const handleOpenEditDialog = () => {
     if (data?.teacher) {
@@ -395,12 +419,28 @@ export default function TeacherDetailPage() {
                 </div>
               </div>
               
-              {/* Teacher ID display */}
-              {teacher.teacherId && (
+              {/* Teacher ID display or generate button */}
+              {teacher.teacherId ? (
                 <p className="text-sm text-muted-foreground mb-4" data-testid="text-teacher-id">
                   Teacher ID: {teacher.teacherId}
                 </p>
-              )}
+              ) : canGenerateTeacherId ? (
+                <div className="mb-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => generateTeacherIdMutation.mutate()}
+                    disabled={generateTeacherIdMutation.isPending}
+                    data-testid="button-generate-teacher-id"
+                  >
+                    <Key className="w-4 h-4 mr-2" />
+                    {generateTeacherIdMutation.isPending ? "Generating..." : "Generate Teacher ID"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This teacher needs an ID to register and claim their profile
+                  </p>
+                </div>
+              ) : null}
 
               {teacher.subjects && teacher.subjects.length > 0 && (
                 <div className="mb-4">

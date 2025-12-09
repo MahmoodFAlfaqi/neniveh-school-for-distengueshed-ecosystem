@@ -1980,6 +1980,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Generate teacher ID for existing teacher (admin only)
+  app.post("/api/teachers/:id/generate-id", requireAdmin, async (req, res) => {
+    try {
+      const teacherProfileId = req.params.id;
+      console.log("[TEACHER GENERATE ID] Generating ID for teacher:", teacherProfileId);
+      
+      const existingTeacher = await storage.getTeacher(teacherProfileId);
+      if (!existingTeacher) {
+        return res.status(404).json({ message: "Teacher not found" });
+      }
+      
+      if (existingTeacher.teacherId) {
+        return res.status(400).json({ 
+          message: "Teacher already has an ID assigned",
+          teacherId: existingTeacher.teacherId 
+        });
+      }
+      
+      // Generate new teacher ID
+      const newTeacherId = `T${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
+      
+      const updatedTeacher = await storage.updateTeacher(teacherProfileId, { teacherId: newTeacherId });
+      if (!updatedTeacher) {
+        return res.status(500).json({ message: "Failed to update teacher with new ID" });
+      }
+      
+      console.log("[TEACHER GENERATE ID] Success. Teacher", teacherProfileId, "assigned ID:", newTeacherId);
+      res.json({ 
+        message: "Teacher ID generated successfully",
+        teacherId: newTeacherId,
+        teacher: updatedTeacher
+      });
+    } catch (error) {
+      console.error("[TEACHER GENERATE ID] Error:", error instanceof Error ? error.message : String(error));
+      res.status(500).json({ message: "Failed to generate teacher ID" });
+    }
+  });
+  
   // Claim teacher profile (teacher registration)
   app.post("/api/teachers/claim", requireAuth, requireNonVisitor, async (req, res) => {
     try {
