@@ -25,6 +25,7 @@ import {
   insertChatMessageSchema,
   insertContentViolationSchema,
   insertUserPunishmentSchema,
+  insertStudySourceSchema,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { z } from "zod";
@@ -1754,9 +1755,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("[TEACHER CREATE] Received body:", JSON.stringify(req.body));
       const teacherData = insertTeacherSchema.parse(req.body);
-      console.log("[TEACHER CREATE] Validated data:", JSON.stringify(teacherData));
-      const teacher = await storage.createTeacher(teacherData);
-      console.log("[TEACHER CREATE] Success:", teacher.id);
+      
+      // Auto-generate teacherId for teacher registration (like student IDs)
+      const teacherId = `T${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
+      console.log("[TEACHER CREATE] Generated teacherId:", teacherId);
+      
+      const teacher = await storage.createTeacher({
+        ...teacherData,
+        teacherId,
+        isClaimed: false,
+      });
+      console.log("[TEACHER CREATE] Success:", teacher.id, "teacherId:", teacherId);
       res.json(teacher);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1803,10 +1812,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update teacher (admin only)
+  // Update teacher (admin only) - Cannot edit if profile is claimed
   app.patch("/api/teachers/:id", requireAdmin, async (req, res) => {
     try {
       console.log("[TEACHER UPDATE] Updating teacher:", req.params.id);
+      
+      // Check if profile is claimed - admins cannot edit claimed profiles
+      const existingTeacher = await storage.getTeacher(req.params.id);
+      if (!existingTeacher) {
+        return res.status(404).json({ message: "Teacher not found" });
+      }
+      
+      if (existingTeacher.isClaimed) {
+        return res.status(403).json({ 
+          message: "This teacher profile has been claimed and can only be edited by the teacher themselves" 
+        });
+      }
+      
       const updates = req.body;
       const teacher = await storage.updateTeacher(req.params.id, updates);
       if (!teacher) {
@@ -1819,6 +1841,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[TEACHER UPDATE] Full error:", error);
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
       res.status(500).json({ message: "Failed to update teacher", error: errorMsg });
+    }
+  });
+  
+  // Claim teacher profile (teacher registration)
+  app.post("/api/teachers/claim", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const { teacherId } = req.body;
+      const userId = req.session.userId!;
+      
+      if (!teacherId) {
+        return res.status(400).json({ message: "Teacher ID is required" });
+      }
+      
+      console.log("[TEACHER CLAIM] User", userId, "attempting to claim teacherId:", teacherId);
+      
+      // Find teacher by teacherId (the registration code)
+      const teacher = await storage.getTeacherByTeacherId(teacherId);
+      if (!teacher) {
+        return res.status(404).json({ message: "Invalid teacher ID. Please check the ID provided by admin." });
+      }
+      
+      if (teacher.isClaimed) {
+        return res.status(400).json({ message: "This teacher profile has already been claimed" });
+      }
+      
+      // Claim the profile
+      const claimed = await storage.claimTeacherProfile(teacher.id, userId);
+      if (!claimed) {
+        return res.status(500).json({ message: "Failed to claim teacher profile" });
+      }
+      
+      console.log("[TEACHER CLAIM] Success. Profile", teacher.id, "claimed by user", userId);
+      res.json({ message: "Teacher profile claimed successfully", teacher: claimed });
+    } catch (error) {
+      console.error("[TEACHER CLAIM] Error:", error);
+      res.status(500).json({ message: "Failed to claim teacher profile" });
+    }
+  });
+  
+  // Update teacher profile by self (teacher only)
+  app.patch("/api/teachers/:id/self", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const teacherId = req.params.id;
+      const userId = req.session.userId!;
+      
+      // Get the teacher profile
+      const teacher = await storage.getTeacher(teacherId);
+      if (!teacher) {
+        return res.status(404).json({ message: "Teacher not found" });
+      }
+      
+      // Verify the user owns this profile
+      if (teacher.claimedByUserId !== userId) {
+        return res.status(403).json({ message: "You can only edit your own teacher profile" });
+      }
+      
+      // Teachers can only update certain fields
+      const { photoUrl, description, classroomRules, academicAchievements } = req.body;
+      const updates = {
+        ...(photoUrl !== undefined && { photoUrl }),
+        ...(description !== undefined && { description }),
+        ...(classroomRules !== undefined && { classroomRules }),
+        ...(academicAchievements !== undefined && { academicAchievements }),
+      };
+      
+      const updated = await storage.updateTeacherProfileBySelf(teacherId, updates);
+      console.log("[TEACHER SELF UPDATE] Success for teacher", teacherId);
+      res.json(updated);
+    } catch (error) {
+      console.error("[TEACHER SELF UPDATE] Error:", error);
+      res.status(500).json({ message: "Failed to update teacher profile" });
     }
   });
 
@@ -2203,6 +2296,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get unread count error:", error);
       res.status(500).json({ message: "Failed to fetch unread count" });
+    }
+  });
+
+  // ==================== STUDY SOURCES ====================
+  
+  // Get study sources (with scope filtering)
+  app.get("/api/study-sources", requireAuth, async (req, res) => {
+    try {
+      const { scopeId } = req.query;
+      const userId = req.session.userId;
+      
+      // If specific scope requested, check access
+      if (scopeId && scopeId !== "public" && userId) {
+        const hasAccess = await storage.hasAccessToScope(userId, scopeId as string);
+        const user = await storage.getUser(userId);
+        if (!hasAccess && user?.role !== "admin") {
+          return res.status(403).json({ message: "You don't have access to this scope" });
+        }
+      }
+      
+      // Get sources - null scopeId for public, string for specific scope
+      const sources = await storage.getStudySources(scopeId === "public" ? null : (scopeId as string));
+      
+      // Enrich with author info
+      const enrichedSources = await Promise.all(sources.map(async (source) => {
+        const author = await storage.getUser(source.authorId);
+        return {
+          ...source,
+          author: author ? { id: author.id, username: author.username, name: author.name, avatarUrl: author.avatarUrl } : null,
+        };
+      }));
+      
+      res.json(enrichedSources);
+    } catch (error) {
+      console.error("[STUDY SOURCES GET] Error:", error);
+      res.status(500).json({ message: "Failed to fetch study sources" });
+    }
+  });
+  
+  // Create study source with file upload
+  app.post("/api/study-sources", requireAuth, requireNonVisitor, upload.single("file"), async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const file = req.file;
+      
+      if (!file) {
+        return res.status(400).json({ message: "File is required" });
+      }
+      
+      const { subject, title, description, scopeId } = req.body;
+      
+      // Validate required fields
+      if (!subject) {
+        return res.status(400).json({ message: "Subject is required" });
+      }
+      
+      // Check scope access if not public
+      if (scopeId && scopeId !== "public") {
+        const hasAccess = await storage.hasAccessToScope(userId, scopeId);
+        const user = await storage.getUser(userId);
+        if (!hasAccess && user?.role !== "admin") {
+          return res.status(403).json({ message: "You don't have access to this scope" });
+        }
+      }
+      
+      const sourceData = {
+        authorId: userId,
+        scopeId: scopeId === "public" ? null : scopeId,
+        fileName: file.originalname,
+        fileUrl: `/uploads/${file.filename}`,
+        fileSize: file.size,
+        fileType: file.mimetype,
+        subject,
+        title: title || null,
+        description: description || null,
+      };
+      
+      const source = await storage.createStudySource(sourceData);
+      console.log("[STUDY SOURCE CREATE] Success:", source.id);
+      res.json(source);
+    } catch (error) {
+      console.error("[STUDY SOURCE CREATE] Error:", error);
+      res.status(500).json({ message: "Failed to create study source" });
+    }
+  });
+  
+  // Delete study source (author or admin only)
+  app.delete("/api/study-sources/:id", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const sourceId = req.params.id;
+      const userId = req.session.userId!;
+      
+      const source = await storage.getStudySource(sourceId);
+      if (!source) {
+        return res.status(404).json({ message: "Study source not found" });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (source.authorId !== userId && user?.role !== "admin") {
+        return res.status(403).json({ message: "You can only delete your own study sources" });
+      }
+      
+      const deleted = await storage.deleteStudySource(sourceId);
+      if (!deleted) {
+        return res.status(500).json({ message: "Failed to delete study source" });
+      }
+      
+      console.log("[STUDY SOURCE DELETE] Success:", sourceId);
+      res.json({ message: "Study source deleted successfully" });
+    } catch (error) {
+      console.error("[STUDY SOURCE DELETE] Error:", error);
+      res.status(500).json({ message: "Failed to delete study source" });
     }
   });
 

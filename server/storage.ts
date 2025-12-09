@@ -24,6 +24,7 @@ import {
   chatMessages,
   contentViolations,
   userPunishments,
+  studySources,
   type User,
   type InsertUser,
   type Scope,
@@ -74,6 +75,8 @@ import {
   type InsertContentViolation,
   type UserPunishment,
   type InsertUserPunishment,
+  type StudySource,
+  type InsertStudySource,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
@@ -215,6 +218,17 @@ export interface IStorage {
   createPunishment(punishment: InsertUserPunishment): Promise<UserPunishment>;
   getUserPunishments(userId: string): Promise<UserPunishment[]>;
   applyPunishment(userId: string, credibilityPenalty: number, banUntil?: Date): Promise<User | undefined>;
+  
+  // Teacher Claim System
+  getTeacherByTeacherId(teacherId: string): Promise<Teacher | undefined>;
+  claimTeacherProfile(teacherProfileId: string, userId: string): Promise<Teacher | undefined>;
+  updateTeacherProfileBySelf(teacherProfileId: string, updates: { photoUrl?: string; description?: string; classroomRules?: string[]; academicAchievements?: string[] }): Promise<Teacher | undefined>;
+  
+  // Study Sources
+  createStudySource(source: InsertStudySource): Promise<StudySource>;
+  getStudySources(scopeId?: string | null): Promise<StudySource[]>;
+  getStudySource(id: string): Promise<StudySource | undefined>;
+  deleteStudySource(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2226,6 +2240,111 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return updated || undefined;
+  }
+
+  // ==================== TEACHER CLAIM SYSTEM ====================
+  async getTeacherByTeacherId(teacherId: string): Promise<Teacher | undefined> {
+    const [teacher] = await db
+      .select()
+      .from(teachers)
+      .where(eq(teachers.teacherId, teacherId));
+    return teacher || undefined;
+  }
+
+  async claimTeacherProfile(teacherProfileId: string, userId: string): Promise<Teacher | undefined> {
+    const teacher = await this.getTeacher(teacherProfileId);
+    if (!teacher || teacher.isClaimed) return undefined;
+    
+    const [updated] = await db
+      .update(teachers)
+      .set({
+        claimedByUserId: userId,
+        isClaimed: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(teachers.id, teacherProfileId))
+      .returning();
+    
+    if (updated) {
+      await db
+        .update(users)
+        .set({
+          role: "teacher",
+          teacherProfileId: teacherProfileId,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+    }
+    
+    return updated || undefined;
+  }
+
+  async updateTeacherProfileBySelf(
+    teacherProfileId: string, 
+    updates: { photoUrl?: string; description?: string; classroomRules?: string[]; academicAchievements?: string[] }
+  ): Promise<Teacher | undefined> {
+    const [updated] = await db
+      .update(teachers)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(teachers.id, teacherProfileId))
+      .returning();
+    
+    return updated || undefined;
+  }
+
+  // ==================== STUDY SOURCES ====================
+  async createStudySource(source: InsertStudySource): Promise<StudySource> {
+    const [created] = await db
+      .insert(studySources)
+      .values(source)
+      .returning();
+    
+    return created;
+  }
+
+  async getStudySources(scopeId?: string | null): Promise<StudySource[]> {
+    if (scopeId === null) {
+      const sources = await db
+        .select()
+        .from(studySources)
+        .where(sql`${studySources.scopeId} IS NULL`)
+        .orderBy(desc(studySources.createdAt));
+      return sources;
+    }
+    
+    if (scopeId) {
+      const sources = await db
+        .select()
+        .from(studySources)
+        .where(eq(studySources.scopeId, scopeId))
+        .orderBy(desc(studySources.createdAt));
+      return sources;
+    }
+    
+    const sources = await db
+      .select()
+      .from(studySources)
+      .orderBy(desc(studySources.createdAt));
+    return sources;
+  }
+
+  async getStudySource(id: string): Promise<StudySource | undefined> {
+    const [source] = await db
+      .select()
+      .from(studySources)
+      .where(eq(studySources.id, id));
+    return source || undefined;
+  }
+
+  async deleteStudySource(id: string): Promise<boolean> {
+    const result = await db
+      .delete(studySources)
+      .where(eq(studySources.id, id))
+      .returning();
+    return result.length > 0;
   }
 }
 
