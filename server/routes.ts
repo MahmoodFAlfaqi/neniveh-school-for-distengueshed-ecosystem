@@ -241,21 +241,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         credibilityScore: 100,
         reputationScore: 0,
         accountStatus: "active",
-        initiativeScore: 0,
-        communicationScore: 0,
-        cooperationScore: 0,
-        kindnessScore: 0,
-        perseveranceScore: 0,
-        fitnessScore: 0,
-        playingSkillsScore: 0,
-        inClassMisconductScore: 0,
-        outClassMisconductScore: 0,
-        literaryScienceScore: 0,
-        naturalScienceScore: 0,
-        electronicScienceScore: 0,
-        confidenceScore: 0,
-        temperScore: 0,
-        cheerfulnessScore: 0,
       }).returning();
       
       // Set session
@@ -417,17 +402,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
       
-      // Create user with teacher role
-      const user = await storage.createUser({
+      // Create user with teacher role - use direct insert since createUser is for students only
+      const [user] = await db.insert(users).values({
         username,
         email,
         password: hashedPassword,
         phone: phone || null,
         role: "teacher",
         name: teacher.name, // Use teacher's name from profile
-        studentId: null, // Not a student
+        studentId: `TEACHER_${Date.now()}`, // Unique ID for teacher accounts
         teacherProfileId: teacher.id,
-      });
+        credibilityScore: 100,
+        reputationScore: 0,
+        accountStatus: "active",
+      }).returning();
       
       // Claim the teacher profile
       await storage.claimTeacherProfile(teacher.id, user.id);
