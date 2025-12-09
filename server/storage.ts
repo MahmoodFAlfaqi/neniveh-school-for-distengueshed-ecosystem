@@ -816,7 +816,28 @@ export class DatabaseStorage implements IStorage {
       return true;
     }
 
-    // For restricted scopes, check if user has the digital key
+    // Get the user to check their grade and class
+    const user = await this.getUser(userId);
+    if (!user) {
+      return false;
+    }
+
+    // For grade scopes, check if user's grade matches
+    if (scope && scope.type === "grade" && scope.gradeNumber !== null) {
+      if (user.grade === scope.gradeNumber) {
+        return true;
+      }
+    }
+
+    // For section scopes, check if user's grade and class match
+    if (scope && scope.type === "section" && scope.sectionName !== null) {
+      const userSectionName = `${user.grade}-${user.className}`;
+      if (userSectionName === scope.sectionName) {
+        return true;
+      }
+    }
+
+    // For restricted scopes, check if user has the digital key (for cross-scope access)
     const keys = await db
       .select()
       .from(digitalKeys)
