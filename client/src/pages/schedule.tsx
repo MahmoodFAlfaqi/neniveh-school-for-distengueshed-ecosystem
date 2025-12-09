@@ -57,7 +57,8 @@ type User = {
   id: string;
   grade: number | null;
   className: string | null;
-  role: "student" | "admin";
+  role: "student" | "admin" | "teacher";
+  teacherProfileId?: string | null;
 };
 
 type Scope = {
@@ -116,6 +117,21 @@ export default function SchedulePage() {
     enabled: !!user,
   });
 
+  // For teachers: fetch their profile to get assigned sections
+  const { data: teacherProfile } = useQuery<Teacher>({
+    queryKey: ["/api/teachers", user?.teacherProfileId],
+    queryFn: async () => {
+      if (!user?.teacherProfileId) return null;
+      const response = await fetch(`/api/teachers/${user.teacherProfileId}`);
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: !!user?.teacherProfileId && user.role === "teacher",
+  });
+
+  // For teachers: get all their assigned class sections
+  const teacherSections = teacherProfile?.sections || [];
+
   // Find user's class scope
   const classScope = scopes?.find(
     (s) => s.name === `Class ${user?.grade}-${user?.className}`
@@ -137,8 +153,10 @@ export default function SchedulePage() {
     enabled: !!classScope?.id,
   });
 
-  // Check if user can edit (admin or has access to class scope)
-  const canEdit = user?.role === "admin" || digitalKeys.some(key => key.scopeId === classScope?.id);
+  // Check if user can edit (admin, teacher, or has access to class scope)
+  const canEdit = user?.role === "admin" || user?.role === "teacher" || digitalKeys.some(key => key.scopeId === classScope?.id);
+  
+  const isTeacher = user?.role === "teacher";
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -267,7 +285,8 @@ export default function SchedulePage() {
     );
   }
 
-  if (!user?.grade || !user?.className) {
+  // Teachers see a different view - they don't need grade/className
+  if (!isTeacher && (!user?.grade || !user?.className)) {
     return (
       <div className="h-full overflow-y-auto">
         <div className="max-w-7xl mx-auto p-6">
@@ -284,6 +303,25 @@ export default function SchedulePage() {
       </div>
     );
   }
+  
+  // Teachers without assigned sections see a different message
+  if (isTeacher && teacherSections.length === 0) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <div className="max-w-7xl mx-auto p-6">
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <Calendar className="w-12 h-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Classes Assigned</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                You have no class sections assigned yet. Contact your administrator to assign your teaching schedule.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
@@ -291,10 +329,14 @@ export default function SchedulePage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2 sm:gap-3">
             <Calendar className="w-6 h-6 sm:w-8 sm:h-8" />
-            <span className="truncate">Schedule & Events</span>
+            <span className="truncate">{isTeacher ? "Teaching Schedule" : "Schedule & Events"}</span>
           </h1>
           <p className="text-muted-foreground mt-2 text-sm sm:text-base truncate">
-            Class {user.grade}-{user.className} • {relevantEvents.length} upcoming events
+            {isTeacher ? (
+              <>Teaching {teacherSections.length} class{teacherSections.length !== 1 ? "es" : ""} • {teacherProfile?.subjects?.join(", ") || "No subjects assigned"}</>
+            ) : (
+              <>Class {user.grade}-{user.className} • {relevantEvents.length} upcoming events</>
+            )}
           </p>
         </div>
 
