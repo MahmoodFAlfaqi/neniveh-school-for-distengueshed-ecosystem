@@ -89,6 +89,7 @@ export default function SchedulePage() {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [editedSchedules, setEditedSchedules] = useState<Record<string, { subject: string | null; teacherName: string | null }>>({});
+  const [selectedTeacherSection, setSelectedTeacherSection] = useState<string | null>(null);
 
   const { data: user, isLoading: userLoading } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -131,16 +132,21 @@ export default function SchedulePage() {
 
   // For teachers: get all their assigned class sections
   const teacherSections = teacherProfile?.sections || [];
+  
+  // For teachers: set default section when sections load
+  const currentSection = selectedTeacherSection || (teacherSections.length > 0 ? teacherSections[0] : null);
 
-  // Find user's class scope
-  const classScope = scopes?.find(
-    (s) => s.name === `Class ${user?.grade}-${user?.className}`
-  );
+  // Find user's class scope - for students/admins use grade/className, for teachers use selected section
+  const isTeacher = user?.role === "teacher";
+  
+  const classScope = isTeacher && currentSection
+    ? scopes?.find((s) => s.name === `Class ${currentSection}`)
+    : scopes?.find((s) => s.name === `Class ${user?.grade}-${user?.className}`);
 
-  // Find user's grade scope
-  const gradeScope = scopes?.find(
-    (s) => s.type === "stage" && s.name === `Grade ${user?.grade}`
-  );
+  // Find user's grade scope (for students only)
+  const gradeScope = !isTeacher 
+    ? scopes?.find((s) => s.type === "stage" && s.name === `Grade ${user?.grade}`)
+    : null;
 
   const { data: schedules = [], isLoading: schedulesLoading } = useQuery<Schedule[]>({
     queryKey: ["/api/schedules", classScope?.id],
@@ -155,8 +161,6 @@ export default function SchedulePage() {
 
   // Check if user can edit (admin, teacher, or has access to class scope)
   const canEdit = user?.role === "admin" || user?.role === "teacher" || digitalKeys.some(key => key.scopeId === classScope?.id);
-  
-  const isTeacher = user?.role === "teacher";
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -326,18 +330,46 @@ export default function SchedulePage() {
   return (
     <div className="h-full overflow-y-auto scrollbar-thin">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 space-y-4 sm:space-y-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2 sm:gap-3">
-            <Calendar className="w-6 h-6 sm:w-8 sm:h-8" />
-            <span className="truncate">{isTeacher ? "Teaching Schedule" : "Schedule & Events"}</span>
-          </h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-base truncate">
-            {isTeacher ? (
-              <>Teaching {teacherSections.length} class{teacherSections.length !== 1 ? "es" : ""} • {teacherProfile?.subjects?.join(", ") || "No subjects assigned"}</>
-            ) : (
-              <>Class {user.grade}-{user.className} • {relevantEvents.length} upcoming events</>
-            )}
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2 sm:gap-3">
+              <Calendar className="w-6 h-6 sm:w-8 sm:h-8" />
+              <span className="truncate">{isTeacher ? "Teaching Schedule" : "Schedule & Events"}</span>
+            </h1>
+            <p className="text-muted-foreground mt-2 text-sm sm:text-base truncate">
+              {isTeacher ? (
+                <>Teaching {teacherSections.length} class{teacherSections.length !== 1 ? "es" : ""} • {teacherProfile?.subjects?.join(", ") || "No subjects assigned"}</>
+              ) : (
+                <>Class {user.grade}-{user.className} • {relevantEvents.length} upcoming events</>
+              )}
+            </p>
+          </div>
+          
+          {/* Section selector for teachers */}
+          {isTeacher && teacherSections.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Viewing:</span>
+              <Select
+                value={currentSection || ""}
+                onValueChange={(value) => {
+                  setSelectedTeacherSection(value);
+                  setEditedSchedules({});
+                  setIsEditing(false);
+                }}
+              >
+                <SelectTrigger className="w-[140px]" data-testid="select-teacher-section">
+                  <SelectValue placeholder="Select class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teacherSections.map((section) => (
+                    <SelectItem key={section} value={section}>
+                      Class {section}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         {/* Calendar with Events */}
