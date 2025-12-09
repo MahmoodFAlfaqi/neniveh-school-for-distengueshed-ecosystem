@@ -126,9 +126,7 @@ function EventCard({ event, currentUser, onEdit }: { event: Event; currentUser: 
     queryKey: ["/api/events", event.id, "attendees"],
     enabled: showAttendees,
     queryFn: async () => {
-      const response = await fetch(`/api/events/${event.id}/attendees`);
-      if (!response.ok) throw new Error("Failed to fetch attendees");
-      return response.json();
+      return await apiRequest("GET", `/api/events/${event.id}/attendees`);
     },
   });
 
@@ -136,9 +134,7 @@ function EventCard({ event, currentUser, onEdit }: { event: Event; currentUser: 
     queryKey: [`/api/events/${event.id}/comments`],
     enabled: showComments,
     queryFn: async () => {
-      const response = await fetch(`/api/events/${event.id}/comments`);
-      if (!response.ok) throw new Error("Failed to fetch comments");
-      return response.json();
+      return await apiRequest("GET", `/api/events/${event.id}/comments`);
     },
   });
 
@@ -465,11 +461,6 @@ export default function EventsPage() {
   // Fetch all events the user has access to
   const { data: rawEvents = [], isLoading } = useQuery<Event[]>({
     queryKey: ["/api/events"],
-    queryFn: async () => {
-      const response = await fetch("/api/events");
-      if (!response.ok) throw new Error("Failed to fetch events");
-      return response.json();
-    },
   });
 
   // Filter and sort events
