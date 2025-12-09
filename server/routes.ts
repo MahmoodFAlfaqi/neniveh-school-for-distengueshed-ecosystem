@@ -375,6 +375,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Teacher Registration
+  app.post("/api/auth/teacher/register", async (req, res) => {
+    try {
+      const { username, teacherId, email, password, phone } = req.body;
+      
+      console.log("[TEACHER_REGISTER] Registration attempt for:", username, "with teacherId:", teacherId);
+      
+      // Validate required fields
+      if (!username || !teacherId || !email || !password) {
+        return res.status(400).json({ message: "Username, Teacher ID, email, and password are required" });
+      }
+      
+      // Check if username already exists
+      const existingByUsername = await storage.getUserByUsername(username);
+      if (existingByUsername) {
+        console.log("[TEACHER_REGISTER] Username already taken:", username);
+        return res.status(400).json({ message: "Username already taken" });
+      }
+      
+      // Check if email already exists
+      const existingByEmail = await storage.getUserByEmail(email);
+      if (existingByEmail) {
+        console.log("[TEACHER_REGISTER] Email already registered:", email);
+        return res.status(400).json({ message: "Email already registered" });
+      }
+      
+      // Find teacher by teacherId
+      const teacher = await storage.getTeacherByTeacherId(teacherId);
+      if (!teacher) {
+        console.log("[TEACHER_REGISTER] Invalid Teacher ID:", teacherId);
+        return res.status(400).json({ message: "Invalid Teacher ID. Please contact your administrator." });
+      }
+      
+      // Check if teacher profile is already claimed
+      if (teacher.isClaimed) {
+        console.log("[TEACHER_REGISTER] Teacher profile already claimed:", teacherId);
+        return res.status(400).json({ message: "This teacher profile has already been claimed." });
+      }
+      
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      // Create user with teacher role
+      const user = await storage.createUser({
+        username,
+        email,
+        password: hashedPassword,
+        phone: phone || null,
+        role: "teacher",
+        name: teacher.name, // Use teacher's name from profile
+        studentId: null, // Not a student
+        teacherProfileId: teacher.id,
+      });
+      
+      // Claim the teacher profile
+      await storage.claimTeacherProfile(teacher.id, user.id);
+      
+      console.log("[TEACHER_REGISTER] Teacher registered successfully:", user.id);
+      
+      // Set session
+      req.session.userId = user.id;
+      
+      // Don't send password back
+      const { password: _, ...userWithoutPassword } = user;
+      
+      res.json({ 
+        message: "Teacher registration successful",
+        user: userWithoutPassword 
+      });
+    } catch (error) {
+      console.error("[TEACHER_REGISTER] Error:", error);
+      res.status(500).json({ 
+        message: "Teacher registration failed. Please try again.",
+      });
+    }
+  });
+
+  // Teacher Login
+  app.post("/api/auth/teacher/login", async (req, res) => {
+    try {
+      const { username, password, rememberMe } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password required" });
+      }
+      
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        console.log("[TEACHER_AUTH] User not found:", username);
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // Verify this is a teacher account
+      if (user.role !== "teacher") {
+        console.log("[TEACHER_AUTH] Not a teacher account:", username);
+        return res.status(401).json({ message: "Invalid credentials. Please use the correct login portal for your account type." });
+      }
+      
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      if (!passwordMatch) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // Set session
+      req.session.userId = user.id;
+      
+      // Handle remember me
+      if (rememberMe) {
+        const token = crypto.randomBytes(32).toString('hex');
+        await storage.createRememberMeToken(user.id, token);
+        
+        // Set remember-me cookie (7 days)
+        res.cookie('remember_token', token, {
+          httpOnly: true,
+          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          sameSite: 'lax',
+        });
+      }
+      
+      const { password: _, ...userWithoutPassword } = user;
+      
+      res.json({ 
+        message: "Login successful",
+        user: userWithoutPassword 
+      });
+    } catch (error) {
+      console.error("[TEACHER_AUTH] Error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
   // Visitor guest access (session-only, no database user)
   app.post("/api/auth/visitor", async (req, res) => {
     try {

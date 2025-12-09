@@ -9,10 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, Eye, EyeOff, ShieldCheck, User, Users } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, ShieldCheck, User, Users, GraduationCap } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-type RoleType = "student" | "admin" | "visitor" | null;
+type RoleType = "student" | "teacher" | "admin" | "visitor" | null;
 
 export default function AuthPage() {
   const [, navigate] = useLocation();
@@ -52,6 +52,23 @@ export default function AuthPage() {
     password: "",
     rememberMe: false,
   });
+
+  const [teacherRegisterData, setTeacherRegisterData] = useState({
+    username: "",
+    teacherId: "",
+    email: "",
+    password: "",
+    phone: "",
+  });
+
+  const [teacherLoginData, setTeacherLoginData] = useState({
+    username: "",
+    password: "",
+    rememberMe: false,
+  });
+
+  const [showTeacherRegisterPassword, setShowTeacherRegisterPassword] = useState(false);
+  const [showTeacherLoginPassword, setShowTeacherLoginPassword] = useState(false);
 
   const registerMutation = useMutation({
     mutationFn: async (data: typeof registerData) => {
@@ -129,6 +146,44 @@ export default function AuthPage() {
     },
   });
 
+  const teacherRegisterMutation = useMutation({
+    mutationFn: async (data: typeof teacherRegisterData) => {
+      return await apiRequest("POST", "/api/auth/teacher/register", data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Teacher registration successful",
+        description: "You've been automatically logged in",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      navigate("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Teacher registration failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const teacherLoginMutation = useMutation({
+    mutationFn: async (data: typeof teacherLoginData) => {
+      return await apiRequest("POST", "/api/auth/teacher/login", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      navigate("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Teacher login failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const visitorMutation = useMutation({
     mutationFn: async () => {
       return await apiRequest("POST", "/api/auth/visitor", {});
@@ -166,6 +221,16 @@ export default function AuthPage() {
     adminLoginMutation.mutate(adminLoginData);
   };
 
+  const handleTeacherRegister = (e: React.FormEvent) => {
+    e.preventDefault();
+    teacherRegisterMutation.mutate(teacherRegisterData);
+  };
+
+  const handleTeacherLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    teacherLoginMutation.mutate(teacherLoginData);
+  };
+
   const handleVisitorAccess = () => {
     visitorMutation.mutate();
   };
@@ -192,6 +257,18 @@ export default function AuthPage() {
                   <div className="text-left">
                     <div className="font-semibold">Student</div>
                     <div className="text-xs text-muted-foreground">Login or register as a student</div>
+                  </div>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 justify-start"
+                  onClick={() => setSelectedRole("teacher")}
+                  data-testid="button-role-teacher"
+                >
+                  <GraduationCap className="mr-2 h-5 w-5" />
+                  <div className="text-left">
+                    <div className="font-semibold">Teacher</div>
+                    <div className="text-xs text-muted-foreground">Login or register with your Teacher ID</div>
                   </div>
                 </Button>
                 <Button
@@ -409,6 +486,187 @@ export default function AuthPage() {
                     
                     <Button type="submit" className="w-full" disabled={adminRegisterMutation.isPending} data-testid="button-admin-register">
                       {adminRegisterMutation.isPending ? "Registering..." : "Register as Admin"}
+                    </Button>
+                  </form>
+                </TabsContent>
+              </Tabs>
+            </>
+          ) : selectedRole === "teacher" ? (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedRole(null)}
+                className="mb-4"
+                data-testid="button-back"
+              >
+                ← Back
+              </Button>
+              <Tabs defaultValue="login">
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="login" data-testid="tab-teacher-login">Login</TabsTrigger>
+                  <TabsTrigger value="register" data-testid="tab-teacher-register">Register</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="login">
+                  <form onSubmit={handleTeacherLogin} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="teacher-login-username">Username</Label>
+                      <Input
+                        id="teacher-login-username"
+                        type="text"
+                        placeholder="teacher.name"
+                        value={teacherLoginData.username}
+                        onChange={(e) => setTeacherLoginData({ ...teacherLoginData, username: e.target.value })}
+                        required
+                        data-testid="input-teacher-username-login"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="teacher-login-password">Password</Label>
+                      <div className="relative">
+                        <Input
+                          id="teacher-login-password"
+                          type={showTeacherLoginPassword ? "text" : "password"}
+                          value={teacherLoginData.password}
+                          onChange={(e) => setTeacherLoginData({ ...teacherLoginData, password: e.target.value })}
+                          required
+                          data-testid="input-teacher-password-login"
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                          onClick={() => setShowTeacherLoginPassword(!showTeacherLoginPassword)}
+                          data-testid="button-toggle-teacher-password-login"
+                        >
+                          {showTeacherLoginPassword ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="remember-me-teacher" 
+                        checked={teacherLoginData.rememberMe}
+                        onCheckedChange={(checked) => 
+                          setTeacherLoginData({ ...teacherLoginData, rememberMe: checked as boolean })
+                        }
+                        data-testid="checkbox-remember-me-teacher"
+                      />
+                      <Label htmlFor="remember-me-teacher" className="text-sm cursor-pointer">
+                        Remember me for 7 days
+                      </Label>
+                    </div>
+                    
+                    <Button type="submit" className="w-full" disabled={teacherLoginMutation.isPending} data-testid="button-teacher-login">
+                      {teacherLoginMutation.isPending ? "Logging in..." : "Login"}
+                    </Button>
+                    <div className="text-center">
+                      <Link href="/forgot-password" className="text-sm text-primary hover:underline" data-testid="link-teacher-forgot-password">
+                        Forgot password?
+                      </Link>
+                    </div>
+                  </form>
+                </TabsContent>
+                
+                <TabsContent value="register">
+                  <form onSubmit={handleTeacherRegister} className="space-y-4">
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="text-sm">
+                        You need an admin-assigned Teacher ID to register. Contact your administrator.
+                      </AlertDescription>
+                    </Alert>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="teacher-register-username">Username</Label>
+                      <Input
+                        id="teacher-register-username"
+                        placeholder="Ahmed.Ibrahim or Sarah.Hassan"
+                        value={teacherRegisterData.username}
+                        onChange={(e) => setTeacherRegisterData({ ...teacherRegisterData, username: e.target.value })}
+                        required
+                        data-testid="input-teacher-username"
+                      />
+                      <p className="text-xs text-muted-foreground">1-5 names, letters/periods/hyphens/commas, single spaces between names</p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="teacher-register-teacherId">Teacher ID</Label>
+                      <Input
+                        id="teacher-register-teacherId"
+                        placeholder="TC2024001"
+                        value={teacherRegisterData.teacherId}
+                        onChange={(e) => setTeacherRegisterData({ ...teacherRegisterData, teacherId: e.target.value })}
+                        required
+                        data-testid="input-teacherid"
+                      />
+                      <p className="text-xs text-muted-foreground">Use the Teacher ID from your profile in the system</p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="teacher-register-email">Email</Label>
+                      <Input
+                        id="teacher-register-email"
+                        type="email"
+                        placeholder="teacher@school.edu"
+                        value={teacherRegisterData.email}
+                        onChange={(e) => setTeacherRegisterData({ ...teacherRegisterData, email: e.target.value })}
+                        required
+                        data-testid="input-teacher-email"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="teacher-register-password">Password</Label>
+                      <div className="relative">
+                        <Input
+                          id="teacher-register-password"
+                          type={showTeacherRegisterPassword ? "text" : "password"}
+                          placeholder="Minimum 8 characters"
+                          value={teacherRegisterData.password}
+                          onChange={(e) => setTeacherRegisterData({ ...teacherRegisterData, password: e.target.value })}
+                          required
+                          data-testid="input-teacher-password"
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                          onClick={() => setShowTeacherRegisterPassword(!showTeacherRegisterPassword)}
+                          data-testid="button-toggle-teacher-password-register"
+                        >
+                          {showTeacherRegisterPassword ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="teacher-register-phone">Phone (Optional)</Label>
+                      <Input
+                        id="teacher-register-phone"
+                        placeholder="+1234567890"
+                        value={teacherRegisterData.phone}
+                        onChange={(e) => setTeacherRegisterData({ ...teacherRegisterData, phone: e.target.value })}
+                        data-testid="input-teacher-phone"
+                      />
+                    </div>
+                    
+                    <Button type="submit" className="w-full" disabled={teacherRegisterMutation.isPending} data-testid="button-teacher-register">
+                      {teacherRegisterMutation.isPending ? "Registering..." : "Register as Teacher"}
                     </Button>
                   </form>
                 </TabsContent>
