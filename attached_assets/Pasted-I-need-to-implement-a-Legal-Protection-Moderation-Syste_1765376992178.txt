@@ -1,0 +1,34 @@
+I need to implement a "Legal Protection & Moderation System" to protect the platform from liability regarding user-generated content. Please implement the following 3 features efficiently:
+
+1. **Database Schema Update (Reports):**
+   - Create a new table/model called `Report`.
+   - It should link to the `User` (reporter).
+   - It must be polymorphic or have nullable Foreign Keys to target specific content: `reported_user_id` (for profiles), `reported_post_id`, and `reported_file_id`.
+   - Include fields for: `reason` (text), `status` (pending/resolved), and `timestamp`.
+
+2. **Legal & Terms Page (/legal):**
+   - Create a new public page at route `/legal`.
+   - Display the following text clearly. Use a clean, readable layout:
+     "Terms of Service & Disclaimer:
+      1. Intermediary Role: This platform is a technical service provider only. We do not endorse or monitor user-generated content.
+      2. No Liability: The platform acts as a neutral host. We are not liable for defamation, insults, or illegal content posted by users. The user bears full legal responsibility for their posts.
+      3. DMCA & Takedown: We strictly prohibit illegal activities. We promise to cooperate with school administrations and legal authorities. If you see infringing or defamatory content, use the 'Report' button, and we will remove it upon verification.
+      4. User Responsibility: By using this site, you agree to indemnify the platform administrators from any legal claims arising from your content."
+
+3. **Report Functionality (Frontend):**
+   - Add a "Report" button/icon (a flag or warning triangle) to:
+     - User Profiles.
+     - Content Posts (Schedules, events).
+     - File downloads.
+   - When clicked, open a simple Modal/Popup asking for the "Reason" and submit it to the database.
+
+4. **Admin Dashboard for Moderation:**
+   - Create a restricted page `/admin/reports` (or add to existing admin panel).
+   - Display a table of all 'pending' reports.
+   - **Crucial Feature:** Each row must have a "View Content" link.
+     - If it's a reported Post -> Link directly to that Post's page.
+     - If it's a reported Profile -> Link to that User's profile.
+     - If it's a reported File -> Link to the file details.
+   - Add action buttons: "Dismiss Report" and "Delete Content".
+
+Please execute this focusing on a secure and direct implementation.
