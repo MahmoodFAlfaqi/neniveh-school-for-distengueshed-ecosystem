@@ -2573,6 +2573,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== REPORTS ====================
+  
+  // Create a report
+  app.post("/api/reports", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { reason, reportedUserId, reportedPostId, reportedEventId, reportedStudySourceId } = req.body;
+      
+      if (!reason || reason.trim().length < 5) {
+        return res.status(400).json({ message: "Reason must be at least 5 characters" });
+      }
+      
+      // Ensure at least one target is specified
+      if (!reportedUserId && !reportedPostId && !reportedEventId && !reportedStudySourceId) {
+        return res.status(400).json({ message: "Must specify what you are reporting" });
+      }
+      
+      const report = await storage.createReport({
+        reporterId: userId,
+        reason: reason.trim(),
+        reportedUserId: reportedUserId || null,
+        reportedPostId: reportedPostId || null,
+        reportedEventId: reportedEventId || null,
+        reportedStudySourceId: reportedStudySourceId || null,
+      });
+      
+      console.log("[REPORT CREATE] Success:", report.id);
+      res.json(report);
+    } catch (error) {
+      console.error("[REPORT CREATE] Error:", error);
+      res.status(500).json({ message: "Failed to create report" });
+    }
+  });
+  
+  // Get all reports (admin only)
+  app.get("/api/reports", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const allReports = await storage.getReports(status);
+      res.json(allReports);
+    } catch (error) {
+      console.error("[REPORTS GET] Error:", error);
+      res.status(500).json({ message: "Failed to get reports" });
+    }
+  });
+  
+  // Resolve a report (admin only)
+  app.patch("/api/reports/:id/resolve", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const reportId = req.params.id;
+      const adminId = req.session.userId!;
+      const { status, notes } = req.body;
+      
+      if (status !== "resolved" && status !== "dismissed") {
+        return res.status(400).json({ message: "Status must be 'resolved' or 'dismissed'" });
+      }
+      
+      const updated = await storage.resolveReport(reportId, adminId, status, notes);
+      if (!updated) {
+        return res.status(404).json({ message: "Report not found" });
+      }
+      
+      console.log("[REPORT RESOLVE] Success:", reportId, status);
+      res.json(updated);
+    } catch (error) {
+      console.error("[REPORT RESOLVE] Error:", error);
+      res.status(500).json({ message: "Failed to resolve report" });
+    }
+  });
+
+  // ==================== USER PREFERENCES ====================
+  
+  // Update language and theme preferences
+  app.patch("/api/users/preferences", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { language, theme } = req.body;
+      
+      const prefs: { language?: "en" | "ar"; theme?: "light" | "dark" | "system" } = {};
+      if (language && (language === "en" || language === "ar")) {
+        prefs.language = language;
+      }
+      if (theme && (theme === "light" || theme === "dark" || theme === "system")) {
+        prefs.theme = theme;
+      }
+      
+      if (Object.keys(prefs).length === 0) {
+        return res.status(400).json({ message: "No valid preferences to update" });
+      }
+      
+      const updated = await storage.updateUserPreferences(userId, prefs);
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { password: _, ...userWithoutPassword } = updated;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("[USER PREFERENCES] Error:", error);
+      res.status(500).json({ message: "Failed to update preferences" });
+    }
+  });
+  
+  // Accept terms
+  app.post("/api/users/accept-terms", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const updated = await storage.acceptTerms(userId);
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { password: _, ...userWithoutPassword } = updated;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("[ACCEPT TERMS] Error:", error);
+      res.status(500).json({ message: "Failed to accept terms" });
+    }
+  });
+
+  // ==================== TEACHER FULL PROFILE EDIT ====================
+  
+  // Teacher updates their own full profile (name, photo, subjects, sections)
+  app.patch("/api/teachers/:id/full", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const teacherId = req.params.id;
+      const userId = req.session.userId!;
+      
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== "teacher") {
+        return res.status(403).json({ message: "Only teachers can edit their profiles" });
+      }
+      
+      const teacher = await storage.getTeacher(teacherId);
+      if (!teacher) {
+        return res.status(404).json({ message: "Teacher not found" });
+      }
+      
+      // Check if user owns this profile
+      if (teacher.claimedByUserId !== userId) {
+        return res.status(403).json({ message: "You can only edit your own profile" });
+      }
+      
+      const { name, photoUrl, subjects, sections, description, classroomRules, academicAchievements } = req.body;
+      
+      const updates: any = {};
+      if (name) updates.name = name;
+      if (photoUrl !== undefined) updates.photoUrl = photoUrl;
+      if (subjects) updates.subjects = subjects;
+      if (sections) updates.sections = sections;
+      if (description !== undefined) updates.description = description;
+      if (classroomRules) updates.classroomRules = classroomRules;
+      if (academicAchievements) updates.academicAchievements = academicAchievements;
+      
+      const updated = await storage.updateTeacherFullProfile(teacherId, updates);
+      if (!updated) {
+        return res.status(500).json({ message: "Failed to update profile" });
+      }
+      
+      console.log("[TEACHER FULL PROFILE] Updated:", teacherId);
+      res.json(updated);
+    } catch (error) {
+      console.error("[TEACHER FULL PROFILE] Error:", error);
+      res.status(500).json({ message: "Failed to update teacher profile" });
+    }
+  });
+
   // ==================== FILE UPLOADS ====================
   
   // Ensure uploads directory exists and serve uploaded files

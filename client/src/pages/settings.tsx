@@ -1,12 +1,50 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTheme } from "@/contexts/theme";
-import { Moon, Sun, Key } from "lucide-react";
+import { Moon, Sun, Key, Globe, FileText, Monitor } from "lucide-react";
 import { Link } from "wouter";
+import { useUser } from "@/hooks/use-user";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SettingsPage() {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
+  const { user } = useUser();
+  const { toast } = useToast();
+
+  const updatePreferencesMutation = useMutation({
+    mutationFn: async (prefs: { language?: string; theme?: string }) => {
+      return await apiRequest("PATCH", "/api/users/preferences", prefs);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({
+        title: "Preferences updated",
+        description: "Your settings have been saved.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update preferences",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleLanguageChange = (language: string) => {
+    updatePreferencesMutation.mutate({ language });
+  };
+
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme as "light" | "dark" | "system");
+    if (user && user.role !== "visitor") {
+      updatePreferencesMutation.mutate({ theme: newTheme });
+    }
+  };
 
   return (
     <div className="h-full overflow-y-auto bg-gradient-to-br from-background via-background to-muted/20">
@@ -18,47 +56,95 @@ export default function SettingsPage() {
           </p>
         </div>
 
+        {/* Language Settings */}
+        <Card className="hover-elevate" data-testid="card-language-settings">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="w-5 h-5" />
+              Language / اللغة
+            </CardTitle>
+            <CardDescription>
+              Choose your preferred language
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+              <div>
+                <Label className="font-semibold text-sm">Interface Language</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Currently: {user?.language === "ar" ? "العربية (Arabic)" : "English"}
+                </p>
+              </div>
+              <Select
+                value={user?.language || "en"}
+                onValueChange={handleLanguageChange}
+                disabled={!user || user.role === "visitor"}
+              >
+                <SelectTrigger className="w-40" data-testid="select-language">
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="ar">العربية (Arabic)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Theme Settings */}
         <Card className="hover-elevate" data-testid="card-theme-settings">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               {theme === "dark" ? (
                 <Moon className="w-5 h-5" />
+              ) : theme === "system" ? (
+                <Monitor className="w-5 h-5" />
               ) : (
                 <Sun className="w-5 h-5" />
               )}
               Theme
             </CardTitle>
             <CardDescription>
-              Choose between light and dark mode
+              Choose your preferred color scheme
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between p-3 rounded-lg border border-border">
               <div>
-                <Label className="font-semibold text-sm">Night Theme</Label>
+                <Label className="font-semibold text-sm">Appearance</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Currently using {theme === "dark" ? "dark" : "light"} mode
+                  Currently using {theme} mode
                 </p>
               </div>
-              <Button
-                onClick={toggleTheme}
-                variant="default"
-                className="gap-2"
-                data-testid="button-toggle-theme"
+              <Select
+                value={theme}
+                onValueChange={handleThemeChange}
               >
-                {theme === "dark" ? (
-                  <>
-                    <Sun className="w-4 h-4" />
-                    Light Mode
-                  </>
-                ) : (
-                  <>
-                    <Moon className="w-4 h-4" />
-                    Dark Mode
-                  </>
-                )}
-              </Button>
+                <SelectTrigger className="w-40" data-testid="select-theme">
+                  <SelectValue placeholder="Select theme" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="light">
+                    <div className="flex items-center gap-2">
+                      <Sun className="w-4 h-4" />
+                      Light
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="dark">
+                    <div className="flex items-center gap-2">
+                      <Moon className="w-4 h-4" />
+                      Dark
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="system">
+                    <div className="flex items-center gap-2">
+                      <Monitor className="w-4 h-4" />
+                      System
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
@@ -83,33 +169,23 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Account Settings */}
-        <Card className="hover-elevate" data-testid="card-account-settings">
+        {/* Legal & Terms */}
+        <Card className="hover-elevate" data-testid="card-legal-settings">
           <CardHeader>
-            <CardTitle>Account Settings</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Legal & Terms
+            </CardTitle>
             <CardDescription>
-              Manage your account preferences
+              View our terms of service and privacy policy
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Additional account settings coming soon...
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Privacy & Security */}
-        <Card className="hover-elevate" data-testid="card-privacy-settings">
-          <CardHeader>
-            <CardTitle>Privacy & Security</CardTitle>
-            <CardDescription>
-              Control your privacy settings
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Privacy and security settings coming soon...
-            </p>
+            <Link href="/legal">
+              <Button variant="outline" data-testid="button-view-legal">
+                View Terms of Service
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>

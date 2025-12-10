@@ -25,6 +25,7 @@ import {
   contentViolations,
   userPunishments,
   studySources,
+  reports,
   type User,
   type InsertUser,
   type Scope,
@@ -77,6 +78,8 @@ import {
   type InsertUserPunishment,
   type StudySource,
   type InsertStudySource,
+  type Report,
+  type InsertReport,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
@@ -229,6 +232,19 @@ export interface IStorage {
   getStudySources(scopeId?: string | null): Promise<StudySource[]>;
   getStudySource(id: string): Promise<StudySource | undefined>;
   deleteStudySource(id: string): Promise<boolean>;
+  
+  // Reports
+  createReport(report: InsertReport): Promise<Report>;
+  getReports(status?: string): Promise<Report[]>;
+  getReport(id: string): Promise<Report | undefined>;
+  resolveReport(reportId: string, adminId: string, status: "resolved" | "dismissed", notes?: string): Promise<Report | undefined>;
+  
+  // User Preferences
+  updateUserPreferences(userId: string, prefs: { language?: "en" | "ar"; theme?: "light" | "dark" | "system" }): Promise<User | undefined>;
+  acceptTerms(userId: string): Promise<User | undefined>;
+  
+  // Teacher Profile (full edit for teachers)
+  updateTeacherFullProfile(teacherProfileId: string, updates: { name?: string; photoUrl?: string; subjects?: string[]; sections?: string[]; description?: string; classroomRules?: string[]; academicAchievements?: string[] }): Promise<Teacher | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2345,6 +2361,92 @@ export class DatabaseStorage implements IStorage {
       .where(eq(studySources.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  // ==================== REPORTS ====================
+  async createReport(report: InsertReport): Promise<Report> {
+    const [created] = await db
+      .insert(reports)
+      .values(report)
+      .returning();
+    return created;
+  }
+
+  async getReports(status?: string): Promise<Report[]> {
+    if (status) {
+      const allReports = await db
+        .select()
+        .from(reports)
+        .where(sql`${reports.status} = ${status}`)
+        .orderBy(desc(reports.createdAt));
+      return allReports;
+    }
+    
+    const allReports = await db
+      .select()
+      .from(reports)
+      .orderBy(desc(reports.createdAt));
+    return allReports;
+  }
+
+  async getReport(id: string): Promise<Report | undefined> {
+    const [report] = await db
+      .select()
+      .from(reports)
+      .where(eq(reports.id, id));
+    return report || undefined;
+  }
+
+  async resolveReport(reportId: string, adminId: string, status: "resolved" | "dismissed", notes?: string): Promise<Report | undefined> {
+    const [updated] = await db
+      .update(reports)
+      .set({
+        status,
+        resolvedById: adminId,
+        resolvedAt: new Date(),
+        resolutionNotes: notes,
+      })
+      .where(eq(reports.id, reportId))
+      .returning();
+    return updated || undefined;
+  }
+
+  // ==================== USER PREFERENCES ====================
+  async updateUserPreferences(userId: string, prefs: { language?: "en" | "ar"; theme?: "light" | "dark" | "system" }): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({
+        ...prefs,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated || undefined;
+  }
+
+  async acceptTerms(userId: string): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({
+        termsAcceptedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated || undefined;
+  }
+
+  // ==================== TEACHER FULL PROFILE EDIT ====================
+  async updateTeacherFullProfile(teacherProfileId: string, updates: { name?: string; photoUrl?: string; subjects?: string[]; sections?: string[]; description?: string; classroomRules?: string[]; academicAchievements?: string[] }): Promise<Teacher | undefined> {
+    const [updated] = await db
+      .update(teachers)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(teachers.id, teacherProfileId))
+      .returning();
+    return updated || undefined;
   }
 }
 

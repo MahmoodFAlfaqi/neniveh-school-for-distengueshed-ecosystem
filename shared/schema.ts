@@ -14,6 +14,9 @@ export const violationTypeEnum = pgEnum("violation_type", ["spam", "offensive", 
 export const violationSeverityEnum = pgEnum("violation_severity", ["low", "medium", "high", "critical"]);
 export const detectionSourceEnum = pgEnum("detection_source", ["ai", "user_report", "admin"]);
 export const punishmentTypeEnum = pgEnum("punishment_type", ["warning", "credibility_reduction", "temp_ban", "permanent_ban"]);
+export const reportStatusEnum = pgEnum("report_status", ["pending", "resolved", "dismissed"]);
+export const languageEnum = pgEnum("language", ["en", "ar"]);
+export const themeEnum = pgEnum("theme", ["light", "dark", "system"]);
 
 // Users table with reputation and credibility
 export const users = pgTable("users", {
@@ -78,9 +81,38 @@ export const users = pgTable("users", {
   socialHumanitarian: integer("social_humanitarian").default(4),
   naturalEnvironmental: integer("natural_environmental").default(4),
   
+  // User preferences
+  language: languageEnum("language").notNull().default("en"),
+  theme: themeEnum("theme").notNull().default("system"),
+  
+  // Terms acceptance
+  termsAcceptedAt: timestamp("terms_accepted_at"),
+  
   // Metadata
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Reports table for user-generated content moderation
+export const reports = pgTable("reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reporterId: varchar("reporter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  // Polymorphic targets (only one should be set)
+  reportedUserId: varchar("reported_user_id").references(() => users.id, { onDelete: "cascade" }),
+  reportedPostId: varchar("reported_post_id").references(() => posts.id, { onDelete: "cascade" }),
+  reportedEventId: varchar("reported_event_id").references(() => events.id, { onDelete: "cascade" }),
+  reportedStudySourceId: varchar("reported_study_source_id").references(() => studySources.id, { onDelete: "cascade" }),
+  
+  reason: text("reason").notNull(),
+  status: reportStatusEnum("status").notNull().default("pending"),
+  
+  // Admin resolution
+  resolvedById: varchar("resolved_by_id").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  resolutionNotes: text("resolution_notes"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // Scopes define the three-tier access system: public (square), grade, and section (class)
@@ -550,6 +582,36 @@ export const profileCommentsRelations = relations(profileComments, ({ one }) => 
   }),
 }));
 
+export const reportsRelations = relations(reports, ({ one }) => ({
+  reporter: one(users, {
+    fields: [reports.reporterId],
+    references: [users.id],
+    relationName: "reportsMade",
+  }),
+  reportedUser: one(users, {
+    fields: [reports.reportedUserId],
+    references: [users.id],
+    relationName: "reportsReceived",
+  }),
+  reportedPost: one(posts, {
+    fields: [reports.reportedPostId],
+    references: [posts.id],
+  }),
+  reportedEvent: one(events, {
+    fields: [reports.reportedEventId],
+    references: [events.id],
+  }),
+  reportedStudySource: one(studySources, {
+    fields: [reports.reportedStudySourceId],
+    references: [studySources.id],
+  }),
+  resolvedBy: one(users, {
+    fields: [reports.resolvedById],
+    references: [users.id],
+    relationName: "reportsResolved",
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users)
   .omit({
@@ -845,6 +907,21 @@ export const insertUserPunishmentSchema = createInsertSchema(userPunishments).om
 
 export type InsertUserPunishment = z.infer<typeof insertUserPunishmentSchema>;
 export type UserPunishment = typeof userPunishments.$inferSelect;
+
+// Report schema and types
+export const insertReportSchema = createInsertSchema(reports).omit({
+  id: true,
+  createdAt: true,
+  resolvedAt: true,
+  resolvedById: true,
+  resolutionNotes: true,
+  status: true,
+}).extend({
+  reason: z.string().trim().min(5, "Reason must be at least 5 characters").max(500, "Reason must not exceed 500 characters"),
+});
+
+export type InsertReport = z.infer<typeof insertReportSchema>;
+export type Report = typeof reports.$inferSelect;
 
 // Session table for connect-pg-simple (persistent sessions)
 export const sessions = pgTable("session", {

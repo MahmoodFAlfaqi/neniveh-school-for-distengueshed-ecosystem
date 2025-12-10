@@ -25,6 +25,8 @@ import GradeDetailPage from "@/pages/grade-detail";
 import ClassDetailPage from "@/pages/class-detail";
 import SupportPage from "@/pages/support";
 import StudySourcesPage from "@/pages/study-sources";
+import LegalPage from "@/pages/legal";
+import AdminReportsPage from "@/pages/admin-reports";
 import NotFound from "@/pages/not-found";
 
 type User = {
@@ -233,6 +235,20 @@ function Router() {
         {() => (
           <AuthenticatedLayout>
             <StudySourcesPage />
+          </AuthenticatedLayout>
+        )}
+      </Route>
+      <Route path="/legal">
+        {() => (
+          <AuthenticatedLayout>
+            <LegalPage />
+          </AuthenticatedLayout>
+        )}
+      </Route>
+      <Route path="/admin/reports">
+        {() => (
+          <AuthenticatedLayout>
+            <AdminReportsPage />
           </AuthenticatedLayout>
         )}
       </Route>
