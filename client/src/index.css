@@ -322,15 +322,30 @@
   }
 
   /* Mobile touch optimization */
-  @media (max-width: 768px) {
+ @media (max-width: 768px) {
     * {
       -webkit-tap-highlight-color: transparent;
     }
   }
-}
-* FORCE FIX: Aggressive Scroll Locking */
-/* This targets every element, not just the body */
-*, *::before, *::after {
-  /* This disables the "Swipe Back" or "Swipe Open" gestures on browser level */
+} 
+/* ^^^ CRITICAL: This bracket closes the "@layer utilities" block above. Do not remove it! */
+
+
+/* --- FORCE MOBILE SCROLL FIX --- */
+
+html, body, #root {
+  /* Forces the browser to handle scrolling, ignoring swipe gestures */
+  touch-action: pan-y !important;
   overscroll-behavior-x: none;
+  overflow-x: hidden;
+}
+
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y !important;
+}
+
+[data-sidebar="sidebar"], 
+[data-mobile="true"] {
+  touch-action: pan-y !important;
 }
