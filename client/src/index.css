@@ -328,4 +328,16 @@
     }
   }
 }
+* FORCE FIX: Aggressive Scroll Locking */
+/* This targets every element, not just the body */
+*, *::before, *::after {
+  /* This disables the "Swipe Back" or "Swipe Open" gestures on browser level */
+  overscroll-behavior-x: none;
+}
 
+/* Specifically target your scrollable containers */
+html, body, #root, .overflow-y-auto, [data-radix-scroll-area-viewport] {
+  /* IMPORTANT: Forces vertical scroll only */
+  touch-action: pan-y !important; 
+  -webkit-overflow-scrolling: touch;
+}
