@@ -328,3 +328,7 @@
     }
   }
 }
+/* FORCE FIX: Stop the sidebar from stealing touches */
+html, body, #root {
+  touch-action: pan-y pinch-zoom;
+}
