@@ -359,32 +359,32 @@
   }
 
   /* Mobile touch optimization */
- @media (max-width: 768px) {
+  @media (max-width: 768px) {
     * {
       -webkit-tap-highlight-color: transparent;
     }
   }
-} 
+}
 /* ^^^ CRITICAL: This bracket closes the "@layer utilities" block above. Do not remove it! */
 
 
 /* --- FORCE MOBILE SCROLL FIX --- */
 
 html, body, #root {
-  /* Forces the browser to handle scrolling, ignoring swipe gestures */
-  touch-action: pan-y !important;
+  /* Forces the browser to handle scrolling, ignoring swipe gestures (pinch-zoom stays allowed for accessibility) */
+  touch-action: pan-y pinch-zoom !important;
   overscroll-behavior-x: none;
   overflow-x: hidden;
 }
 
 .overflow-y-auto {
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-y !important;
+  touch-action: pan-y pinch-zoom !important;
 }
 
-[data-sidebar="sidebar"], 
+[data-sidebar="sidebar"],
 [data-mobile="true"] {
-  touch-action: pan-y !important;
+  touch-action: pan-y pinch-zoom !important;
 }
 
 /* Respect users who ask the OS for less motion */
