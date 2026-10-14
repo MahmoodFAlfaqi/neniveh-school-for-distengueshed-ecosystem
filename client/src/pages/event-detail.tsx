@@ -138,7 +138,7 @@ export default function EventDetail() {
           <CardContent className="p-6">
             {event.imageUrl && (
               <div className="mb-6 rounded-lg overflow-hidden">
-                <img
+                <img decoding="async"
                   src={event.imageUrl}
                   alt={event.title}
                   className="w-full h-64 object-cover"

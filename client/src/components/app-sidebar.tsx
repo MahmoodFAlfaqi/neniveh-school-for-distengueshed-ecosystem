@@ -1,4 +1,4 @@
-import { Home, Calendar, Users, Settings, BookOpen, User, LogOut, Shield, GraduationCap, Newspaper, Heart, FileText } from "lucide-react";
+import { Home, Calendar, Users, Settings, BookOpen, User, LogOut, Shield, GraduationCap, Newspaper, Heart, FileText, Flag } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useI18n, type TranslationKey } from "@/lib/i18n";
 
 type User = {
   id: string;
@@ -32,36 +33,43 @@ type User = {
 const mainNavItems = [
   {
     title: "Home",
+    labelKey: "nav.home" as TranslationKey,
     url: "/",
     icon: Home,
   },
   {
     title: "News",
+    labelKey: "nav.news" as TranslationKey,
     url: "/news",
     icon: Newspaper,
   },
   {
     title: "Grades",
+    labelKey: "nav.grades" as TranslationKey,
     url: "/grades",
     icon: GraduationCap,
   },
   {
     title: "Events",
+    labelKey: "nav.events" as TranslationKey,
     url: "/events",
     icon: Calendar,
   },
   {
     title: "Teachers",
+    labelKey: "nav.teachers" as TranslationKey,
     url: "/teachers",
     icon: Users,
   },
   {
     title: "Schedule",
+    labelKey: "nav.schedule" as TranslationKey,
     url: "/schedule",
     icon: BookOpen,
   },
   {
     title: "Study Sources",
+    labelKey: "nav.studySources" as TranslationKey,
     url: "/study-sources",
     icon: FileText,
   },
@@ -70,24 +78,34 @@ const mainNavItems = [
 const adminNavItems = [
   {
     title: "Admin Management",
+    labelKey: "nav.admin" as TranslationKey,
     url: "/admin",
     icon: Shield,
+  },
+  {
+    title: "Reports",
+    labelKey: "nav.reports" as TranslationKey,
+    url: "/admin/reports",
+    icon: Flag,
   },
 ];
 
 const bottomNavItems = [
   {
     title: "Profile",
+    labelKey: "nav.profile" as TranslationKey,
     url: "/profile",
     icon: User,
   },
   {
     title: "Settings",
+    labelKey: "nav.settings" as TranslationKey,
     url: "/settings",
     icon: Settings,
   },
   {
     title: "Support",
+    labelKey: "nav.support" as TranslationKey,
     url: "/support",
     icon: Heart,
   },
@@ -96,6 +114,7 @@ const bottomNavItems = [
 export function AppSidebar() {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
+  const { t, dir } = useI18n();
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -106,9 +125,10 @@ export function AppSidebar() {
       await apiRequest("POST", "/api/auth/logout");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      // Drop every cached response so the next person on this device sees nothing of ours
+      queryClient.clear();
       toast({
-        title: "Logged out successfully",
+        title: t("nav.loggedOut"),
       });
       navigate("/auth");
     },
@@ -128,7 +148,7 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar data-testid="sidebar-main" className="border-r border-border/50">
+    <Sidebar data-testid="sidebar-main" side={dir === "rtl" ? "right" : "left"} className="border-border/50">
       <SidebarContent className="space-y-4">
         {/* Logo/Branding */}
         <div className="px-4 py-3 flex items-center gap-2">
@@ -136,13 +156,13 @@ export function AppSidebar() {
             <span className="text-white font-bold text-sm">SC</span>
           </div>
           <div>
-            <h1 className="font-bold text-sm">School Community</h1>
-            <p className="text-xs text-muted-foreground">Connected & Engaged</p>
+            <h1 className="font-bold text-sm">{t("app.short")}</h1>
+            <p className="text-xs text-muted-foreground">{t("app.tagline")}</p>
           </div>
         </div>
 
         <SidebarGroup>
-          <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wider px-2">Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wider px-2">{t("nav.section.navigation")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
               {mainNavItems
@@ -163,9 +183,9 @@ export function AppSidebar() {
                           : "hover:bg-background/50"
                       }`}
                     >
-                      <Link href={item.url} className="flex items-center gap-3">
-                        <item.icon className="w-4 h-4" />
-                        <span className="text-sm">{item.title}</span>
+                      <Link href={item.url} className="flex items-center gap-3 h-11 md:h-9" aria-current={location === item.url ? "page" : undefined}>
+                        <item.icon className="w-4 h-4" aria-hidden="true" />
+                        <span className="text-sm">{t(item.labelKey)}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -176,7 +196,7 @@ export function AppSidebar() {
 
         {user?.role === "admin" && (
           <SidebarGroup>
-            <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wider px-2">Administration</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wider px-2">{t("nav.section.administration")}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu className="space-y-1">
                 {adminNavItems.map((item) => (
@@ -190,9 +210,9 @@ export function AppSidebar() {
                           : "hover:bg-background/50"
                       }`}
                     >
-                      <Link href={item.url} className="flex items-center gap-3">
-                        <item.icon className="w-4 h-4" />
-                        <span className="text-sm">{item.title}</span>
+                      <Link href={item.url} className="flex items-center gap-3 h-11 md:h-9" aria-current={location === item.url ? "page" : undefined}>
+                        <item.icon className="w-4 h-4" aria-hidden="true" />
+                        <span className="text-sm">{t(item.labelKey)}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -203,7 +223,7 @@ export function AppSidebar() {
         )}
 
         <SidebarGroup>
-          <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wider px-2">Account</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-xs font-bold uppercase tracking-wider px-2">{t("nav.section.account")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
               {bottomNavItems
@@ -224,9 +244,9 @@ export function AppSidebar() {
                           : "hover:bg-background/50"
                       }`}
                     >
-                      <Link href={item.url} className="flex items-center gap-3">
-                        <item.icon className="w-4 h-4" />
-                        <span className="text-sm">{item.title}</span>
+                      <Link href={item.url} className="flex items-center gap-3 h-11 md:h-9" aria-current={location === item.url ? "page" : undefined}>
+                        <item.icon className="w-4 h-4" aria-hidden="true" />
+                        <span className="text-sm">{t(item.labelKey)}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -247,7 +267,7 @@ export function AppSidebar() {
                   </AvatarFallback>
                 </Avatar>
                 {user.role === "admin" && (
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
+                  <div className="absolute -top-1 -end-1 w-4h-4 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
                     ★
                   </div>
                 )}
@@ -258,7 +278,7 @@ export function AppSidebar() {
                 </p>
                 <div className="flex items-center gap-2 mt-1">
                   <Badge variant="outline" className="text-[0.65rem]">
-                    {user.role}
+                    {t(`role.${user.role}` as TranslationKey)}
                   </Badge>
                   <span className="text-xs text-muted-foreground font-medium">
                     {(user.credibilityScore ?? 0).toFixed(0)}⭐
@@ -272,7 +292,7 @@ export function AppSidebar() {
               className="flex items-center justify-center gap-2 w-full px-3 py-2 text-sm rounded-lg hover-elevate active-elevate-2 bg-destructive/10 hover:bg-destructive/20 text-destructive font-medium transition-colors"
             >
               <LogOut className="w-4 h-4" />
-              <span>Logout</span>
+              <span>{t("nav.logout")}</span>
             </button>
           </div>
         </SidebarFooter>

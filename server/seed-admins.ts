@@ -8,12 +8,14 @@ const ADMIN_ACCOUNTS = [
     username: "Mahmood.Fawaz.AL-Faqi",
     email: "keneyreplitalfaqi+mahmood@gmail.com",
     name: "Mahmood Fawaz AL-Faqi",
+    studentId: "ADMIN001",
     role: "admin" as const,
   },
   {
     username: "Mustafa.Mouied.Al-Ali",
     email: "keneyreplitalfaqi+mustafa@gmail.com",
     name: "Mustafa Mouied Al-Ali",
+    studentId: "ADMIN002",
     role: "admin" as const,
   },
 ];
@@ -52,10 +54,12 @@ export async function seedAdminAccounts() {
           username: adminData.username,
           email: adminData.email,
           name: adminData.name,
+          studentId: adminData.studentId,
           password: hashedPassword,
           role: adminData.role,
+          isSpecialAdmin: true,
           credibilityScore: 100,
-          reputationPoints: 0,
+          reputationScore: 0,
           accountStatus: "active",
         });
 

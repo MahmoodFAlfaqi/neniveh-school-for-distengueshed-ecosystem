@@ -460,7 +460,7 @@ export default function AuthPage() {
                         <Input
                           id="admin-register-password"
                           type={showAdminRegisterPassword ? "text" : "password"}
-                          placeholder="Minimum 6 characters"
+                          placeholder="Minimum 8 characters"
                           value={adminRegisterData.password}
                           onChange={(e) => setAdminRegisterData({ ...adminRegisterData, password: e.target.value })}
                           required

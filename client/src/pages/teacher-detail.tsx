@@ -8,7 +8,7 @@ import { Star, ArrowLeft, Shield, Edit, CheckCircle, Key } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, ApiError } from "@/lib/queryClient";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { X } from "lucide-react";
@@ -121,7 +121,7 @@ export default function TeacherDetailPage() {
         return { result, isUpdate: true };
       } catch (error) {
         // If 404, feedback doesn't exist yet, so create it
-        if (error instanceof Error && error.message.includes("404")) {
+        if (error instanceof ApiError && error.status === 404) {
           const result = await apiRequest("POST", `/api/teachers/${id}/feedback`, feedbackData);
           return { result, isUpdate: false };
         }
@@ -260,7 +260,7 @@ export default function TeacherDetailPage() {
   // Generate teacher ID mutation (admin only)
   const generateTeacherIdMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", `/api/teachers/${id}/generate-id`);
+      return (await apiRequest("POST", `/api/teachers/${id}/generate-id`)).json();
     },
     onSuccess: (result: { teacherId: string }) => {
       toast({

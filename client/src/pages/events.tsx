@@ -126,7 +126,7 @@ function EventCard({ event, currentUser, onEdit }: { event: Event; currentUser: 
     queryKey: ["/api/events", event.id, "attendees"],
     enabled: showAttendees,
     queryFn: async () => {
-      return await apiRequest("GET", `/api/events/${event.id}/attendees`);
+      return (await apiRequest("GET", `/api/events/${event.id}/attendees`)).json();
     },
   });
 
@@ -134,13 +134,14 @@ function EventCard({ event, currentUser, onEdit }: { event: Event; currentUser: 
     queryKey: [`/api/events/${event.id}/comments`],
     enabled: showComments,
     queryFn: async () => {
-      return await apiRequest("GET", `/api/events/${event.id}/comments`);
+      return (await apiRequest("GET", `/api/events/${event.id}/comments`)).json();
     },
   });
 
   const rsvpMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", `/api/events/${event.id}/rsvp`, {});
+      // Server returns the RSVP, or null when it was toggled off
+      return (await apiRequest("POST", `/api/events/${event.id}/rsvp`, {})).json();
     },
     onSuccess: (result) => {
       if (result === null) {

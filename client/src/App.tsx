@@ -1,80 +1,79 @@
-import { useState, useEffect } from "react";
-import { Switch, Route, Redirect } from "wouter";
+import { lazy, Suspense, useEffect, useRef } from "react";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
-import { ThemeProvider } from "@/contexts/theme";
+import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
+import { ThemeProvider, useTheme } from "@/contexts/theme";
 import { AppSidebar } from "@/components/app-sidebar";
-import Home from "@/pages/home";
+import { LanguageProvider, useI18n } from "@/lib/i18n";
 import AuthPage from "@/pages/auth";
-import ForgotPasswordPage from "@/pages/forgot-password";
-import NewsPage from "@/pages/news";
-import EventsPage from "@/pages/events";
-import EventDetailPage from "@/pages/event-detail";
-import KeysPage from "@/pages/keys";
-import TeachersPage from "@/pages/teachers";
-import TeacherDetailPage from "@/pages/teacher-detail";
-import SchedulePage from "@/pages/schedule";
-import ProfilePage from "@/pages/profile";
-import SettingsPage from "@/pages/settings";
-import AdminPage from "@/pages/admin";
-import GradesPage from "@/pages/grades";
-import GradeDetailPage from "@/pages/grade-detail";
-import ClassDetailPage from "@/pages/class-detail";
-import SupportPage from "@/pages/support";
-import StudySourcesPage from "@/pages/study-sources";
-import LegalPage from "@/pages/legal";
-import AdminReportsPage from "@/pages/admin-reports";
 import NotFound from "@/pages/not-found";
+
+// Pages are split into separate chunks so phones only download what they open
+const Home = lazy(() => import("@/pages/home"));
+const ForgotPasswordPage = lazy(() => import("@/pages/forgot-password"));
+const NewsPage = lazy(() => import("@/pages/news"));
+const EventsPage = lazy(() => import("@/pages/events"));
+const EventDetailPage = lazy(() => import("@/pages/event-detail"));
+const KeysPage = lazy(() => import("@/pages/keys"));
+const TeachersPage = lazy(() => import("@/pages/teachers"));
+const TeacherDetailPage = lazy(() => import("@/pages/teacher-detail"));
+const SchedulePage = lazy(() => import("@/pages/schedule"));
+const ProfilePage = lazy(() => import("@/pages/profile"));
+const SettingsPage = lazy(() => import("@/pages/settings"));
+const AdminPage = lazy(() => import("@/pages/admin"));
+const GradesPage = lazy(() => import("@/pages/grades"));
+const GradeDetailPage = lazy(() => import("@/pages/grade-detail"));
+const ClassDetailPage = lazy(() => import("@/pages/class-detail"));
+const SupportPage = lazy(() => import("@/pages/support"));
+const StudySourcesPage = lazy(() => import("@/pages/study-sources"));
+const LegalPage = lazy(() => import("@/pages/legal"));
+const AdminReportsPage = lazy(() => import("@/pages/admin-reports"));
 
 type User = {
   id: string;
   name: string;
   email: string;
   role: string;
+  theme?: "light" | "dark" | "system";
 };
 
-function HeaderWithGestures() {
-  const { toggleSidebar } = useSidebar();
-  const [touchStart, setTouchStart] = useState(0);
-
+// Apply the theme saved on the account once per login (so it follows the user across devices)
+function useAccountTheme(user: User | undefined) {
+  const { setTheme } = useTheme();
+  const appliedFor = useRef<string | null>(null);
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Tab key to toggle sidebar on desktop
-      if (e.key === "Tab" && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
-        e.preventDefault();
-        toggleSidebar();
-      }
-    };
+    if (user?.id && user.theme && appliedFor.current !== user.id) {
+      appliedFor.current = user.id;
+      setTheme(user.theme);
+    }
+  }, [user?.id, user?.theme, setTheme]);
+}
 
-    const handleTouchStart = (e: TouchEvent) => {
-      setTouchStart(e.touches[0].clientX);
-    };
+function PageSpinner() {
+  return (
+    <div className="flex items-center justify-center min-h-[50dvh]" role="status" aria-label="Loading">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    </div>
+  );
+}
 
-    const handleTouchEnd = (e: TouchEvent) => {
-      const touchEnd = e.changedTouches[0].clientX;
-      // Swipe from left edge (within 50px) to the right to open sidebar
-      if (touchStart < 50 && touchEnd - touchStart > 100) {
-        toggleSidebar();
-      }
-    };
+function AppHeader() {
+  const { isMobile, setOpenMobile } = useSidebar();
+  const [location] = useLocation();
+  const { t } = useI18n();
 
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("touchstart", handleTouchStart);
-    window.addEventListener("touchend", handleTouchEnd);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchend", handleTouchEnd);
-    };
-  }, [toggleSidebar]);
+  // Close the mobile menu after navigating
+  useEffect(() => {
+    if (isMobile) setOpenMobile(false);
+  }, [location, isMobile, setOpenMobile]);
 
   return (
-    <header className="sticky top-0 z-40 flex items-center justify-between px-6 py-3 border-b border-border/50 bg-background/80 backdrop-blur-sm dark:bg-background/70">
-      <h2 className="text-sm font-semibold text-foreground hidden md:block">School Community Ecosystem</h2>
+    <header className="sticky top-0 z-40 flex items-center gap-3 px-3 md:px-6 h-14 border-b border-border/60 bg-background/95 supports-[backdrop-filter]:md:bg-background/80 supports-[backdrop-filter]:md:backdrop-blur-sm pt-[env(safe-area-inset-top)]">
+      <SidebarTrigger className="h-10 w-10" aria-label={t("menu.open")} data-testid="button-menu" />
+      <h2 className="font-display text-sm font-semibold text-foreground truncate">{t("app.name")}</h2>
     </header>
   );
 }
@@ -83,13 +82,10 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const { data: user, isLoading } = useQuery<User>({
     queryKey: ["/api/auth/me"],
   });
+  useAccountTheme(user);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   if (!user) {
@@ -103,155 +99,61 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full scrollbar-thin">
+      <div className="flex h-dvh w-full">
         <AppSidebar />
-        <div className="flex flex-col flex-1">
-          <HeaderWithGestures />
-          <main className="flex-1 overflow-auto scrollbar-thin bg-gradient-to-br from-background via-background to-background/50 dark:from-background dark:via-background dark:to-background/40">{children}</main>
+        <div className="flex flex-col flex-1 min-w-0">
+          <AppHeader />
+          <main id="main-content" className="flex-1 overflow-y-auto overscroll-contain bg-background pb-[env(safe-area-inset-bottom)]">
+            <Suspense fallback={<PageSpinner />}>{children}</Suspense>
+          </main>
         </div>
       </div>
     </SidebarProvider>
   );
 }
 
+const protectedRoutes: Array<[string, React.ComponentType]> = [
+  ["/", Home],
+  ["/news", NewsPage],
+  ["/events/:id", EventDetailPage],
+  ["/events", EventsPage],
+  ["/keys", KeysPage],
+  ["/teachers/:id", TeacherDetailPage],
+  ["/teachers", TeachersPage],
+  ["/schedule", SchedulePage],
+  ["/profile/:userId", ProfilePage],
+  ["/profile", ProfilePage],
+  ["/settings", SettingsPage],
+  ["/admin/reports", AdminReportsPage],
+  ["/admin", AdminPage],
+  ["/grades/:gradeNumber/:className", ClassDetailPage],
+  ["/grades/:gradeNumber", GradeDetailPage],
+  ["/grades", GradesPage],
+  ["/support", SupportPage],
+  ["/study-sources", StudySourcesPage],
+  ["/legal", LegalPage],
+];
+
 function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
-      <Route path="/forgot-password" component={ForgotPasswordPage} />
-      <Route path="/">
+      <Route path="/forgot-password">
         {() => (
-          <AuthenticatedLayout>
-            <Home />
-          </AuthenticatedLayout>
+          <Suspense fallback={<PageSpinner />}>
+            <ForgotPasswordPage />
+          </Suspense>
         )}
       </Route>
-      <Route path="/news">
-        {() => (
-          <AuthenticatedLayout>
-            <NewsPage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/events/:id">
-        {() => (
-          <AuthenticatedLayout>
-            <EventDetailPage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/events">
-        {() => (
-          <AuthenticatedLayout>
-            <EventsPage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/keys">
-        {() => (
-          <AuthenticatedLayout>
-            <KeysPage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/teachers/:id">
-        {() => (
-          <AuthenticatedLayout>
-            <TeacherDetailPage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/teachers">
-        {() => (
-          <AuthenticatedLayout>
-            <TeachersPage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/schedule">
-        {() => (
-          <AuthenticatedLayout>
-            <SchedulePage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/profile/:userId">
-        {() => (
-          <AuthenticatedLayout>
-            <ProfilePage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/profile">
-        {() => (
-          <AuthenticatedLayout>
-            <ProfilePage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/settings">
-        {() => (
-          <AuthenticatedLayout>
-            <SettingsPage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/admin">
-        {() => (
-          <AuthenticatedLayout>
-            <AdminPage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/grades/:gradeNumber/:className">
-        {() => (
-          <AuthenticatedLayout>
-            <ClassDetailPage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/grades/:gradeNumber">
-        {() => (
-          <AuthenticatedLayout>
-            <GradeDetailPage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/grades">
-        {() => (
-          <AuthenticatedLayout>
-            <GradesPage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/support">
-        {() => (
-          <AuthenticatedLayout>
-            <SupportPage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/study-sources">
-        {() => (
-          <AuthenticatedLayout>
-            <StudySourcesPage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/legal">
-        {() => (
-          <AuthenticatedLayout>
-            <LegalPage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
-      <Route path="/admin/reports">
-        {() => (
-          <AuthenticatedLayout>
-            <AdminReportsPage />
-          </AuthenticatedLayout>
-        )}
-      </Route>
+      {protectedRoutes.map(([path, Page]) => (
+        <Route key={path} path={path}>
+          {() => (
+            <AuthenticatedLayout>
+              <Page />
+            </AuthenticatedLayout>
+          )}
+        </Route>
+      ))}
       <Route component={NotFound} />
     </Switch>
   );
@@ -261,10 +163,12 @@ function App() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+        <LanguageProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </LanguageProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

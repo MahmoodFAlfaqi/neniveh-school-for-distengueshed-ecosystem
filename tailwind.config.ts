@@ -5,10 +5,12 @@ export default {
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
+      // Driven by --radius in index.css so the theme controls corner rounding
       borderRadius: {
-        lg: ".5625rem", /* 9px */
-        md: ".375rem", /* 6px */
-        sm: ".1875rem", /* 3px */
+        xl: "calc(var(--radius) + 0.25rem)",
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 0.25rem)",
+        sm: "calc(var(--radius) - 0.375rem)",
       },
       colors: {
         // Flat / base colors (regular buttons)
@@ -84,6 +86,7 @@ export default {
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
+        display: ["var(--font-display)"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
       },

@@ -31,7 +31,7 @@ export default function ForgotPasswordPage() {
 
   const requestResetMutation = useMutation({
     mutationFn: async (email: string) => {
-      return await apiRequest("POST", "/api/auth/forgot-password", { email });
+      return (await apiRequest("POST", "/api/auth/forgot-password", { email })).json();
     },
     onSuccess: (data: any) => {
       // Always show email sent confirmation - server handles security
@@ -101,10 +101,10 @@ export default function ForgotPasswordPage() {
       });
       return;
     }
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       toast({
         title: "Password too short",
-        description: "Password must be at least 6 characters",
+        description: "Password must be at least 8 characters",
         variant: "destructive",
       });
       return;
@@ -230,7 +230,7 @@ export default function ForgotPasswordPage() {
                 <Input
                   id="newPassword"
                   type="password"
-                  placeholder="At least 6 characters"
+                  placeholder="At least 8 characters"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   data-testid="input-new-password"

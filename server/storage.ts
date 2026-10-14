@@ -82,10 +82,13 @@ import {
   type InsertReport,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, getTableColumns } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
 const CREDIBILITY_THRESHOLD_FOR_THREAT = 25.0; // Below this, account becomes "threatened"
+
+export type PostSort = "newest" | "oldest" | "mostLiked" | "highestCredibility";
+export type PostListOptions = { limit?: number; offset?: number; sort?: PostSort };
 
 export interface IStorage {
   // User management
@@ -93,8 +96,6 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getAdminUser(): Promise<User | undefined>;
-  getVisitorUser(): Promise<User | undefined>;
-  createVisitorUser(userData: InsertUser): Promise<User>;
   getStudentsByClass(grade: number, className: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUserProfile(userId: string, updates: { bio?: string; avatarUrl?: string; grade?: number; className?: string; empathy?: number; angerManagement?: number; cooperation?: number; selfConfidence?: number; acceptingCriticism?: number; listening?: number; problemSolving?: number; creativity?: number; memoryFocus?: number; planningOrganization?: number; communicationExpression?: number; leadershipInitiative?: number; artisticCreative?: number; athleticPhysical?: number; technicalTech?: number; linguisticReading?: number; socialHumanitarian?: number; naturalEnvironmental?: number; hobbies?: string[] }): Promise<User | undefined>;
@@ -114,6 +115,16 @@ export interface IStorage {
   verifyAndUnlockScope(userId: string, scopeId: string, accessCode: string): Promise<{ success: boolean; message: string; key?: DigitalKey }>;
   getUserDigitalKeys(userId: string): Promise<DigitalKey[]>;
   hasAccessToScope(userId: string, scopeId: string): Promise<boolean>;
+  getAccessibleScopeIds(userId?: string): Promise<Set<string> | "all">;
+  getAdmins(): Promise<User[]>;
+  updateUserClass(userId: string, grade: number | null, className: string | null): Promise<User | undefined>;
+  getActiveBan(userId: string): Promise<UserPunishment | undefined>;
+  getOwnerId(): Promise<string | null>;
+  claimOwnershipIfUnset(userId: string): Promise<string>;
+  setOwner(userId: string): Promise<void>;
+  updatePassword(userId: string, newPassword: string): Promise<void>;
+  demoteAdmin(userId: string): Promise<User | undefined>;
+  liftExpiredSuspension(userId: string): Promise<void>;
   
   // Admin Handover Protocol
   transferAdminPrivileges(currentAdminId: string, successorId: string, notes?: string): Promise<{ success: boolean; message: string; succession?: AdminSuccession }>;
@@ -134,7 +145,7 @@ export interface IStorage {
   
   // Posts
   createPost(post: InsertPost): Promise<Post>;
-  getPosts(scopeId?: string | null, userId?: string): Promise<any[]>;
+  getPosts(scopeId?: string | null, userId?: string, options?: PostListOptions): Promise<any[]>;
   getPost(id: string): Promise<Post | undefined>;
   updatePost(postId: string, content: string): Promise<Post | undefined>;
   updatePostCredibility(postId: string, rating: number): Promise<Post | undefined>;
@@ -199,8 +210,8 @@ export interface IStorage {
   
   // Friends
   sendFriendRequest(user1Id: string, user2Id: string): Promise<Friendship>;
-  acceptFriendRequest(friendshipId: string): Promise<Friendship | undefined>;
-  rejectFriendRequest(friendshipId: string): Promise<Friendship | undefined>;
+  acceptFriendRequest(friendshipId: string, userId: string): Promise<Friendship | undefined>;
+  rejectFriendRequest(friendshipId: string, userId: string): Promise<Friendship | undefined>;
   getFriends(userId: string): Promise<User[]>;
   getPendingFriendRequests(userId: string): Promise<Array<Friendship & { initiator: User }>>;
   unfriend(user1Id: string, user2Id: string): Promise<boolean>;
@@ -209,7 +220,7 @@ export interface IStorage {
   // Chat
   sendChatMessage(senderId: string, receiverId: string, content: string): Promise<ChatMessage>;
   getChatMessages(user1Id: string, user2Id: string): Promise<ChatMessage[]>;
-  markMessageAsRead(messageId: string): Promise<ChatMessage | undefined>;
+  markMessageAsRead(messageId: string, userId: string): Promise<ChatMessage | undefined>;
   getUnreadMessageCount(userId: string): Promise<number>;
   
   // Content Moderation
@@ -220,7 +231,7 @@ export interface IStorage {
   // Punishments
   createPunishment(punishment: InsertUserPunishment): Promise<UserPunishment>;
   getUserPunishments(userId: string): Promise<UserPunishment[]>;
-  applyPunishment(userId: string, credibilityPenalty: number, banUntil?: Date): Promise<User | undefined>;
+  applyPunishment(userId: string, credibilityPenalty: number, banUntil?: Date, permanent?: boolean): Promise<User | undefined>;
   
   // Teacher Claim System
   getTeacherByTeacherId(teacherId: string): Promise<Teacher | undefined>;
@@ -268,26 +279,6 @@ export class DatabaseStorage implements IStorage {
   async getAdminUser(): Promise<User | undefined> {
     const [admin] = await db.select().from(users).where(eq(users.role, "admin"));
     return admin || undefined;
-  }
-
-  async getVisitorUser(): Promise<User | undefined> {
-    const [visitor] = await db.select().from(users).where(eq(users.role, "visitor"));
-    return visitor || undefined;
-  }
-
-  async createVisitorUser(insertUser: InsertUser): Promise<User> {
-    const hashedPassword = await bcrypt.hash(insertUser.password, 10);
-    
-    const [user] = await db
-      .insert(users)
-      .values({
-        ...insertUser,
-        password: hashedPassword,
-        role: "visitor",
-      })
-      .returning();
-    
-    return user;
   }
 
   // ==================== FAILED LOGIN TRACKING ====================
@@ -622,7 +613,7 @@ export class DatabaseStorage implements IStorage {
           throw new Error("Teacher not found");
         }
 
-        const userId = teacher.userId;
+        const userId = teacher.claimedByUserId ?? teacher.userId;
 
         // Delete all teacher reviews for this teacher
         await tx.delete(teacherReviews).where(eq(teacherReviews.teacherId, teacherId));
@@ -753,7 +744,7 @@ export class DatabaseStorage implements IStorage {
   async getAssignedStudents(): Promise<(User & { assignedDate: string | null })[]> {
     const result = await db
       .select({
-        ...users,
+        ...getTableColumns(users),
         assignedDate: adminStudentIds.assignedAt,
       })
       .from(users)
@@ -852,6 +843,11 @@ export class DatabaseStorage implements IStorage {
       return false;
     }
 
+    // Admins have access to every scope
+    if (user.role === "admin") {
+      return true;
+    }
+
     // For grade scopes, check if user's grade matches
     if (scope && scope.type === "grade" && scope.gradeNumber !== null) {
       if (user.grade === scope.gradeNumber) {
@@ -879,6 +875,46 @@ export class DatabaseStorage implements IStorage {
     return keys.length > 0;
   }
 
+  /**
+   * All scope ids a user can see, computed in 3 queries (used to avoid N+1 checks in lists).
+   * Visitors (no userId) only see the public scope.
+   */
+  async getAccessibleScopeIds(userId?: string): Promise<Set<string> | "all"> {
+    const user = userId ? await this.getUser(userId) : undefined;
+    if (user?.role === "admin") return "all";
+
+    const allScopes = await this.getAllScopes();
+    const keyed = user
+      ? new Set((await this.getUserDigitalKeys(user.id)).map((k) => k.scopeId))
+      : new Set<string>();
+
+    const ids = new Set<string>();
+    for (const scope of allScopes) {
+      if (
+        scope.type === "public" ||
+        keyed.has(scope.id) ||
+        (user && scope.type === "grade" && scope.gradeNumber === user.grade) ||
+        (user && scope.type === "section" && scope.sectionName === `${user.grade}-${user.className}`)
+      ) {
+        ids.add(scope.id);
+      }
+    }
+    return ids;
+  }
+
+  async getAdmins(): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.role, "admin")).orderBy(users.name);
+  }
+
+  async updateUserClass(userId: string, grade: number | null, className: string | null): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ grade, className, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
+  }
+
   // ==================== ADMIN HANDOVER PROTOCOL ====================
   
   /**
@@ -900,6 +936,10 @@ export class DatabaseStorage implements IStorage {
     const successor = await this.getUser(successorId);
     if (!successor) {
       return { success: false, message: "Successor not found" };
+    }
+
+    if (successor.role !== "student") {
+      return { success: false, message: "Admin privileges can only be handed over to a student account" };
     }
 
     // Prevent self-succession
@@ -978,6 +1018,10 @@ export class DatabaseStorage implements IStorage {
 
     if (targetUser.role === "admin") {
       return { success: false, message: "User is already an admin" };
+    }
+
+    if (targetUser.role !== "student") {
+      return { success: false, message: "Only student accounts can be promoted to admin" };
     }
 
     if (currentAdminId === userId) {
@@ -1174,68 +1218,24 @@ export class DatabaseStorage implements IStorage {
     return post;
   }
 
-  async getPosts(scopeId?: string | null, userId?: string): Promise<any[]> {
-    if (scopeId === null || scopeId === undefined) {
-      // Get public square posts (no scope) with author info
-      const results = await db
-        .select({
-          id: posts.id,
-          content: posts.content,
-          authorId: posts.authorId,
-          scopeId: posts.scopeId,
-          credibilityRating: posts.credibilityRating,
-          mediaUrl: posts.mediaUrl,
-          mediaType: posts.mediaType,
-          likesCount: posts.likesCount,
-          commentsCount: posts.commentsCount,
-          createdAt: posts.createdAt,
-          authorName: users.name,
-          authorRole: users.role,
-          authorAvatarUrl: users.avatarUrl,
-          authorCredibilityScore: users.credibilityScore,
-        })
-        .from(posts)
-        .leftJoin(users, eq(posts.authorId, users.id))
-        .where(sql`${posts.scopeId} IS NULL`)
-        .orderBy(desc(posts.createdAt));
-      
-      // Get user's liked posts if userId provided
-      const likedPostIds = userId ? (await db
-        .select({ postId: postReactions.postId })
-        .from(postReactions)
-        .where(eq(postReactions.userId, userId)))
-        .map(r => r.postId) : [];
-      
-      // Get user's accuracy ratings if userId provided (gracefully handle if table doesn't exist yet)
-      let accuracyRatings: Record<string, number> = {};
-      try {
-        if (userId) {
-          const ratings = await db
-            .select({ postId: postAccuracyRatings.postId, rating: postAccuracyRatings.rating })
-            .from(postAccuracyRatings)
-            .where(eq(postAccuracyRatings.userId, userId));
-          accuracyRatings = ratings.reduce((map, r) => ({ ...map, [r.postId]: r.rating }), {});
-        }
-      } catch (error) {
-        // Table might not exist yet, continue without accuracy ratings
-      }
-      
-      // Transform to ensure author always exists and include liked status
-      return results.map(post => {
-        return {
-          ...post,
-          isLikedByCurrentUser: likedPostIds.includes(post.id),
-          currentUserAccuracyRating: accuracyRatings[post.id] || null,
-          author: {
-            name: post.authorName || "Unknown User",
-            role: post.authorRole || "student",
-            avatarUrl: post.authorAvatarUrl,
-          },
-        };
-      });
-    }
-    
-    const results = await db
+  async getPosts(scopeId?: string | null, userId?: string, options: PostListOptions = {}): Promise<any[]> {
+    // The public square is stored either as NULL or as the public scope's id; treat both as one feed
+    const publicScope = (await this.getAllScopes()).find((scope) => scope.type === "public");
+    const isPublicFeed = !scopeId || scopeId === publicScope?.id;
+    const scopeFilter = isPublicFeed
+      ? publicScope
+        ? sql`(${posts.scopeId} IS NULL OR ${posts.scopeId} = ${publicScope.id})`
+        : sql`${posts.scopeId} IS NULL`
+      : eq(posts.scopeId, scopeId!);
+
+    const orderBy = {
+      newest: [desc(posts.createdAt)],
+      oldest: [posts.createdAt],
+      mostLiked: [desc(posts.likesCount), desc(posts.createdAt)],
+      highestCredibility: [desc(users.credibilityScore), desc(posts.createdAt)],
+    }[options.sort ?? "newest"];
+
+    let query = db
       .select({
         id: posts.id,
         content: posts.content,
@@ -1244,6 +1244,7 @@ export class DatabaseStorage implements IStorage {
         credibilityRating: posts.credibilityRating,
         mediaUrl: posts.mediaUrl,
         mediaType: posts.mediaType,
+        isTeacherPost: posts.isTeacherPost,
         likesCount: posts.likesCount,
         commentsCount: posts.commentsCount,
         createdAt: posts.createdAt,
@@ -1254,43 +1255,43 @@ export class DatabaseStorage implements IStorage {
       })
       .from(posts)
       .leftJoin(users, eq(posts.authorId, users.id))
-      .where(eq(posts.scopeId, scopeId))
-      .orderBy(desc(posts.createdAt));
-    
-    // Get user's liked posts if userId provided
-    const likedPostIds = userId ? (await db
-      .select({ postId: postReactions.postId })
-      .from(postReactions)
-      .where(eq(postReactions.userId, userId)))
-      .map(r => r.postId) : [];
-    
-    // Get user's accuracy ratings if userId provided (gracefully handle if table doesn't exist yet)
-    let accuracyRatings2: Record<string, number> = {};
-    try {
-      if (userId) {
-        const ratings = await db
+      .where(scopeFilter)
+      .orderBy(...orderBy)
+      .$dynamic();
+    if (options.limit) query = query.limit(options.limit);
+    if (options.offset) query = query.offset(options.offset);
+    const results = await query;
+
+    // Only look up the current user's likes/ratings for the posts on this page
+    const postIds = results.map((post) => post.id);
+    const likedPostIds = new Set<string>();
+    const accuracyRatings = new Map<string, number>();
+    if (userId && postIds.length > 0) {
+      const [likes, ratings] = await Promise.all([
+        db
+          .select({ postId: postReactions.postId })
+          .from(postReactions)
+          .where(and(eq(postReactions.userId, userId), inArray(postReactions.postId, postIds))),
+        db
           .select({ postId: postAccuracyRatings.postId, rating: postAccuracyRatings.rating })
           .from(postAccuracyRatings)
-          .where(eq(postAccuracyRatings.userId, userId));
-        accuracyRatings2 = ratings.reduce((map, r) => ({ ...map, [r.postId]: r.rating }), {});
-      }
-    } catch (error) {
-      // Table might not exist yet, continue without accuracy ratings
+          .where(and(eq(postAccuracyRatings.userId, userId), inArray(postAccuracyRatings.postId, postIds))),
+      ]);
+      likes.forEach((like) => likedPostIds.add(like.postId));
+      ratings.forEach((rating) => accuracyRatings.set(rating.postId, rating.rating));
     }
-    
-    // Transform to ensure author always exists and include liked status
-    return results.map(post => {
-      return {
-        ...post,
-        isLikedByCurrentUser: likedPostIds.includes(post.id),
-        currentUserAccuracyRating: accuracyRatings2[post.id] || null,
-        author: {
-          name: post.authorName || "Unknown User",
-          role: post.authorRole || "student",
-          avatarUrl: post.authorAvatarUrl,
-        },
-      };
-    });
+
+    return results.map((post) => ({
+      ...post,
+      authorCredibilityScore: post.authorCredibilityScore ?? 0,
+      isLikedByCurrentUser: likedPostIds.has(post.id),
+      currentUserAccuracyRating: accuracyRatings.get(post.id) ?? null,
+      author: {
+        name: post.authorName || "Unknown User",
+        role: post.authorRole || "student",
+        avatarUrl: post.authorAvatarUrl,
+      },
+    }));
   }
 
   async getPost(id: string): Promise<Post | undefined> {
@@ -1379,39 +1380,14 @@ export class DatabaseStorage implements IStorage {
         result = created;
       }
 
-      // Recalculate post author's credibility based on ALL accuracy ratings across ALL their posts
-      const post = await this.getPost(postId);
-      if (post) {
-        try {
-          // Get all posts by the author
-          const authorPosts = await db
-            .select({ id: posts.id })
-            .from(posts)
-            .where(eq(posts.authorId, post.authorId));
-          
-          const postIds = authorPosts.map(p => p.id);
-          
-          // Get all accuracy ratings for all author's posts
-          let allAccuracyRatings: any[] = [];
-          if (postIds.length > 0) {
-            allAccuracyRatings = await db
-              .select()
-              .from(postAccuracyRatings)
-              .where(inArray(postAccuracyRatings.postId, postIds));
-          }
-          
-          // Calculate average credibility: average of all ratings * 20
-          let avgCredibility = 50;
-          if (allAccuracyRatings.length > 0) {
-            const sumRatings = allAccuracyRatings.reduce((sum, r) => sum + r.rating, 0);
-            avgCredibility = (sumRatings / allAccuracyRatings.length) * 20;
-          }
-          
-          // Update user credibility
-          await this.updateUserCredibility(post.authorId, avgCredibility);
-        } catch (e) {
-          // Ignore errors in recalculating credibility
-        }
+      // Single credibility formula shared with admin ratings:
+      // post credibility = average stars x 20, author credibility = average post credibility
+      const [{ avg }] = await db
+        .select({ avg: sql<number>`AVG(${postAccuracyRatings.rating})` })
+        .from(postAccuracyRatings)
+        .where(eq(postAccuracyRatings.postId, postId));
+      if (avg !== null) {
+        await this.updatePostCredibility(postId, Number(avg) * 20);
       }
 
       return result;
@@ -1462,55 +1438,44 @@ export class DatabaseStorage implements IStorage {
     let results;
     
     if (scopeId) {
-      // Specific scope requested
+      // Specific scope requested (the public scope also includes events stored without a scope)
+      const scope = await this.getScope(scopeId);
       results = await baseQuery
-        .where(eq(events.scopeId, scopeId))
+        .where(scope?.type === "public"
+          ? sql`(${events.scopeId} IS NULL OR ${events.scopeId} = ${scopeId})`
+          : eq(events.scopeId, scopeId))
         .orderBy(desc(events.startTime));
     } else {
-      // Get all events, then filter by user's scope access
+      // Get all events, then filter by user's scope access (visitors: public only)
       results = await baseQuery.orderBy(desc(events.startTime));
-      
-      // Filter events based on user's scope access
-      if (userId) {
-        const filteredResults = [];
-        
-        for (const event of results) {
-          if (!event.scopeId) {
-            // Events with no scope ID are always accessible
-            filteredResults.push(event);
-            continue;
-          }
-          
-          // Check if scope is public or user has access
-          const hasAccess = await this.hasAccessToScope(userId, event.scopeId);
-          if (hasAccess) {
-            filteredResults.push(event);
-          }
-        }
-        
-        results = filteredResults;
+      const accessible = await this.getAccessibleScopeIds(userId);
+      if (accessible !== "all") {
+        results = results.filter((event) => !event.scopeId || accessible.has(event.scopeId));
       }
     }
     
-    // Add RSVP count and user's RSVP status for each event
-    const eventsWithRsvps = await Promise.all(
-      results.map(async (event) => {
-        const rsvps = await this.getEventRsvps(event.id);
-        const userHasRsvpd = userId ? rsvps.some(r => r.userId === userId) : false;
-        
-        return { 
-          ...event, 
-          rsvpCount: rsvps.length, 
-          userHasRsvpd,
-          createdBy: {
-            name: event.createdByName || "Unknown User",
-            role: event.createdByRole || "student",
-            avatarUrl: event.createdByAvatarUrl,
-          }
-        };
-      })
-    );
-    return eventsWithRsvps;
+    // Add RSVP count and user's RSVP status in one query instead of one per event
+    const eventIds = results.map((event) => event.id);
+    const rsvps = eventIds.length
+      ? await db.select().from(eventRsvps).where(inArray(eventRsvps.eventId, eventIds))
+      : [];
+    const rsvpCounts = new Map<string, number>();
+    const userRsvpd = new Set<string>();
+    for (const rsvp of rsvps) {
+      rsvpCounts.set(rsvp.eventId, (rsvpCounts.get(rsvp.eventId) ?? 0) + 1);
+      if (rsvp.userId === userId) userRsvpd.add(rsvp.eventId);
+    }
+    
+    return results.map((event) => ({
+      ...event,
+      rsvpCount: rsvpCounts.get(event.id) ?? 0,
+      userHasRsvpd: userRsvpd.has(event.id),
+      createdBy: {
+        name: event.createdByName || "Unknown User",
+        role: event.createdByRole || "student",
+        avatarUrl: event.createdByAvatarUrl,
+      },
+    }));
   }
 
   async getEvent(eventId: string): Promise<Event | undefined> {
@@ -1958,6 +1923,46 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // ==================== OWNER ====================
+  // The first admin to sign in becomes the owner. Stored in settings so no migration is needed.
+
+  async getOwnerId(): Promise<string | null> {
+    return (await this.getSetting("ownerUserId"))?.value ?? null;
+  }
+
+  /** Atomically records userId as owner if nobody owns the app yet; returns the owner id. */
+  async claimOwnershipIfUnset(userId: string): Promise<string> {
+    await db.insert(settings).values({ key: "ownerUserId", value: userId }).onConflictDoNothing({ target: settings.key });
+    const ownerId = await this.getOwnerId();
+    // Self-heal if the recorded owner was removed or is no longer an admin
+    const owner = ownerId ? await this.getUser(ownerId) : undefined;
+    if (!owner || owner.role !== "admin") {
+      await this.setOwner(userId);
+      return userId;
+    }
+    return owner.id;
+  }
+
+  async setOwner(userId: string): Promise<void> {
+    await this.setSetting("ownerUserId", userId);
+  }
+
+  async updatePassword(userId: string, newPassword: string): Promise<void> {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await db.update(users).set({ password: hashedPassword, updatedAt: new Date() }).where(eq(users.id, userId));
+    // Log out other "remember me" devices after a password change
+    await db.delete(rememberMeTokens).where(eq(rememberMeTokens.userId, userId));
+  }
+
+  async demoteAdmin(userId: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ role: "student", updatedAt: new Date() })
+      .where(and(eq(users.id, userId), eq(users.role, "admin")))
+      .returning();
+    return user || undefined;
+  }
+
   // ==================== PASSWORD RESET ====================
   async createPasswordResetToken(userId: string): Promise<string> {
     // Generate a random token
@@ -2037,21 +2042,31 @@ export class DatabaseStorage implements IStorage {
     return friendship;
   }
 
-  async acceptFriendRequest(friendshipId: string): Promise<Friendship | undefined> {
+  // Only the receiving party of a pending request can answer it
+  private answerableRequest(friendshipId: string, userId: string) {
+    return and(
+      eq(friendships.id, friendshipId),
+      eq(friendships.status, "pending"),
+      sql`(${friendships.user1Id} = ${userId} OR ${friendships.user2Id} = ${userId})`,
+      sql`${friendships.initiatorId} != ${userId}`
+    );
+  }
+
+  async acceptFriendRequest(friendshipId: string, userId: string): Promise<Friendship | undefined> {
     const [friendship] = await db
       .update(friendships)
       .set({ status: "accepted", updatedAt: new Date() })
-      .where(eq(friendships.id, friendshipId))
+      .where(this.answerableRequest(friendshipId, userId))
       .returning();
     
     return friendship || undefined;
   }
 
-  async rejectFriendRequest(friendshipId: string): Promise<Friendship | undefined> {
+  async rejectFriendRequest(friendshipId: string, userId: string): Promise<Friendship | undefined> {
     const [friendship] = await db
       .update(friendships)
       .set({ status: "rejected", updatedAt: new Date() })
-      .where(eq(friendships.id, friendshipId))
+      .where(this.answerableRequest(friendshipId, userId))
       .returning();
     
     return friendship || undefined;
@@ -2159,11 +2174,11 @@ export class DatabaseStorage implements IStorage {
     return messages;
   }
 
-  async markMessageAsRead(messageId: string): Promise<ChatMessage | undefined> {
+  async markMessageAsRead(messageId: string, userId: string): Promise<ChatMessage | undefined> {
     const [message] = await db
       .update(chatMessages)
       .set({ isRead: true })
-      .where(eq(chatMessages.id, messageId))
+      .where(and(eq(chatMessages.id, messageId), eq(chatMessages.receiverId, userId)))
       .returning();
     
     return message || undefined;
@@ -2232,7 +2247,7 @@ export class DatabaseStorage implements IStorage {
     return punishments;
   }
 
-  async applyPunishment(userId: string, credibilityPenalty: number, banUntil?: Date): Promise<User | undefined> {
+  async applyPunishment(userId: string, credibilityPenalty: number, banUntil?: Date, permanent = false): Promise<User | undefined> {
     const user = await this.getUser(userId);
     if (!user) return undefined;
     
@@ -2243,7 +2258,7 @@ export class DatabaseStorage implements IStorage {
       updatedAt: new Date(),
     };
     
-    if (banUntil) {
+    if (banUntil || permanent) {
       updates.accountStatus = "suspended";
     } else if (newCredibility < CREDIBILITY_THRESHOLD_FOR_THREAT) {
       updates.accountStatus = "threatened";
@@ -2256,6 +2271,34 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return updated || undefined;
+  }
+
+  /** Latest punishment that still blocks the user (permanent, or temp ban not yet expired) */
+  async getActiveBan(userId: string): Promise<UserPunishment | undefined> {
+    const [ban] = await db
+      .select()
+      .from(userPunishments)
+      .where(
+        and(
+          eq(userPunishments.userId, userId),
+          sql`(${userPunishments.punishmentType} = 'permanent_ban' OR (${userPunishments.punishmentType} = 'temp_ban' AND ${userPunishments.banUntil} > NOW()))`
+        )
+      )
+      .orderBy(desc(userPunishments.createdAt))
+      .limit(1);
+    return ban || undefined;
+  }
+
+  async liftExpiredSuspension(userId: string): Promise<void> {
+    const user = await this.getUser(userId);
+    if (!user || user.accountStatus !== "suspended") return;
+    await db
+      .update(users)
+      .set({
+        accountStatus: user.credibilityScore < CREDIBILITY_THRESHOLD_FOR_THREAT ? "threatened" : "active",
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
   }
 
   // ==================== TEACHER CLAIM SYSTEM ====================

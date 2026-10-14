@@ -14,7 +14,7 @@ Preferred communication style: Simple, everyday language.
 
 The platform features a modern and premium design, incorporating a vibrant color palette (rich purple, vibrant teal, warm coral), Inter and Outfit typography, and consistent design elements like 0.875rem border radii. It utilizes an elevation system with colored shadows, glassmorphism effects, and smooth 300ms animations. Key design principles include clear hierarchy, generous whitespace, consistency, dark/light mode harmony, micro-interactions, and accessibility. The home page features a hero section, 4-column stat card grid, quick action cards, a mini calendar, and a featured news section. Responsive design is implemented with breakpoints for mobile, tablet, and desktop, using a defined spacing scale and container strategy.
 
-**Navigation Controls:** Sidebar can be toggled via Tab key (desktop) or swipe gesture from left edge (mobile), removing need for manual trigger button.
+**Navigation Controls:** A menu button in the header opens the sidebar (on phones it opens as a drawer that closes after navigating). Ctrl/Cmd+B toggles it on desktop. The Tab key is left for normal keyboard navigation.
 
 ### Technical Implementations
 
@@ -27,15 +27,18 @@ The frontend is built with React, TypeScript, and Vite, utilizing Shadcn UI (bas
 -   **Buttons & Interactive Elements**: Gradient backgrounds, smooth hover effects, badge styling, accessible focus rings.
 -   **Forms & Inputs**: Clean design, rounded corners, proper label hierarchy, validation states.
 -   **News & Posts**: Public square posts visible to all users on news page; scope-specific posts only visible to users with access to that scope. Scope selector allows filtering by public square, grade scopes, or class section scopes. Public square is the default scope on news page.
--   **Teacher Management**: Teachers can be assigned to multiple subjects and sections. Admin interface allows selecting which subjects and sections each teacher teaches.
+-   **Teacher Management**: Teachers can be assigned to multiple subjects and sections. Only admins assign subjects and sections (also after a teacher claims the profile); teachers edit their own personal fields. Teacher registration codes and admin notes are only visible to admins.
 -   **Schedule Auto-Population**: In the schedule page (Sunday-Thursday school week), when a subject is selected, the teacher dropdown auto-populates with only teachers who teach that subject in the user's class section. Teacher is automatically cleared when subject changes.
 -   **Authentication System**: Three-tier system for Admins, Students, and Visitors.
-    -   **Admin Auth**: Requires one-time invitation code, unique credentials, auto-generated student IDs, separate UI flow, 7-day persistent login.
+    -   **Admin Auth**: Requires the admin sign-up code (starts as the original code; the owner can change it on the Admin page), unique credentials, separate UI flow, 7-day persistent login.
+    -   **Owner**: The first admin to sign in becomes the owner. Only the owner can promote/demote/delete admins, change other admins' classes, hand over the admin role (ownership moves with it), and change the admin sign-up code. Stored in the `settings` table (`ownerUserId`).
+    -   **Passwords**: Any signed-in user can change their password in Settings (signs out other remembered devices).
+    -   **Admin Access & Classes**: Admins can open every grade and class scope without access codes. Admins can assign a grade/class to any admin (including themselves) and move students between classes from the Admin page. Students cannot change their own class.
     -   **Student Auth**: Standard username/password, 7-day persistent login, full account creation.
     -   **Visitor Access**: Session-only, read-only, single-click access with restricted UI.
         -   **Hidden from Visitors**: Profile card, Schedule/Calendar card, Community Highlights section on home page; Profile and Schedule links in sidebar.
         -   **Visible to Visitors**: Activity Status card, Quick Access card, all other navigation (Home, News, Grades, Events, Teachers, Settings, Support).
-    -   **Security**: Failed login tracking (3 attempts, 15-min lockout), `remember-me` tokens with sliding expiration, HttpOnly cookies, PostgreSQL-backed sessions (30-day expiration, persists across server restarts).
+    -   **Security**: Failed login tracking on all login forms (3 attempts, 15-min lockout), minimum password length 8 everywhere, session id regenerated on login, suspended accounts are read-only until the ban expires, `remember-me` tokens with sliding expiration, HttpOnly cookies, PostgreSQL-backed sessions (30-day expiration, persists across server restarts).
     -   **Password Recovery**: Gmail-based email recovery system using nodemailer with SMTP. Three-step flow: request email → email sent confirmation → reset password. Token sent via email link, never exposed to frontend. Requires GMAIL_USER and GMAIL_APP_PASSWORD environment secrets. Token expiration: 1 hour.
 -   **Admin Account Seeding**: Automatic creation of 2 admin accounts on server startup, configured via environment variables. Passwords are set only during initial creation and are NOT reset on subsequent server restarts (preserving admin password changes).
 
@@ -43,12 +46,14 @@ The frontend is built with React, TypeScript, and Vite, utilizing Shadcn UI (bas
 
 -   **Access Code Pattern**: "Secret Access Codes" and "Digital Keys" manage content creation and access within school scopes (global, grade, class).
 -   **Credibility & Reputation Engine**: Dual-score system (credibility for content, reputation for contribution) with automatic account status adjustments.
--   **Admin Succession Protocol**: One-click handover mechanism for admin privileges.
+-   **Admin Succession Protocol**: Handover card on the Admin page passes the admin role to a student (the current admin becomes a student).
 -   **Session-Based Authentication**: Utilizes `express-session` with HttpOnly cookies and a 7-day expiration.
 -   **Peer Rating System**: Students can rate peers on 15 performance metrics, aggregated on user profiles. Self-rating is prevented.
 -   **Profile Social Features**: Profile comments for peer feedback, clickable avatars/names.
 -   **Server-Authoritative Social Interactions**: Post likes tracked server-side, `isLikedByCurrentUser` included in queries, safeguards for counter updates.
 -   **Support System**: Configurable donation URL system for external fundraising.
+-   **Languages**: English and Arabic (right-to-left). Navigation, header and Settings are translated; strings live in `client/src/lib/i18n.tsx`. Other pages are still English.
+-   **News Feed**: Loads 20 posts at a time, sorted on the server (`/api/posts?limit=&offset=&sort=`). Public-square posts stored with a NULL scope or the public scope id show in the same feed.
 
 ### Database Schema
 

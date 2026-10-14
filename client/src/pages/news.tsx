@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useInfiniteQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,8 @@ type Post = {
   };
 };
 
+const POSTS_PAGE_SIZE = 20;
+
 export default function NewsPage() {
   const { toast } = useToast();
   const [newPost, setNewPost] = useState("");
@@ -78,26 +80,32 @@ export default function NewsPage() {
 
   // Fetch news posts for the selected scope (or all global posts if no scope selected)
   const scopeParam = selectedScope === null ? "null" : selectedScope;
-  const { data: rawPosts = [], isLoading } = useQuery<Post[]>({
-    queryKey: [`/api/posts?scopeId=${scopeParam}`],
+  // Posts load 20 at a time (sorted by the server) so phones don't download the whole history
+  const {
+    data: postPages,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery<Post[]>({
+    queryKey: ["/api/posts", scopeParam, sortBy],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const params = new URLSearchParams({
+        scopeId: scopeParam,
+        sort: sortBy,
+        limit: String(POSTS_PAGE_SIZE),
+        offset: String(pageParam),
+      });
+      const response = await fetch(`/api/posts?${params}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to load posts");
+      return response.json();
+    },
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === POSTS_PAGE_SIZE ? allPages.length * POSTS_PAGE_SIZE : undefined,
+    enabled: hasAccess !== false,
   });
-
-  // Sort posts based on selected criteria
-  const posts = useMemo(() => {
-    const sorted = [...rawPosts];
-    switch (sortBy) {
-      case "newest":
-        return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      case "oldest":
-        return sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      case "mostLiked":
-        return sorted.sort((a, b) => b.likesCount - a.likesCount);
-      case "highestCredibility":
-        return sorted.sort((a, b) => b.authorCredibilityScore - a.authorCredibilityScore);
-      default:
-        return sorted;
-    }
-  }, [rawPosts, sortBy]);
+  const posts = useMemo(() => postPages?.pages.flat() ?? [], [postPages]);
 
   // Get current user info
   const { data: user } = useQuery<{
@@ -116,7 +124,7 @@ export default function NewsPage() {
     },
     onSuccess: () => {
       // Refetch posts to get updated likes count and status
-      queryClient.invalidateQueries({ queryKey: ["/api/posts", selectedScope] });
+      queryClient.invalidateQueries({ queryKey: ["/api/posts"] });
     },
     onError: (error: Error) => {
       toast({
@@ -140,7 +148,7 @@ export default function NewsPage() {
         description: "Your news has been shared successfully",
       });
       setNewPost("");
-      queryClient.invalidateQueries({ queryKey: ["/api/posts", selectedScope] });
+      queryClient.invalidateQueries({ queryKey: ["/api/posts"] });
     },
     onError: (error: Error) => {
       toast({
@@ -156,7 +164,7 @@ export default function NewsPage() {
       return await apiRequest("POST", `/api/posts/${data.postId}/rate-accuracy`, { rating: data.rating });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/posts", selectedScope] });
+      queryClient.invalidateQueries({ queryKey: ["/api/posts"] });
     },
     onError: (error: Error) => {
       toast({
@@ -176,7 +184,7 @@ export default function NewsPage() {
         title: "Post updated",
         description: "Your post has been edited successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/posts", selectedScope] });
+      queryClient.invalidateQueries({ queryKey: ["/api/posts"] });
       setEditingPostId(null);
       setEditContent("");
     },
@@ -217,7 +225,7 @@ export default function NewsPage() {
         title: "Post deleted",
         description: "The post has been removed successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/posts", selectedScope] });
+      queryClient.invalidateQueries({ queryKey: ["/api/posts"] });
     },
     onError: (error: Error) => {
       toast({
@@ -373,7 +381,7 @@ export default function NewsPage() {
               {posts.map((post) => (
               <Card 
                 key={post.id} 
-                className={`hover-elevate ${post.isTeacherPost || post.authorRole === 'teacher' ? 'ring-2 ring-amber-400/50 bg-gradient-to-br from-amber-50/30 to-yellow-50/20 dark:from-amber-900/20 dark:to-yellow-900/10 shadow-amber-200/30 dark:shadow-amber-700/20' : ''}`}
+                className={`hover-elevate content-auto ${post.isTeacherPost || post.authorRole === 'teacher' ? 'ring-2 ring-amber-400/50 bg-gradient-to-br from-amber-50/30 to-yellow-50/20 dark:from-amber-900/20 dark:to-yellow-900/10 shadow-amber-200/30 dark:shadow-amber-700/20' : ''}`}
                 data-testid={`card-post-${post.id}`}
               >
                 <CardHeader>
@@ -411,16 +419,18 @@ export default function NewsPage() {
                           size="icon"
                           variant="ghost"
                           onClick={() => handleEditPost(post)}
+                          aria-label="Edit post"
                           data-testid={`button-edit-post-${post.id}`}
                         >
                           <Edit2 className="w-4 h-4" />
                         </Button>
                       )}
-                      {isAdmin() && (
+                      {(isAdmin() || isPostAuthor(post.authorId)) && (
                         <Button
                           size="icon"
                           variant="ghost"
                           onClick={() => handleDeletePost(post.id)}
+                          aria-label="Delete post"
                           data-testid={`button-delete-post-${post.id}`}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -436,7 +446,7 @@ export default function NewsPage() {
                   {post.mediaUrl && (
                     <div className="mt-4">
                       {post.mediaType === "image" && (
-                        <img
+                        <img loading="lazy" decoding="async"
                           src={post.mediaUrl}
                           alt="Post media"
                           className="rounded-md max-h-96 w-full object-cover"
@@ -508,6 +518,17 @@ export default function NewsPage() {
                 </CardFooter>
               </Card>
               ))}
+              {hasNextPage && (
+                <Button
+                  variant="outline"
+                  className="w-full h-11"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  data-testid="button-load-more-posts"
+                >
+                  {isFetchingNextPage ? "Loading..." : "Load more posts"}
+                </Button>
+              )}
             </div>
           )}
         </div>

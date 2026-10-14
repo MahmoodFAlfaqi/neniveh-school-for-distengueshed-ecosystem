@@ -74,8 +74,6 @@ export default function ProfilePage() {
   const userId = params?.userId;
   const [editingProfile, setEditingProfile] = useState(false);
   const [editBio, setEditBio] = useState("");
-  const [editGrade, setEditGrade] = useState("");
-  const [editClassName, setEditClassName] = useState("");
   const [editingHexagon, setEditingHexagon] = useState<"social" | "skills" | "interests" | null>(null);
   const [hexagonValues, setHexagonValues] = useState<Record<string, number>>({});
   const [addingHobby, setAddingHobby] = useState(false);
@@ -91,7 +89,7 @@ export default function ProfilePage() {
   });
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: { bio: string; grade?: number; className?: string }) => {
+    mutationFn: async (data: { bio: string }) => {
       return await apiRequest("PATCH", `/api/users/${currentUser?.id}/profile`, data);
     },
     onSuccess: () => {
@@ -115,19 +113,13 @@ export default function ProfilePage() {
   const handleEditProfile = () => {
     if (user) {
       setEditBio(user.bio || "");
-      setEditGrade(user.grade?.toString() || "");
-      setEditClassName(user.className || "");
       setEditingProfile(true);
     }
   };
 
   const handleSaveProfile = () => {
     if (currentUser?.id === user?.id) {
-      updateProfileMutation.mutate({
-        bio: editBio,
-        grade: editGrade ? parseInt(editGrade) : undefined,
-        className: editClassName || undefined,
-      });
+      updateProfileMutation.mutate({ bio: editBio });
     }
   };
 
@@ -171,7 +163,7 @@ export default function ProfilePage() {
     
     const initialValues: Record<string, number> = {};
     metricKeys[type].forEach((key) => {
-      initialValues[key] = (user as any)[key] ?? 4;
+      initialValues[key] = (user as any)[key] ?? 0;
     });
     
     setHexagonValues(initialValues);
@@ -270,7 +262,7 @@ export default function ProfilePage() {
     const validKeys = metricKeys[editingHexagon];
     const filteredValues: Record<string, number> = {};
     validKeys.forEach(key => {
-      filteredValues[key] = hexagonValues[key] ?? 4;
+      filteredValues[key] = hexagonValues[key] ?? 0;
     });
     
     const total = Object.values(filteredValues).reduce((sum, v) => sum + v, 0);
@@ -485,12 +477,12 @@ export default function ProfilePage() {
               title="Social Personality"
               description="Interpersonal traits and social skills"
               metrics={[
-                { metric: "empathy", arabicLabel: "التعاطف", value: user.empathy || 4, max: 10 },
-                { metric: "angerManagement", arabicLabel: "إدارة الغضب", value: user.angerManagement || 4, max: 10 },
-                { metric: "cooperation", arabicLabel: "التعاون", value: user.cooperation || 4, max: 10 },
-                { metric: "selfConfidence", arabicLabel: "الثقة بالنفس", value: user.selfConfidence || 4, max: 10 },
-                { metric: "acceptingCriticism", arabicLabel: "تقبل النقد", value: user.acceptingCriticism || 4, max: 10 },
-                { metric: "listening", arabicLabel: "الاستماع", value: user.listening || 4, max: 10 },
+                { metric: "empathy", arabicLabel: "التعاطف", value: user.empathy ?? 0, max: 10 },
+                { metric: "angerManagement", arabicLabel: "إدارة الغضب", value: user.angerManagement ?? 0, max: 10 },
+                { metric: "cooperation", arabicLabel: "التعاون", value: user.cooperation ?? 0, max: 10 },
+                { metric: "selfConfidence", arabicLabel: "الثقة بالنفس", value: user.selfConfidence ?? 0, max: 10 },
+                { metric: "acceptingCriticism", arabicLabel: "تقبل النقد", value: user.acceptingCriticism ?? 0, max: 10 },
+                { metric: "listening", arabicLabel: "الاستماع", value: user.listening ?? 0, max: 10 },
               ]}
               color="hsl(var(--chart-1))"
               isOwnProfile={isOwnProfile}
@@ -501,12 +493,12 @@ export default function ProfilePage() {
               title="Skills & Abilities"
               description="Cognitive and practical capabilities"
               metrics={[
-                { metric: "problemSolving", arabicLabel: "حل المشكلات", value: user.problemSolving || 4, max: 10 },
-                { metric: "creativity", arabicLabel: "الإبداع", value: user.creativity || 4, max: 10 },
-                { metric: "memoryFocus", arabicLabel: "الذاكرة والتركيز", value: user.memoryFocus || 4, max: 10 },
-                { metric: "planningOrganization", arabicLabel: "التخطيط والتنظيم", value: user.planningOrganization || 4, max: 10 },
-                { metric: "communicationExpression", arabicLabel: "التواصل والتعبير", value: user.communicationExpression || 4, max: 10 },
-                { metric: "leadershipInitiative", arabicLabel: "القيادة والمبادرة", value: user.leadershipInitiative || 4, max: 10 },
+                { metric: "problemSolving", arabicLabel: "حل المشكلات", value: user.problemSolving ?? 0, max: 10 },
+                { metric: "creativity", arabicLabel: "الإبداع", value: user.creativity ?? 0, max: 10 },
+                { metric: "memoryFocus", arabicLabel: "الذاكرة والتركيز", value: user.memoryFocus ?? 0, max: 10 },
+                { metric: "planningOrganization", arabicLabel: "التخطيط والتنظيم", value: user.planningOrganization ?? 0, max: 10 },
+                { metric: "communicationExpression", arabicLabel: "التواصل والتعبير", value: user.communicationExpression ?? 0, max: 10 },
+                { metric: "leadershipInitiative", arabicLabel: "القيادة والمبادرة", value: user.leadershipInitiative ?? 0, max: 10 },
               ]}
               color="hsl(var(--chart-2))"
               isOwnProfile={isOwnProfile}
@@ -517,12 +509,12 @@ export default function ProfilePage() {
               title="Interests"
               description="Hobbies and personal preferences"
               metrics={[
-                { metric: "artisticCreative", arabicLabel: "الفن والإبداع", value: user.artisticCreative || 4, max: 10 },
-                { metric: "athleticPhysical", arabicLabel: "الرياضة واللياقة", value: user.athleticPhysical || 4, max: 10 },
-                { metric: "technicalTech", arabicLabel: "التقنية والحاسوب", value: user.technicalTech || 4, max: 10 },
-                { metric: "linguisticReading", arabicLabel: "اللغة والقراءة", value: user.linguisticReading || 4, max: 10 },
-                { metric: "socialHumanitarian", arabicLabel: "الاجتماعي والإنساني", value: user.socialHumanitarian || 4, max: 10 },
-                { metric: "naturalEnvironmental", arabicLabel: "الطبيعة والبيئة", value: user.naturalEnvironmental || 4, max: 10 },
+                { metric: "artisticCreative", arabicLabel: "الفن والإبداع", value: user.artisticCreative ?? 0, max: 10 },
+                { metric: "athleticPhysical", arabicLabel: "الرياضة واللياقة", value: user.athleticPhysical ?? 0, max: 10 },
+                { metric: "technicalTech", arabicLabel: "التقنية والحاسوب", value: user.technicalTech ?? 0, max: 10 },
+                { metric: "linguisticReading", arabicLabel: "اللغة والقراءة", value: user.linguisticReading ?? 0, max: 10 },
+                { metric: "socialHumanitarian", arabicLabel: "الاجتماعي والإنساني", value: user.socialHumanitarian ?? 0, max: 10 },
+                { metric: "naturalEnvironmental", arabicLabel: "الطبيعة والبيئة", value: user.naturalEnvironmental ?? 0, max: 10 },
               ]}
               color="hsl(var(--chart-3))"
               isOwnProfile={isOwnProfile}
@@ -595,37 +587,10 @@ export default function ProfilePage() {
             <DialogDescription>Update your profile information.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="grade" className="text-sm font-medium">Grade</label>
-              <Select value={editGrade} onValueChange={setEditGrade}>
-                <SelectTrigger id="grade" data-testid="select-edit-grade">
-                  <SelectValue placeholder="Select grade" />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 4, 5, 6].map((g) => (
-                    <SelectItem key={g} value={g.toString()}>
-                      Grade {g}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="className" className="text-sm font-medium">Class</label>
-              <Select value={editClassName} onValueChange={setEditClassName}>
-                <SelectTrigger id="className" data-testid="select-edit-class">
-                  <SelectValue placeholder="Select class" />
-                </SelectTrigger>
-                <SelectContent>
-                  {["A", "B", "C", "D"].map((cls) => (
-                    <SelectItem key={cls} value={cls}>
-                      {cls}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <p className="text-sm text-muted-foreground" data-testid="text-class-locked">
+              Class: {user?.grade && user?.className ? `${user.grade}-${user.className}` : "Not assigned"}
+              {" "}· Only an admin can change your class.
+            </p>
 
             <div className="space-y-2">
               <label htmlFor="bio" className="text-sm font-medium">Bio</label>
@@ -679,7 +644,7 @@ export default function ProfilePage() {
             {Object.entries(currentHexagonLabels).map(([key, label]) => (
               <div key={key} className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">{label}</label>
+                  <label className="text-sm font-medium">{String(label)}</label>
                   <span className="text-sm font-bold text-primary">{hexagonValues[key] || 0}/10</span>
                 </div>
                 <Slider

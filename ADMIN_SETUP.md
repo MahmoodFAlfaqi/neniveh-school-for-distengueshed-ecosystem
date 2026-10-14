@@ -62,11 +62,27 @@ The new "Promote to Admin" feature allows you to:
 - **Keep your own admin privileges** (this is different from the "handover" feature)
 - Multiple admins can exist simultaneously
 
+### Owner
+- The **first admin who signs in** becomes the **owner**. The owner is shown with a crown badge on the Admin page.
+- Only the owner can: promote students to admin, demote admins, delete admin accounts, change other admins' classes,
+  hand over the admin role, and change the **admin sign-up code**.
+- The admin sign-up code starts as the original code (`ADMIN_REGISTRATION_CODE` / `ADMIN_DEFAULT_PASSWORD` if set,
+  otherwise `NOTHINg27$`). Once the owner sets a new one on the Admin page, it is stored hashed and replaces it.
+- Handing over the admin role also hands over ownership. The owner account cannot be demoted or deleted.
+
+### Admin Classes
+- Admins can open every grade and class without access codes.
+- The **Admin Accounts** card lets you give any admin (including yourself) a grade and class, or "No class".
+- The **Student Accounts** list lets you move a student to another class. Students can no longer change their own class.
+
 ### Handover vs. Promotion
 - **Handover**: Transfers admin privileges to another user and demotes you to student
 - **Promotion** (New): Grants admin privileges to a student while you remain an admin
+- Both are owner-only
 
 ## Security Notes
+
+- Every user can change their password in **Settings → Change Password**.
 
 - The default password should be changed after first login
 - Admin accounts are marked with `isSpecialAdmin: true` flag

@@ -6,7 +6,10 @@ import { Label } from "@/components/ui/label";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, Copy, Check, ChevronUp, ChevronDown, Crown } from "lucide-react";
+import { Trash2, Plus, Copy, Check, ChevronUp, ChevronDown, Crown, ShieldCheck, ArrowRightLeft, KeyRound } from "lucide-react";
+import { useLocation } from "wouter";
+import { ClassPicker, CLASS_LETTERS, GRADES } from "@/components/ClassPicker";
+import { useUser } from "@/hooks/use-user";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -57,17 +60,28 @@ type SortDirection = "asc" | "desc";
 type Scope = {
   id: string;
   name: string;
-  type: "grade" | "section";
+  type: "grade" | "section" | "public";
   gradeNumber: number | null;
   sectionName: string | null;
-  accessCode: string;
+  accessCode: string | null;
   createdAt: string;
+};
+
+type AdminAccount = {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  grade: number | null;
+  className: string | null;
+  isSpecialAdmin: boolean;
+  isOwner: boolean;
 };
 
 function ScopeManagement() {
   const { toast } = useToast();
   const [scopeName, setScopeName] = useState("");
-  const [scopeType, setScopeType] = useState<"grade" | "section">("section");
+  const [scopeType, setScopeType] = useState<"grade" | "section" | "public">("section");
   const [gradeNumber, setGradeNumber] = useState("");
   const [sectionName, setSectionName] = useState("");
   const [accessCode, setAccessCode] = useState("");
@@ -79,7 +93,7 @@ function ScopeManagement() {
   });
 
   const createScopeMutation = useMutation({
-    mutationFn: async (data: { name: string; type: string; gradeNumber?: number; sectionName?: string; accessCode: string }) => {
+    mutationFn: async (data: { name: string; type: string; gradeNumber?: number; sectionName?: string; accessCode: string | null }) => {
       return await apiRequest("POST", "/api/scopes", data);
     },
     onSuccess: () => {
@@ -419,8 +433,316 @@ function ScopeManagement() {
   );
 }
 
+function AdminAccountsCard() {
+  const { user } = useUser();
+  const { toast } = useToast();
+  const isOwner = !!(user as { isOwner?: boolean } | undefined)?.isOwner;
+  const [adminToDemote, setAdminToDemote] = useState<AdminAccount | null>(null);
+  const { data: admins, isLoading } = useQuery<AdminAccount[]>({
+    queryKey: ["/api/admin/admins"],
+  });
+
+  const demoteMutation = useMutation({
+    mutationFn: async (userId: string) => (await apiRequest("POST", "/api/admin/demote", { userId })).json(),
+    onSuccess: (result: { message?: string }) => {
+      toast({ title: "Admin demoted", description: result?.message });
+      setAdminToDemote(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/admins"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/students"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to demote admin", description: error.message, variant: "destructive" });
+      setAdminToDemote(null);
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ShieldCheck className="w-5 h-5" />
+          Admin Accounts
+        </CardTitle>
+        <CardDescription>
+          Admins can open every grade and class without an access code; the class only decides where they appear
+          in class lists. Every admin can set their own class. The owner (the first admin who signed in) can also
+          change other admins' classes and demote admins.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8" role="status" aria-label="Loading admins">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : !admins || admins.length === 0 ? (
+          <p className="text-center text-muted-foreground py-8">No admin accounts found.</p>
+        ) : (
+          <ul className="space-y-2">
+            {admins.map((admin) => (
+              <li
+                key={admin.id}
+                className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4 rounded-lg border"
+                data-testid={`admin-account-${admin.id}`}
+              >
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-semibold truncate">
+                      {admin.name}
+                      {admin.id === user?.id && <span className="text-muted-foreground font-normal"> (you)</span>}
+                    </span>
+                    <code className="text-sm font-mono text-muted-foreground truncate">@{admin.username}</code>
+                  </div>
+                  {admin.isOwner && (
+                    <Badge className="gap-1" data-testid={`badge-owner-${admin.id}`}>
+                      <Crown className="w-3 h-3" aria-hidden="true" /> Owner
+                    </Badge>
+                  )}
+                  <Badge variant="outline">
+                    {admin.grade && admin.className ? `Class ${admin.grade}-${admin.className}` : "No class"}
+                  </Badge>
+                </div>
+                {(isOwner || admin.id === user?.id) && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ClassPicker
+                      userId={admin.id}
+                      userName={admin.name}
+                      grade={admin.grade}
+                      className={admin.className}
+                      allowNone
+                      invalidate={[["/api/admin/admins"], ["/api/auth/me"]]}
+                    />
+                    {isOwner && !admin.isOwner && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-10"
+                        onClick={() => setAdminToDemote(admin)}
+                        data-testid={`button-demote-${admin.id}`}
+                      >
+                        Demote
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+
+      <AlertDialog open={!!adminToDemote} onOpenChange={(open) => !open && setAdminToDemote(null)}>
+        <AlertDialogContent data-testid="dialog-confirm-demote">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Demote {adminToDemote?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>They will lose admin access and become a student.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => adminToDemote && demoteMutation.mutate(adminToDemote.id)}
+              disabled={demoteMutation.isPending}
+              data-testid="button-confirm-demote"
+            >
+              {demoteMutation.isPending ? "Demoting..." : "Demote"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
+}
+
+function AdminCodeCard() {
+  const { toast } = useToast();
+  const [code, setCode] = useState("");
+  const [confirmCode, setConfirmCode] = useState("");
+
+  const mutation = useMutation({
+    mutationFn: async () => (await apiRequest("PUT", "/api/admin/settings/admin-code", { code })).json(),
+    onSuccess: () => {
+      toast({ title: "Admin sign-up code updated", description: "New admins must use the new code from now on." });
+      setCode("");
+      setConfirmCode("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update code", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const mismatch = confirmCode.length > 0 && code !== confirmCode;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <KeyRound className="w-5 h-5" />
+          Admin Sign-up Code
+        </CardTitle>
+        <CardDescription>
+          The code new admins enter on the admin sign-up form. It starts as the original code; only you, the owner,
+          can change it.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!mismatch && code.length >= 8) mutation.mutate();
+          }}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="admin-code">New code</Label>
+              <Input
+                id="admin-code"
+                type="password"
+                autoComplete="new-password"
+                placeholder="At least 8 characters"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                data-testid="input-admin-code"
+              />
+            </div>
+            <div>
+              <Label htmlFor="admin-code-confirm">Repeat new code</Label>
+              <Input
+                id="admin-code-confirm"
+                type="password"
+                autoComplete="new-password"
+                value={confirmCode}
+                onChange={(e) => setConfirmCode(e.target.value)}
+                aria-invalid={mismatch}
+                aria-describedby={mismatch ? "admin-code-mismatch" : undefined}
+                data-testid="input-admin-code-confirm"
+              />
+              {mismatch && (
+                <p id="admin-code-mismatch" className="text-sm text-destructive mt-1">Codes don't match</p>
+              )}
+            </div>
+          </div>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={code.length < 8 || code !== confirmCode || mutation.isPending}
+            data-testid="button-save-admin-code"
+          >
+            {mutation.isPending ? "Saving..." : "Save new code"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function HandoverCard({ students, studentsLoading }: { students: Student[]; studentsLoading: boolean }) {
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const [successorId, setSuccessorId] = useState("");
+  const [notes, setNotes] = useState("");
+  const [showConfirm, setShowConfirm] = useState(false);
+  const successor = students.find((s) => s.id === successorId);
+
+  const handoverMutation = useMutation({
+    mutationFn: async () =>
+      (await apiRequest("POST", "/api/admin/handover", { successorId, notes: notes.trim() || undefined })).json(),
+    onSuccess: (result: { message?: string }) => {
+      toast({ title: "Admin role handed over", description: result?.message });
+      setShowConfirm(false);
+      queryClient.invalidateQueries();
+      navigate("/");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Handover failed", description: error.message, variant: "destructive" });
+      setShowConfirm(false);
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ArrowRightLeft className="w-5 h-5" />
+          Hand Over Admin Role
+        </CardTitle>
+        <CardDescription>
+          Pass your admin role and ownership to a student. They become the owner and you become a student. This is
+          recorded in the succession history.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <Label htmlFor="select-successor">Successor</Label>
+          <Select value={successorId} onValueChange={setSuccessorId}>
+            <SelectTrigger id="select-successor" data-testid="select-successor">
+              <SelectValue placeholder={studentsLoading ? "Loading..." : "Choose a student..."} />
+            </SelectTrigger>
+            <SelectContent>
+              {students.length > 0 ? (
+                students.map((student) => (
+                  <SelectItem key={student.id} value={student.id}>
+                    {student.name} (@{student.username})
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="none" disabled>
+                  No students available
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="handover-notes">Notes (optional)</Label>
+          <Input
+            id="handover-notes"
+            placeholder="e.g., End of school year handover"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            data-testid="input-handover-notes"
+          />
+        </div>
+        <Button
+          variant="destructive"
+          className="w-full"
+          disabled={!successorId || handoverMutation.isPending}
+          onClick={() => setShowConfirm(true)}
+          data-testid="button-handover"
+        >
+          <ArrowRightLeft className="w-4 h-4 mr-2" />
+          Hand over admin role
+        </Button>
+      </CardContent>
+
+      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <AlertDialogContent data-testid="dialog-confirm-handover">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hand over your admin role?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{successor?.name}</strong> will become an admin and you will lose admin access immediately. Only
+              another admin can give it back.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => handoverMutation.mutate()}
+              disabled={handoverMutation.isPending}
+              data-testid="button-confirm-handover"
+            >
+              {handoverMutation.isPending ? "Handing over..." : "Hand over"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
+}
+
 export default function AdminPage() {
   const { toast } = useToast();
+  const { user: currentUser } = useUser();
+  const isOwner = !!(currentUser as { isOwner?: boolean } | undefined)?.isOwner;
   const [username, setUsername] = useState("");
   const [grade, setGrade] = useState("");
   const [className, setClassName] = useState("");
@@ -446,7 +768,7 @@ export default function AdminPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: { username: string; grade: number; className: string }) => {
-      return await apiRequest("POST", "/api/admin/student-ids", data);
+      return (await apiRequest("POST", "/api/admin/student-ids", data)).json();
     },
     onSuccess: (response: any) => {
       const generatedId = response?.studentId?.studentId || response?.studentId || "Unknown";
@@ -530,6 +852,7 @@ export default function AdminPage() {
       setSelectedUserToPromote("");
       setShowPromoteDialog(false);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/students"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/admins"] });
     },
     onError: (error: Error) => {
       toast({
@@ -663,8 +986,8 @@ export default function AdminPage() {
   }, [studentIds, idSearchQuery, idSortField, idSortDirection]);
 
   return (
-    <div className="container max-w-6xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Admin Management</h1>
+    <div className="container max-w-6xl mx-auto px-4 py-6 sm:p-6">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6">Admin Management</h1>
 
       <div className="grid gap-6">
         <Card>
@@ -688,27 +1011,30 @@ export default function AdminPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="grade">Grade (1-6)</Label>
-                  <Input
-                    id="grade"
-                    type="number"
-                    min="1"
-                    max="6"
-                    placeholder="1-6"
-                    value={grade}
-                    onChange={(e) => setGrade(e.target.value)}
-                    data-testid="input-grade"
-                  />
+                  <Label htmlFor="grade">Grade</Label>
+                  <Select value={grade} onValueChange={setGrade}>
+                    <SelectTrigger id="grade" data-testid="input-grade">
+                      <SelectValue placeholder="Choose 1-6" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {GRADES.map((g) => (
+                        <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="className">Class</Label>
-                  <Input
-                    id="className"
-                    placeholder="e.g., A"
-                    value={className}
-                    onChange={(e) => setClassName(e.target.value)}
-                    data-testid="input-class"
-                  />
+                  <Select value={className} onValueChange={setClassName}>
+                    <SelectTrigger id="className" data-testid="input-class">
+                      <SelectValue placeholder="Choose A-E" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CLASS_LETTERS.map((letter) => (
+                        <SelectItem key={letter} value={letter}>Class {letter}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <Button 
@@ -799,10 +1125,10 @@ export default function AdminPage() {
                   {filteredAndSortedStudentIds.map((record) => (
                     <div
                       key={record.id}
-                      className="flex items-center justify-between p-4 rounded-lg border hover-elevate"
+                      className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4 rounded-lg border content-auto"
                       data-testid={`student-id-${record.studentId}`}
                     >
-                      <div className="flex items-center gap-4 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 flex-1 min-w-0">
                         <div className="flex flex-col">
                           <span className="font-semibold">{record.username}</span>
                           <code className="text-sm font-mono text-muted-foreground">
@@ -823,9 +1149,10 @@ export default function AdminPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Button
-                          size="sm"
+                          size="icon"
                           variant="ghost"
                           onClick={() => handleCopy(record.studentId)}
+                          aria-label={`Copy student ID ${record.studentId}`}
                           data-testid={`button-copy-${record.studentId}`}
                         >
                           {copiedId === record.studentId ? (
@@ -836,10 +1163,11 @@ export default function AdminPage() {
                         </Button>
                         {!record.isAssigned && (
                           <Button
-                            size="sm"
+                            size="icon"
                             variant="ghost"
                             onClick={() => deleteMutation.mutate(record.id)}
                             disabled={deleteMutation.isPending}
+                            aria-label={`Delete student ID for ${record.username}`}
                             data-testid={`button-delete-${record.studentId}`}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -858,7 +1186,7 @@ export default function AdminPage() {
           <CardHeader>
             <CardTitle>Student Accounts</CardTitle>
             <CardDescription>
-              All registered student accounts. You can delete accounts here, which will remove all associated data.
+              All registered student accounts. Move a student to another class, or delete an account and all of its data.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-3 pt-0">
@@ -929,10 +1257,10 @@ export default function AdminPage() {
                   {filteredAndSortedStudents.map((student) => (
                     <div
                       key={student.id}
-                      className="flex items-center justify-between p-4 rounded-lg border hover-elevate"
+                      className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4 rounded-lg border content-auto"
                       data-testid={`student-account-${student.id}`}
                     >
-                      <div className="flex items-center gap-4 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 flex-1 min-w-0">
                         <div className="flex flex-col">
                           <span className="font-semibold">{student.name}</span>
                           <code className="text-sm font-mono text-muted-foreground">
@@ -951,15 +1279,25 @@ export default function AdminPage() {
                           Joined {new Date(student.createdAt).toLocaleDateString()}
                         </span>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDeleteStudent(student.id, student.name)}
-                        disabled={deleteAccountMutation.isPending}
-                        data-testid={`button-delete-account-${student.id}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ClassPicker
+                          userId={student.id}
+                          userName={student.name}
+                          grade={student.grade}
+                          className={student.className}
+                          invalidate={[["/api/admin/students"]]}
+                        />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDeleteStudent(student.id, student.name)}
+                          disabled={deleteAccountMutation.isPending}
+                          aria-label={`Delete ${student.name}'s account`}
+                          data-testid={`button-delete-account-${student.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -981,6 +1319,13 @@ export default function AdminPage() {
           </CardContent>
         </Card>
 
+        <AdminAccountsCard />
+
+        {isOwner && <AdminCodeCard />}
+
+        {isOwner && <HandoverCard students={students ?? []} studentsLoading={studentsLoading} />}
+
+        {isOwner && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -1044,6 +1389,7 @@ export default function AdminPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         <AlertDialog open={showPromoteDialog} onOpenChange={setShowPromoteDialog}>
           <AlertDialogContent data-testid="dialog-confirm-promote">

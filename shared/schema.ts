@@ -34,7 +34,7 @@ export const users = pgTable("users", {
   
   // Grade and Class assignment (for students)
   grade: integer("grade"), // 1-6 for grades 1-6, null for admins
-  className: text("class_name"), // e.g., "A", "B", "C", "D", null for admins
+  className: text("class_name"), // "A"-"E"; optional for admins (set from the Admin page)
   
   // Teacher profile link (for teacher role)
   teacherProfileId: varchar("teacher_profile_id"), // Links to teachers.id when role is 'teacher'
@@ -55,31 +55,31 @@ export const users = pgTable("users", {
   hobbies: text("hobbies").array(),
   
   // Hexagon Tendency Charts - 3 hexagons with 6 metrics each
-  // Total points per hexagon: 24, each metric max: 10
+  // Total points per hexagon: 33, each metric max: 10 (defaults 6+6+6+5+5+5 = 33)
   
   // Social Personality Hexagon (6 metrics)
-  empathy: integer("empathy").default(4),
-  angerManagement: integer("anger_management").default(4),
-  cooperation: integer("cooperation").default(4),
-  selfConfidence: integer("self_confidence").default(4),
-  acceptingCriticism: integer("accepting_criticism").default(4),
-  listening: integer("listening").default(4),
+  empathy: integer("empathy").default(6),
+  angerManagement: integer("anger_management").default(6),
+  cooperation: integer("cooperation").default(6),
+  selfConfidence: integer("self_confidence").default(5),
+  acceptingCriticism: integer("accepting_criticism").default(5),
+  listening: integer("listening").default(5),
   
   // Skills & Abilities Hexagon (6 metrics)
-  problemSolving: integer("problem_solving").default(4),
-  creativity: integer("creativity").default(4),
-  memoryFocus: integer("memory_focus").default(4),
-  planningOrganization: integer("planning_organization").default(4),
-  communicationExpression: integer("communication_expression").default(4),
-  leadershipInitiative: integer("leadership_initiative").default(4),
+  problemSolving: integer("problem_solving").default(6),
+  creativity: integer("creativity").default(6),
+  memoryFocus: integer("memory_focus").default(6),
+  planningOrganization: integer("planning_organization").default(5),
+  communicationExpression: integer("communication_expression").default(5),
+  leadershipInitiative: integer("leadership_initiative").default(5),
   
   // Interests Hexagon (6 metrics)
-  artisticCreative: integer("artistic_creative").default(4),
-  athleticPhysical: integer("athletic_physical").default(4),
-  technicalTech: integer("technical_tech").default(4),
-  linguisticReading: integer("linguistic_reading").default(4),
-  socialHumanitarian: integer("social_humanitarian").default(4),
-  naturalEnvironmental: integer("natural_environmental").default(4),
+  artisticCreative: integer("artistic_creative").default(6),
+  athleticPhysical: integer("athletic_physical").default(6),
+  technicalTech: integer("technical_tech").default(6),
+  linguisticReading: integer("linguistic_reading").default(5),
+  socialHumanitarian: integer("social_humanitarian").default(5),
+  naturalEnvironmental: integer("natural_environmental").default(5),
   
   // User preferences
   language: languageEnum("language").notNull().default("en"),
@@ -149,7 +149,7 @@ export const adminStudentIds = pgTable("admin_student_ids", {
   username: text("username").notNull().unique(), // The pre-assigned username (e.g., "John.Smith"), must be unique
   studentId: text("student_id").notNull().unique(), // The auto-generated random ID
   grade: integer("grade").notNull(), // 1-6 for grades
-  className: text("class_name").notNull(), // e.g., "A", "B", "C", "D"
+  className: text("class_name").notNull(), // "A"-"E"
   isAssigned: boolean("is_assigned").notNull().default(false), // Whether this ID has been used
   assignedToUserId: varchar("assigned_to_user_id").references(() => users.id), // Which user claimed this ID
   createdByAdminId: varchar("created_by_admin_id").notNull().references(() => users.id),
@@ -670,7 +670,7 @@ export const insertAdminStudentIdSchema = createInsertSchema(adminStudentIds)
         "Username must contain 1-5 names with only letters, periods, hyphens, commas, and single spaces between names"
       ),
     grade: z.number().int().min(1).max(6),
-    className: z.string().trim().min(1, "Class name is required"),
+    className: z.string().trim().toUpperCase().regex(/^[A-E]$/, "Class must be a letter A-E"),
   });
 
 export const insertPostSchema = createInsertSchema(posts)

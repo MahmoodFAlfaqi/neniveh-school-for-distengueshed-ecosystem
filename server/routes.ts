@@ -7,6 +7,7 @@ import crypto from "crypto";
 import { storage } from "./storage";
 import { db } from "./db";
 import { 
+  type User,
   users,
   insertUserSchema,
   insertPostSchema,
@@ -70,12 +71,104 @@ async function requireNonVisitor(req: Request, res: Response, next: NextFunction
   if (!user) {
     return res.status(401).json({ message: "User not found" });
   }
-  
+
   if (user.role === "visitor") {
     return res.status(403).json({ message: "Visitors cannot perform this action. Please login as a student or admin." });
   }
-  
+
+  // Enforce bans: suspended accounts are read-only until the ban expires
+  if (user.accountStatus === "suspended") {
+    const ban = await storage.getActiveBan(user.id);
+    if (ban) {
+      const until = ban.banUntil ? ` until ${ban.banUntil.toISOString()}` : " permanently";
+      return res.status(403).json({ message: `Your account is suspended${until}.` });
+    }
+    await storage.liftExpiredSuspension(user.id);
+  }
+
   next();
+}
+
+// Scope access check that also handles session-only visitors (public scope only)
+async function canAccessScope(req: Request, scopeId: string | null | undefined): Promise<boolean> {
+  if (!scopeId) return true;
+  if (!req.session.userId) {
+    const scope = await storage.getScope(scopeId);
+    return scope?.type === "public";
+  }
+  return storage.hasAccessToScope(req.session.userId, scopeId);
+}
+
+async function isAdminSession(req: Request): Promise<boolean> {
+  if (!req.session.userId) return false;
+  const user = await storage.getUser(req.session.userId);
+  return user?.role === "admin";
+}
+
+const MIN_PASSWORD_LENGTH = 8;
+
+// Original admin sign-up code. The owner can replace it from the Admin page (stored hashed in settings).
+const DEFAULT_ADMIN_CODE = "NOTHINg27$";
+
+async function verifyAdminCode(code: string): Promise<boolean> {
+  const stored = await storage.getSetting("adminRegistrationCodeHash");
+  if (stored?.value) {
+    return bcrypt.compare(code, stored.value);
+  }
+  return code === (process.env.ADMIN_REGISTRATION_CODE || process.env.ADMIN_DEFAULT_PASSWORD || DEFAULT_ADMIN_CODE);
+}
+
+// The first admin to sign in becomes the owner (full privileges, cannot be demoted or deleted)
+async function claimOwnerIfAdmin(user: { id: string; role: string }) {
+  if (user.role === "admin") {
+    await storage.claimOwnershipIfUnset(user.id);
+  }
+}
+
+async function isOwnerSession(req: Request): Promise<boolean> {
+  if (!req.session.userId) return false;
+  const [ownerId, user] = await Promise.all([storage.getOwnerId(), storage.getUser(req.session.userId)]);
+  return user?.role === "admin" && ownerId === user.id;
+}
+
+async function requireOwner(req: Request, res: Response, next: NextFunction) {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+  if (!(await isOwnerSession(req))) {
+    return res.status(403).json({ message: "Only the owner can do this" });
+  }
+  next();
+}
+
+// Safe subset of a user record for other users to see (never password/email/phone)
+function toPublicUser(user: User) {
+  return {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    role: user.role,
+    grade: user.grade,
+    className: user.className,
+    avatarUrl: user.avatarUrl,
+    bio: user.bio,
+    credibilityScore: user.credibilityScore,
+    reputationScore: user.reputationScore,
+    accountStatus: user.accountStatus,
+  };
+}
+
+// Teacher registration codes and admin notes are admin-only
+function toPublicTeacher<T extends { teacherId: string | null; adminNotes: string | null }>(teacher: T) {
+  const { teacherId, adminNotes, ...rest } = teacher;
+  return { ...rest, hasTeacherId: !!teacherId };
+}
+
+// Session fixation protection: issue a fresh session id on every login
+function regenerateSession(req: Request): Promise<void> {
+  return new Promise((resolve, reject) => {
+    req.session.regenerate((err) => (err ? reject(err) : resolve()));
+  });
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -107,8 +200,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[REGISTER] User created successfully:", user.id);
       
       // Set session
+      await regenerateSession(req);
       req.session.userId = user.id;
-      
+      await claimOwnerIfAdmin(user);
+
       // Don't send password back
       const { password, ...userWithoutPassword } = user;
       
@@ -152,23 +247,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Username and password required" });
       }
       
+      if (await storage.isAccountLocked(username)) {
+        return res.status(429).json({
+          message: "Account locked due to too many failed attempts. Please try again in 15 minutes."
+        });
+      }
+
       const user = await storage.getUserByUsername(username);
       if (!user) {
-        console.log("[AUTH] User not found:", username);
+        await storage.recordFailedLogin(username);
         return res.status(401).json({ message: "Invalid credentials" });
       }
-      
-      console.log("[AUTH] User found:", { id: user.id, username: user.username });
+
       const passwordMatch = await bcrypt.compare(password, user.password);
-      console.log("[AUTH] Password match:", passwordMatch);
-      
+
       if (!passwordMatch) {
+        await storage.recordFailedLogin(username);
         return res.status(401).json({ message: "Invalid credentials" });
       }
-      
+
+      await storage.clearFailedLoginAttempts(username);
+
       // Set session
+      await regenerateSession(req);
       req.session.userId = user.id;
-      console.log("[AUTH] Session set:", req.session.userId);
+      await claimOwnerIfAdmin(user);
+console.log("[AUTH] Session set:", req.session.userId);
       
       // Handle remember me for students (same as admins)
       if (rememberMe) {
@@ -206,14 +310,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "All fields are required" });
       }
 
-      if (password.length < 6) {
-        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      if (password.length < MIN_PASSWORD_LENGTH) {
+        return res.status(400).json({ message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
       }
 
-      // Verify administration code
-      const ADMIN_CODE = process.env.ADMIN_DEFAULT_PASSWORD || "NOTHINg27$";
-      
-      if (scientificAnswer !== ADMIN_CODE) {
+if (await storage.isAccountLocked(`admin-register:${req.ip}`)) {
+        return res.status(429).json({ message: "Too many attempts. Please try again in 15 minutes." });
+      }
+
+      if (!(await verifyAdminCode(scientificAnswer))) {
+        await storage.recordFailedLogin(`admin-register:${req.ip}`);
         return res.status(401).json({ message: "Incorrect administration code" });
       }
       
@@ -244,8 +350,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }).returning();
       
       // Set session
+      await regenerateSession(req);
       req.session.userId = admin.id;
-      
+      await claimOwnerIfAdmin(admin);
+
       const { password: _, ...adminWithoutPassword } = admin;
       
       res.json({ 
@@ -271,12 +379,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(500).json({ 
-        message: userMessage, 
-        error: errorMsg,
-        debug: {
-          type: errorType,
-          details: errorMsg
-        }
+        message: userMessage
       });
     }
   });
@@ -319,7 +422,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.clearFailedLoginAttempts(username);
       
       // Set session
+      await regenerateSession(req);
       req.session.userId = user.id;
+      await claimOwnerIfAdmin(user);
 
       // Handle remember-me functionality
       if (rememberMe) {
@@ -350,12 +455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Stack trace:", error.stack);
       }
       res.status(500).json({ 
-        message: "Admin login failed", 
-        error: errorMsg,
-        debug: {
-          type: errorType,
-          details: errorMsg
-        }
+        message: "Admin login failed"
       });
     }
   });
@@ -370,6 +470,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate required fields
       if (!username || !teacherId || !email || !password) {
         return res.status(400).json({ message: "Username, Teacher ID, email, and password are required" });
+      }
+      
+      if (password.length < MIN_PASSWORD_LENGTH) {
+        return res.status(400).json({ message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
       }
       
       // Check if username already exists
@@ -423,8 +527,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[TEACHER_REGISTER] Teacher registered successfully:", user.id);
       
       // Set session
+      await regenerateSession(req);
       req.session.userId = user.id;
-      
+      await claimOwnerIfAdmin(user);
+
       // Don't send password back
       const { password: _, ...userWithoutPassword } = user;
       
@@ -449,9 +555,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Username and password required" });
       }
       
+      if (await storage.isAccountLocked(username)) {
+        return res.status(429).json({ 
+          message: "Account locked due to too many failed attempts. Please try again in 15 minutes." 
+        });
+      }
+      
       const user = await storage.getUserByUsername(username);
       if (!user) {
-        console.log("[TEACHER_AUTH] User not found:", username);
+        await storage.recordFailedLogin(username);
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
@@ -463,12 +575,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const passwordMatch = await bcrypt.compare(password, user.password);
       if (!passwordMatch) {
+        await storage.recordFailedLogin(username);
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
-      // Set session
-      req.session.userId = user.id;
+      await storage.clearFailedLoginAttempts(username);
       
+      // Set session
+      await regenerateSession(req);
+      req.session.userId = user.id;
+      await claimOwnerIfAdmin(user);
+
       // Handle remember me
       if (rememberMe) {
         const token = crypto.randomBytes(32).toString('hex');
@@ -477,6 +594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Set remember-me cookie (7 days)
         res.cookie('remember_token', token, {
           httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
           maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
           sameSite: 'lax',
         });
@@ -622,8 +740,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Token and new password required" });
       }
 
-      if (newPassword.length < 6) {
-        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      if (newPassword.length < MIN_PASSWORD_LENGTH) {
+        return res.status(400).json({ message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
       }
 
       const success = await storage.resetPassword(token, newPassword);
@@ -636,6 +754,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Reset password error:", error);
       res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
+  // Change own password (logged-in users)
+  app.post("/api/auth/change-password", requireAuth, requireNonVisitor, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      if (typeof currentPassword !== "string" || typeof newPassword !== "string") {
+        return res.status(400).json({ message: "Current and new password are required" });
+      }
+      if (newPassword.length < MIN_PASSWORD_LENGTH) {
+        return res.status(400).json({ message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+      }
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !(await bcrypt.compare(currentPassword, user.password))) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+      await storage.updatePassword(user.id, newPassword);
+      res.clearCookie("remember_token");
+      res.json({ message: "Password changed successfully" });
+    } catch (error) {
+      console.error("Change password error:", error);
+      res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
+  // Owner changes the admin sign-up code
+  app.put("/api/admin/settings/admin-code", requireOwner, async (req, res) => {
+    try {
+      const { code } = req.body;
+      if (typeof code !== "string" || code.length < MIN_PASSWORD_LENGTH) {
+        return res.status(400).json({ message: `Code must be at least ${MIN_PASSWORD_LENGTH} characters` });
+      }
+      await storage.setSetting("adminRegistrationCodeHash", await bcrypt.hash(code, 10));
+      res.json({ message: "Admin sign-up code updated" });
+    } catch (error) {
+      console.error("Failed to update admin code:", error);
+      res.status(500).json({ message: "Failed to update admin code" });
     }
   });
 
@@ -653,9 +809,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const { password, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      const ownerId = user.role === "admin" ? await storage.getOwnerId() : null;
+      res.json({ ...userWithoutPassword, isOwner: ownerId === user.id });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Search user by email (for admin handover)
+  app.get("/api/users/search", requireAdmin, async (req, res) => {
+    try {
+      const { email } = req.query;
+      
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ message: "Email query parameter required" });
+      }
+      
+      const user = await storage.getUserByEmail(email);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Return limited info
+      res.json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to search user" });
     }
   });
 
@@ -719,14 +903,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You can only edit your own profile" });
       }
       
-      const { bio, avatarUrl, grade, className } = req.body;
+      // grade/className are assigned by admins only (see PATCH /api/admin/users/:userId/class)
+      const { bio, avatarUrl } = req.body;
       
       // Moderate bio before updating
       if (bio && typeof bio === "string" && bio.trim()) {
         await requireModeration(bio);
       }
       
-      const updated = await storage.updateUserProfile(userId, { bio, avatarUrl, grade, className });
+      const updated = await storage.updateUserProfile(userId, { bio, avatarUrl });
       
       if (!updated) {
         return res.status(404).json({ message: "User not found" });
@@ -824,7 +1009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // hexagonData is already validated by Zod schema (integers 0-10)
       const updates: Record<string, number> = hexagonData;
       
-      // Validate total points for the detected hexagon (must be exactly 24)
+      // Validate total points for the detected hexagon (must be exactly 33)
       const total = Object.values(updates).reduce((sum, v) => sum + v, 0);
       
       if (total !== 33) {
@@ -937,7 +1122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/students", requireAdmin, async (req, res) => {
     try {
       const students = await storage.getAssignedStudents();
-      res.json(students);
+      res.json(students.map(({ password, ...student }) => student));
     } catch (error) {
       console.error("Failed to fetch assigned students:", error);
       res.status(500).json({ message: "Failed to fetch assigned students" });
@@ -1112,7 +1297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== ADMIN HANDOVER PROTOCOL ====================
   
   // Transfer admin privileges (requires current user to be admin)
-  app.post("/api/admin/handover", requireAdmin, async (req, res) => {
+  app.post("/api/admin/handover", requireOwner, async (req, res) => {
     try {
       const { successorId, notes } = req.body;
       const currentAdminId = req.session.userId!; // Authenticated admin
@@ -1122,11 +1307,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const result = await storage.transferAdminPrivileges(currentAdminId, successorId, notes);
-      
+
       if (!result.success) {
         return res.status(400).json({ message: result.message });
       }
-      
+
+      // Ownership moves with the handover
+      await storage.setOwner(successorId);
+
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to transfer admin privileges" });
@@ -1144,7 +1332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Promote user to admin (requires current user to be admin)
-  app.post("/api/admin/promote", requireAdmin, async (req, res) => {
+  app.post("/api/admin/promote", requireOwner, async (req, res) => {
     try {
       const { userId } = req.body;
       const currentAdminId = req.session.userId!;
@@ -1163,6 +1351,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to promote user to admin:", error);
       res.status(500).json({ message: "Failed to promote user to admin" });
+    }
+  });
+
+  // Demote an admin back to student (owner only; the owner cannot be demoted)
+  app.post("/api/admin/demote", requireOwner, async (req, res) => {
+    try {
+      const { userId } = req.body;
+      if (!userId || userId === req.session.userId) {
+        return res.status(400).json({ message: "Choose another admin to demote" });
+      }
+      const demoted = await storage.demoteAdmin(userId);
+      if (!demoted) {
+        return res.status(404).json({ message: "Admin not found" });
+      }
+      res.json({ message: `${demoted.name} is now a student` });
+    } catch (error) {
+      console.error("Failed to demote admin:", error);
+      res.status(500).json({ message: "Failed to demote admin" });
+    }
+  });
+
+  // List admin accounts (admin only)
+  app.get("/api/admin/admins", requireAdmin, async (req, res) => {
+    try {
+      const [admins, ownerId] = await Promise.all([storage.getAdmins(), storage.getOwnerId()]);
+      res.json(admins.map((admin) => ({
+        ...toPublicUser(admin),
+        email: admin.email,
+        isSpecialAdmin: admin.isSpecialAdmin,
+        isOwner: admin.id === ownerId,
+      })));
+    } catch (error) {
+      console.error("Failed to fetch admins:", error);
+      res.status(500).json({ message: "Failed to fetch admins" });
+    }
+  });
+
+  // Change the grade/class of an admin or student (admin only).
+  // Admins may be unassigned (null); students always need a class.
+  app.patch("/api/admin/users/:userId/class", requireAdmin, async (req, res) => {
+    try {
+      const classSchema = z.object({
+        grade: z.number().int().min(1).max(6).nullable(),
+        className: z.string().trim().toUpperCase().regex(/^[A-E]$/, "Class must be a letter A-E").nullable(),
+      }).refine((v) => (v.grade === null) === (v.className === null), {
+        message: "Grade and class must be set together",
+      });
+      const parsed = classSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0]?.message ?? "Invalid class", errors: parsed.error.errors });
+      }
+      const { grade, className } = parsed.data;
+
+      const target = await storage.getUser(req.params.userId);
+      if (!target) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      if (target.role !== "admin" && target.role !== "student") {
+        return res.status(400).json({ message: "Only admin and student classes can be changed" });
+      }
+      if (target.role === "admin" && target.id !== req.session.userId && !(await isOwnerSession(req))) {
+        return res.status(403).json({ message: "Only the owner can change another admin's class" });
+      }
+      if (target.role === "student" && grade === null) {
+        return res.status(400).json({ message: "Students must belong to a class" });
+      }
+
+      const updated = await storage.updateUserClass(target.id, grade, className);
+      res.json(updated ? toPublicUser(updated) : null);
+    } catch (error) {
+      console.error("Failed to change user class:", error);
+      res.status(500).json({ message: "Failed to change class" });
     }
   });
 
@@ -1210,6 +1470,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (currentAdmin?.id === userId) {
         return res.status(400).json({ message: "You cannot delete your own account" });
       }
+
+      const target = await storage.getUser(userId);
+      if (target?.role === "admin") {
+        if (userId === (await storage.getOwnerId())) {
+          return res.status(403).json({ message: "The owner account cannot be deleted" });
+        }
+        if (!(await isOwnerSession(req))) {
+          return res.status(403).json({ message: "Only the owner can delete admin accounts" });
+        }
+      }
       
       const success = await storage.deleteUser(userId);
       
@@ -1225,7 +1495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get user stats (public - for profile cards)
-  app.get("/api/users/:userId/stats", async (req, res) => {
+  app.get("/api/users/:userId/stats", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUser(req.params.userId);
       if (!user) {
@@ -1244,33 +1514,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch user stats" });
-    }
-  });
-
-  // Search user by email (for admin handover)
-  app.get("/api/users/search", requireAuth, async (req, res) => {
-    try {
-      const { email } = req.query;
-      
-      if (!email || typeof email !== "string") {
-        return res.status(400).json({ message: "Email query parameter required" });
-      }
-      
-      const user = await storage.getUserByEmail(email);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      // Return limited info
-      res.json({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to search user" });
     }
   });
 
@@ -1306,7 +1549,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/scopes", requireAuth, async (req, res) => {
     try {
       const scopes = await storage.getAllScopes();
-      res.json(scopes);
+      // Access codes are secrets: only admins may see them
+      if (await isAdminSession(req)) {
+        return res.json(scopes);
+      }
+      res.json(scopes.map(({ accessCode, ...scope }) => scope));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch scopes" });
     }
@@ -1319,7 +1566,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!scope) {
         return res.status(404).json({ message: "Scope not found" });
       }
-      res.json(scope);
+      if (await isAdminSession(req)) {
+        return res.json(scope);
+      }
+      const { accessCode, ...publicScope } = scope;
+      res.json(publicScope);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch scope" });
     }
@@ -1461,9 +1712,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get posts (by scope or public square)
   app.get("/api/posts", requireAuth, async (req, res) => {
     try {
-      const scopeId = req.query.scopeId as string | undefined;
-      const userId = req.session.userId!;
-      const posts = await storage.getPosts(scopeId === "null" ? null : scopeId, userId);
+      const rawScopeId = req.query.scopeId as string | undefined;
+      const scopeId = !rawScopeId || rawScopeId === "null" ? null : rawScopeId;
+      if (!(await canAccessScope(req, scopeId))) {
+        return res.status(403).json({ message: "You don't have access to this scope. Please enter the access code first." });
+      }
+      // Optional paging: ?limit=20&offset=40&sort=newest|oldest|mostLiked|highestCredibility
+      const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 0, 0), 100) || undefined;
+      const offset = Math.max(parseInt(req.query.offset as string) || 0, 0) || undefined;
+      const sortParam = req.query.sort as string | undefined;
+      const sort = (["newest", "oldest", "mostLiked", "highestCredibility"] as const).find((option) => option === sortParam);
+      const posts = await storage.getPosts(scopeId, req.session.userId, { limit, offset, sort });
       res.json(posts);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch posts" });
@@ -1527,14 +1786,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete post (admin only)
-  app.delete("/api/posts/:id", requireAdmin, async (req, res) => {
+  // Delete post (author or admin)
+  app.delete("/api/posts/:id", requireAuth, requireNonVisitor, async (req, res) => {
     try {
       const postId = req.params.id;
       
       const post = await storage.getPost(postId);
       if (!post) {
         return res.status(404).json({ message: "Post not found" });
+      }
+      
+      if (post.authorId !== req.session.userId && !(await isAdminSession(req))) {
+        return res.status(403).json({ message: "Only the author or an admin can delete this post" });
       }
       
       const success = await storage.deletePost(postId);
@@ -1652,8 +1915,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/events", requireAuth, async (req, res) => {
     try {
       const scopeId = req.query.scopeId as string | undefined;
-      const userId = req.session.userId;
-      const events = await storage.getEvents(scopeId, userId);
+      if (!(await canAccessScope(req, scopeId))) {
+        return res.status(403).json({ message: "You don't have access to this scope. Please enter the access code first." });
+      }
+      const events = await storage.getEvents(scopeId, req.session.userId);
       res.json(events);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch events" });
@@ -1663,8 +1928,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get single event by ID
   app.get("/api/events/:id", requireAuth, async (req, res) => {
     try {
-      const events = await storage.getEvents(undefined, req.session.userId);
-      const event = events.find(e => e.id === req.params.id);
+      const base = await storage.getEvent(req.params.id);
+      if (!base || !(await canAccessScope(req, base.scopeId))) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      const [event] = (await storage.getEvents(base.scopeId ?? undefined, req.session.userId))
+        .filter(e => e.id === base.id);
       if (!event) {
         return res.status(404).json({ message: "Event not found" });
       }
@@ -1696,14 +1965,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await requireModeration(req.body.description);
       }
       
-      // Parse dates if provided
-      const updates: any = { ...req.body };
-      if (updates.startTime) {
-        updates.startTime = new Date(updates.startTime);
-      }
-      if (updates.endTime) {
-        updates.endTime = new Date(updates.endTime);
-      }
+      // Only allow editing content fields (never owner or scope)
+      const { title, description, eventType, location, imageUrl, startTime, endTime } = req.body;
+      const updates: any = {};
+      if (title !== undefined) updates.title = title;
+      if (description !== undefined) updates.description = description;
+      if (eventType === "curricular" || eventType === "extracurricular") updates.eventType = eventType;
+      if (location !== undefined) updates.location = location;
+      if (imageUrl !== undefined) updates.imageUrl = imageUrl;
+      if (startTime) updates.startTime = new Date(startTime);
+      if (endTime) updates.endTime = new Date(endTime);
       
       const updated = await storage.updateEvent(eventId, updates);
       res.json(updated);
@@ -1781,7 +2052,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/events/:id/attendees", requireAuth, async (req, res) => {
     try {
       const attendees = await storage.getEventAttendees(req.params.id);
-      res.json(attendees);
+      res.json(attendees.map(toPublicUser));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch event attendees" });
     }
@@ -1899,40 +2170,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[TEACHER CREATE] Database error:", error instanceof Error ? error.message : String(error));
       console.error("[TEACHER CREATE] Full error:", error);
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      res.status(500).json({ message: "Failed to create teacher", error: errorMsg });
+      res.status(500).json({ message: "Failed to create teacher" });
     }
   });
   
   // Get all teachers
   app.get("/api/teachers", requireAuth, async (req, res) => {
     try {
-      console.log("[TEACHER GET] Fetching all teachers");
       const teachers = await storage.getTeachers();
-      console.log("[TEACHER GET] Success, found", teachers.length, "teachers");
-      res.json(teachers);
+      if (await isAdminSession(req)) {
+        return res.json(teachers);
+      }
+      res.json(teachers.map(toPublicTeacher));
     } catch (error) {
       console.error("[TEACHER GET] Error:", error instanceof Error ? error.message : String(error));
       console.error("[TEACHER GET] Full error:", error);
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      res.status(500).json({ message: "Failed to fetch teachers", error: errorMsg });
+      res.status(500).json({ message: "Failed to fetch teachers" });
     }
   });
   
   // Get single teacher with reviews and average rating
   app.get("/api/teachers/:id", requireAuth, async (req, res) => {
     try {
-      console.log("[TEACHER GET BY ID] Fetching teacher:", req.params.id);
       const result = await storage.getTeacherWithReviews(req.params.id);
       if (!result) {
         return res.status(404).json({ message: "Teacher not found" });
       }
-      console.log("[TEACHER GET BY ID] Success");
-      res.json(result);
+      if (await isAdminSession(req)) {
+        return res.json(result);
+      }
+      res.json({ ...result, teacher: toPublicTeacher(result.teacher) });
     } catch (error) {
       console.error("[TEACHER GET BY ID] Error:", error instanceof Error ? error.message : String(error));
       console.error("[TEACHER GET BY ID] Full error:", error);
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      res.status(500).json({ message: "Failed to fetch teacher", error: errorMsg });
+      res.status(500).json({ message: "Failed to fetch teacher" });
     }
   });
 
@@ -1947,13 +2220,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Teacher not found" });
       }
       
-      if (existingTeacher.isClaimed) {
-        return res.status(403).json({ 
-          message: "This teacher profile has been claimed and can only be edited by the teacher themselves" 
-        });
+      // Admins always control subject/section assignment and admin notes.
+      // Personal fields of a claimed profile belong to the teacher.
+      const adminFields = ["subjects", "sections", "adminNotes"] as const;
+      const personalFields = ["name", "photoUrl", "description", "academicAchievements", "classroomRules"] as const;
+      const allowed: readonly string[] = existingTeacher.isClaimed ? adminFields : [...adminFields, ...personalFields];
+      const updates: Record<string, unknown> = {};
+      for (const key of allowed) {
+        if (req.body[key] !== undefined) updates[key] = req.body[key];
       }
-      
-      const updates = req.body;
       const teacher = await storage.updateTeacher(req.params.id, updates);
       if (!teacher) {
         return res.status(404).json({ message: "Teacher not found" });
@@ -1964,7 +2239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[TEACHER UPDATE] Error:", error instanceof Error ? error.message : String(error));
       console.error("[TEACHER UPDATE] Full error:", error);
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      res.status(500).json({ message: "Failed to update teacher", error: errorMsg });
+      res.status(500).json({ message: "Failed to update teacher" });
     }
   });
   
@@ -2026,6 +2301,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (teacher.isClaimed) {
         return res.status(400).json({ message: "This teacher profile has already been claimed" });
+      }
+      
+      const claimant = await storage.getUser(userId);
+      if (claimant?.role !== "student") {
+        return res.status(403).json({ message: "Only student accounts can be converted into teacher accounts" });
       }
       
       // Claim the profile
@@ -2091,7 +2371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[TEACHER DELETE] Error:", error instanceof Error ? error.message : String(error));
       console.error("[TEACHER DELETE] Full error:", error);
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      res.status(500).json({ message: "Failed to delete teacher", error: errorMsg });
+      res.status(500).json({ message: "Failed to delete teacher" });
     }
   });
   
@@ -2159,7 +2439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[FEEDBACK CREATE] Error:", error instanceof Error ? error.message : String(error));
       console.error("[FEEDBACK CREATE] Full error:", error);
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      res.status(500).json({ message: "Failed to submit feedback", error: errorMsg });
+      res.status(500).json({ message: "Failed to submit feedback" });
     }
   });
 
@@ -2176,8 +2456,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No feedback found to update. Please submit new feedback first." });
       }
 
-      // Validate update data (allow partial updates)
-      const updateData = req.body;
+      // Validate update data (allow partial updates, only rating fields + notes)
+      const updateData = insertTeacherFeedbackSchema
+        .pick({ clarity: true, instruction: true, communication: true, patience: true, motivation: true, improvement: true, notes: true })
+        .partial()
+        .parse(req.body);
       const updated = await storage.updateTeacherFeedback(teacherId, studentId, updateData);
       
       if (!updated) {
@@ -2187,10 +2470,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[FEEDBACK UPDATE] Success:", updated.id);
       res.json(updated);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
       console.error("[FEEDBACK UPDATE] Error:", error instanceof Error ? error.message : String(error));
       console.error("[FEEDBACK UPDATE] Full error:", error);
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      res.status(500).json({ message: "Failed to update feedback", error: errorMsg });
+      res.status(500).json({ message: "Failed to update feedback" });
     }
   });
 
@@ -2223,13 +2509,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[FEEDBACK STATS] Error:", error instanceof Error ? error.message : String(error));
       console.error("[FEEDBACK STATS] Full error:", error);
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      res.status(500).json({ message: "Failed to fetch feedback statistics", error: errorMsg });
+      res.status(500).json({ message: "Failed to fetch feedback statistics" });
     }
   });
 
   // ==================== POST COMMENTS ====================
   app.post("/api/posts/:postId/comments", requireAuth, requireNonVisitor, async (req, res) => {
     try {
+      if (req.body.content?.trim()) {
+        await requireModeration(req.body.content);
+      }
       const commentData = insertPostCommentSchema.parse({
         ...req.body,
         postId: req.params.postId,
@@ -2241,6 +2530,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      if (error instanceof Error && error.message.includes("community guidelines")) {
+        return res.status(400).json({ message: error.message });
       }
       res.status(500).json({ message: "Failed to create comment" });
     }
@@ -2258,6 +2550,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== EVENT COMMENTS ====================
   app.post("/api/events/:eventId/comments", requireAuth, requireNonVisitor, async (req, res) => {
     try {
+      if (req.body.content?.trim()) {
+        await requireModeration(req.body.content);
+      }
       const commentData = insertEventCommentSchema.parse({
         ...req.body,
         eventId: req.params.eventId,
@@ -2269,6 +2564,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      if (error instanceof Error && error.message.includes("community guidelines")) {
+        return res.status(400).json({ message: error.message });
       }
       res.status(500).json({ message: "Failed to create comment" });
     }
@@ -2290,6 +2588,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { receiverId } = req.body;
       const senderId = req.session.userId!;
       
+      if (!receiverId || typeof receiverId !== "string" || !(await storage.getUser(receiverId))) {
+        return res.status(400).json({ message: "User not found" });
+      }
+      
       if (senderId === receiverId) {
         return res.status(400).json({ message: "Cannot send friend request to yourself" });
       }
@@ -2309,7 +2611,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/friends/accept/:friendshipId", requireNonVisitor, async (req, res) => {
     try {
-      const friendship = await storage.acceptFriendRequest(req.params.friendshipId);
+      const friendship = await storage.acceptFriendRequest(req.params.friendshipId, req.session.userId!);
       if (!friendship) {
         return res.status(404).json({ message: "Friend request not found" });
       }
@@ -2322,7 +2624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/friends/reject/:friendshipId", requireNonVisitor, async (req, res) => {
     try {
-      const friendship = await storage.rejectFriendRequest(req.params.friendshipId);
+      const friendship = await storage.rejectFriendRequest(req.params.friendshipId, req.session.userId!);
       if (!friendship) {
         return res.status(404).json({ message: "Friend request not found" });
       }
@@ -2336,7 +2638,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/friends", requireNonVisitor, async (req, res) => {
     try {
       const friends = await storage.getFriends(req.session.userId!);
-      res.json(friends);
+      res.json(friends.map(toPublicUser));
     } catch (error) {
       console.error("Get friends error:", error);
       res.status(500).json({ message: "Failed to fetch friends" });
@@ -2346,7 +2648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/friends/requests", requireNonVisitor, async (req, res) => {
     try {
       const requests = await storage.getPendingFriendRequests(req.session.userId!);
-      res.json(requests);
+      res.json(requests.map((r) => ({ ...r, initiator: toPublicUser(r.initiator) })));
     } catch (error) {
       console.error("Get friend requests error:", error);
       res.status(500).json({ message: "Failed to fetch friend requests" });
@@ -2407,7 +2709,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.applyPunishment(
           messageData.senderId,
           punishment.credibilityPenalty,
-          punishment.banDurationHours ? new Date(Date.now() + punishment.banDurationHours * 60 * 60 * 1000) : undefined
+          punishment.banDurationHours ? new Date(Date.now() + punishment.banDurationHours * 60 * 60 * 1000) : undefined,
+          punishment.punishmentType === "permanent_ban"
         );
         
         return res.status(400).json({ 
@@ -2440,7 +2743,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/chat/messages/:messageId/read", requireNonVisitor, async (req, res) => {
     try {
-      const message = await storage.markMessageAsRead(req.params.messageId);
+      const message = await storage.markMessageAsRead(req.params.messageId, req.session.userId!);
       if (!message) {
         return res.status(404).json({ message: "Message not found" });
       }
@@ -2469,17 +2772,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { scopeId } = req.query;
       const userId = req.session.userId;
       
-      // If specific scope requested, check access
-      if (scopeId && scopeId !== "public" && userId) {
-        const hasAccess = await storage.hasAccessToScope(userId, scopeId as string);
-        const user = await storage.getUser(userId);
-        if (!hasAccess && user?.role !== "admin") {
-          return res.status(403).json({ message: "You don't have access to this scope" });
-        }
+      // No scope (or "public") means public sources only; never return every scope at once
+      const targetScope = !scopeId || scopeId === "public" ? null : (scopeId as string);
+      if (!(await canAccessScope(req, targetScope))) {
+        return res.status(403).json({ message: "You don't have access to this scope" });
       }
       
-      // Get sources - null scopeId for public, string for specific scope
-      const sources = await storage.getStudySources(scopeId === "public" ? null : (scopeId as string));
+      const sources = await storage.getStudySources(targetScope);
       
       // Enrich with author info
       const enrichedSources = await Promise.all(sources.map(async (source) => {
@@ -2515,12 +2814,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Check scope access if not public
-      if (scopeId && scopeId !== "public") {
-        const hasAccess = await storage.hasAccessToScope(userId, scopeId);
-        const user = await storage.getUser(userId);
-        if (!hasAccess && user?.role !== "admin") {
-          return res.status(403).json({ message: "You don't have access to this scope" });
-        }
+      if (scopeId && scopeId !== "public" && !(await storage.hasAccessToScope(userId, scopeId))) {
+        return res.status(403).json({ message: "You don't have access to this scope" });
       }
       
       const sourceData = {
@@ -2716,13 +3011,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You can only edit your own profile" });
       }
       
-      const { name, photoUrl, subjects, sections, description, classroomRules, academicAchievements } = req.body;
+      // Subjects and sections are assigned by admins (they drive schedule auto-population)
+      const { name, photoUrl, description, classroomRules, academicAchievements } = req.body;
       
       const updates: any = {};
       if (name) updates.name = name;
       if (photoUrl !== undefined) updates.photoUrl = photoUrl;
-      if (subjects) updates.subjects = subjects;
-      if (sections) updates.sections = sections;
       if (description !== undefined) updates.description = description;
       if (classroomRules) updates.classroomRules = classroomRules;
       if (academicAchievements) updates.academicAchievements = academicAchievements;

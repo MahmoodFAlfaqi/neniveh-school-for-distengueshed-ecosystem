@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useDigitalKeys } from "@/hooks/use-digital-keys";
+import { useDigitalKeys, canAccessScope, useCurrentUserForAccess } from "@/hooks/use-digital-keys";
 import { UnlockScopeDialog } from "@/components/UnlockScopeDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Lock, Unlock, Key } from "lucide-react";
-import type { Scope, DigitalKey } from "@shared/schema";
+import type { Scope } from "@shared/schema";
 
 export default function KeysPage() {
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
@@ -18,7 +18,9 @@ export default function KeysPage() {
 
   const { data: keys = [], isLoading: loadingKeys } = useDigitalKeys();
 
-  const hasKey = (scopeId: string) => keys.some((key) => key.scopeId === scopeId);
+  const user = useCurrentUserForAccess();
+  // Own grade/class and admin access count as unlocked, not only entered codes
+  const hasAccess = (scope: Scope) => canAccessScope(scope, user, keys);
 
   const handleUnlockClick = (scope: Scope) => {
     setSelectedScope(scope);
@@ -26,31 +28,31 @@ export default function KeysPage() {
   };
 
   const getScopeDisplayName = (scope: Scope) => {
-    if (scope.type === "global") return "Public Square (Global)";
-    if (scope.type === "stage") return `Grade ${scope.stageLevel}`;
+    if (scope.type === "public") return "Public Square";
+    if (scope.type === "grade") return `Grade ${scope.gradeNumber}`;
     if (scope.type === "section") return scope.sectionName || "Unknown Section";
     return scope.name;
   };
 
   const getScopeBadgeType = (scope: Scope) => {
-    if (scope.type === "global") return "default";
-    if (scope.type === "stage") return "secondary";
+    if (scope.type === "public") return "default";
+    if (scope.type === "grade") return "secondary";
     return "outline";
   };
 
-  const globalScope = scopes.find((s) => s.type === "global");
-  const stageScopes = scopes.filter((s) => s.type === "stage").sort((a, b) => (a.stageLevel || 0) - (b.stageLevel || 0));
+  const globalScope = scopes.find((s) => s.type === "public");
+  const stageScopes = scopes.filter((s) => s.type === "grade").sort((a, b) => (a.gradeNumber || 0) - (b.gradeNumber || 0));
   const sectionScopes = scopes.filter((s) => s.type === "section").sort((a, b) => (a.sectionName || "").localeCompare(b.sectionName || ""));
 
   const isLoading = loadingScopes || loadingKeys;
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="px-4 py-6 sm:p-6">
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Key className="w-8 h-8 text-primary" />
           <div>
-            <h1 className="text-3xl font-bold" data-testid="text-page-title">
+            <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-page-title">
               Keys & Scopes
             </h1>
             <p className="text-muted-foreground" data-testid="text-page-description">
@@ -88,7 +90,7 @@ export default function KeysPage() {
                       scope={scope}
                       displayName={getScopeDisplayName(scope)}
                       badgeType={getScopeBadgeType(scope)}
-                      isUnlocked={hasKey(scope.id)}
+                      isUnlocked={hasAccess(scope)}
                       onUnlockClick={() => handleUnlockClick(scope)}
                     />
                   ))}
@@ -106,7 +108,7 @@ export default function KeysPage() {
                       scope={scope}
                       displayName={getScopeDisplayName(scope)}
                       badgeType={getScopeBadgeType(scope)}
-                      isUnlocked={hasKey(scope.id)}
+                      isUnlocked={hasAccess(scope)}
                       onUnlockClick={() => handleUnlockClick(scope)}
                     />
                   ))}
@@ -154,7 +156,7 @@ function ScopeCard({
   isUnlocked: boolean;
   onUnlockClick: () => void;
 }) {
-  const isGlobal = scope.type === "global";
+  const isGlobal = scope.type === "public";
 
   return (
     <Card

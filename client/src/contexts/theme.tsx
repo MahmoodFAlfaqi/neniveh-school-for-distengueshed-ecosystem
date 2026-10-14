@@ -16,23 +16,31 @@ function getSystemTheme(): "light" | "dark" {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
-    const stored = localStorage.getItem("theme");
-    if (stored === "light" || stored === "dark" || stored === "system") {
-      return stored;
+    try {
+      const stored = localStorage.getItem("theme");
+      if (stored === "light" || stored === "dark" || stored === "system") {
+        return stored;
+      }
+    } catch {
+      // Storage can be blocked (private mode); fall back to system
     }
     return "system";
   });
 
   useEffect(() => {
-    localStorage.setItem("theme", theme);
+    try {
+      localStorage.setItem("theme", theme);
+    } catch {
+      // ignore
+    }
     
     const applyTheme = () => {
       const effectiveTheme = theme === "system" ? getSystemTheme() : theme;
-      if (effectiveTheme === "dark") {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
+      document.documentElement.classList.toggle("dark", effectiveTheme === "dark");
+      // Keep the phone's browser bar in sync with the app background
+      document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+        meta.setAttribute("content", effectiveTheme === "dark" ? "#16141f" : "#f5f3fb");
+      });
     };
     
     applyTheme();
